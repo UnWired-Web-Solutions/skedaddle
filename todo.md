@@ -215,3 +215,13 @@
 - [x] Add note for newly activated GBP profiles (many zero months)
 - [x] Fix grammar: singular/plural suburb names in opportunity callouts
 - [x] Re-upload all 15 corrected reports
+
+## Revenue Data Validation (Jul 28, 2026 — Dave Loom Feedback)
+- [x] CRITICAL: Investigate revenue doubling — London shows $2.64M vs actual $1.08M (Barry says double)
+- [x] CRITICAL: Investigate Denver suburb revenue rankings — Aurora shows highest but Salesforce says Denver > Littleton > Aurora
+- [x] Validate all territory revenue numbers against CSV source data
+- [x] Fix root cause of revenue discrepancy (Looker CSV double-counting + AI-fabricated data for missing territories)
+- [x] Regenerate all 18 territory reports with corrected revenue data from Kira's verified Salesforce exports
+- [ ] Send validation summary to Dave/Ryan/Barry
+- [ ] Future: Investigate Salesforce MCP/API for direct data access
+- [ ] Use Basecamp for communication going forward (Dave's request)
