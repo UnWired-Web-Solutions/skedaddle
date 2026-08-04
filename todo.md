@@ -236,4 +236,4 @@
 - [x] Create client/src/pages/SalesforceConnect.tsx (admin-only page with connect button + status)
 - [x] Wire /salesforce route in App.tsx + sidebar nav (admin only)
 - [x] Write vitest tests for Salesforce router
-- [ ] Prepare Monday meeting guide for Barry
+- [x] Prepare Monday meeting guide for Barry

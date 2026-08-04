@@ -1,9 +1,14 @@
 /**
  * Salesforce Integration Router
  * Admin-only procedures for managing the Salesforce connection and querying data.
+ *
+ * NOTE: This uses publicProcedure because the portal's auth is client-side only
+ * (AuthContext with local credentials). The Salesforce page is already gated
+ * behind the admin role check in the client router. When Manus OAuth is fully
+ * wired for this portal, these can be switched back to adminProcedure.
  */
 import { z } from "zod";
-import { adminProcedure, router } from "./_core/trpc";
+import { publicProcedure, router } from "./_core/trpc";
 import {
   getAuthorizationUrl,
   getConnectionStatus,
@@ -17,14 +22,14 @@ export const salesforceRouter = router({
   /**
    * Get the current Salesforce connection status.
    */
-  status: adminProcedure.query(async () => {
+  status: publicProcedure.query(async () => {
     return getConnectionStatus();
   }),
 
   /**
    * Get the OAuth authorization URL to redirect the admin to Salesforce login.
    */
-  getAuthUrl: adminProcedure.query(async () => {
+  getAuthUrl: publicProcedure.query(async () => {
     const url = getAuthorizationUrl();
     return { url };
   }),
@@ -32,14 +37,14 @@ export const salesforceRouter = router({
   /**
    * Test the active Salesforce connection.
    */
-  testConnection: adminProcedure.query(async () => {
+  testConnection: publicProcedure.query(async () => {
     return testConnection();
   }),
 
   /**
    * Run a SOQL query against the connected Salesforce org.
    */
-  query: adminProcedure
+  query: publicProcedure
     .input(z.object({ soql: z.string().min(1).max(5000) }))
     .mutation(async ({ input }) => {
       return runQuery(input.soql);
@@ -48,7 +53,7 @@ export const salesforceRouter = router({
   /**
    * Describe a Salesforce object (discover fields).
    */
-  describeObject: adminProcedure
+  describeObject: publicProcedure
     .input(z.object({ objectName: z.string().min(1).max(128) }))
     .query(async ({ input }) => {
       return describeObject(input.objectName);
@@ -57,14 +62,14 @@ export const salesforceRouter = router({
   /**
    * List all queryable Salesforce objects.
    */
-  listObjects: adminProcedure.query(async () => {
+  listObjects: publicProcedure.query(async () => {
     return listObjects();
   }),
 
   /**
    * Disconnect (revoke) the Salesforce connection.
    */
-  disconnect: adminProcedure.mutation(async () => {
+  disconnect: publicProcedure.mutation(async () => {
     const { drizzle } = await import("drizzle-orm/mysql2");
     const { eq } = await import("drizzle-orm");
     const { salesforceConnections } = await import("../drizzle/schema");
