@@ -225,3 +225,15 @@
 - [ ] Send validation summary to Dave/Ryan/Barry
 - [ ] Future: Investigate Salesforce MCP/API for direct data access
 - [ ] Use Basecamp for communication going forward (Dave's request)
+
+## Salesforce Integration (Aug 4, 2026)
+- [x] Install jsforce package
+- [x] Add Salesforce OAuth env vars to server env config (SF_CLIENT_ID, SF_CLIENT_SECRET, SF_LOGIN_URL)
+- [x] Create salesforce_connections DB table (stores refresh_token, access_token, instance_url per org)
+- [x] Create server/salesforceClient.ts (jsforce connection helper with token refresh)
+- [x] Create server/salesforceRouter.ts (tRPC procedures: connect status, initiate OAuth, schema discovery, data queries)
+- [x] Add Salesforce OAuth callback route to server/_core/oauth.ts
+- [x] Create client/src/pages/SalesforceConnect.tsx (admin-only page with connect button + status)
+- [x] Wire /salesforce route in App.tsx + sidebar nav (admin only)
+- [x] Write vitest tests for Salesforce router
+- [ ] Prepare Monday meeting guide for Barry

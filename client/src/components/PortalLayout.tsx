@@ -7,6 +7,7 @@ import {
   BarChart3,
   BookOpen,
   ChevronRight,
+  Cloud,
   FileText,
   ImageIcon,
   LayoutDashboard,
@@ -33,6 +34,7 @@ const TOP_NAV: NavItem[] = [
   { label: "GBP Images", href: "/gbp-images", icon: <ImageIcon size={16} /> },
   { label: "Analytics", href: "/analytics", icon: <LineChart size={16} /> },
   { label: "Resources", href: "/resources", icon: <BookOpen size={16} />, adminOnly: true },
+  { label: "Salesforce", href: "/salesforce", icon: <Cloud size={16} />, adminOnly: true },
 ];
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {

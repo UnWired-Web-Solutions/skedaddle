@@ -7,4 +7,9 @@ export const ENV = {
   isProduction: process.env.NODE_ENV === "production",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
+  // Salesforce OAuth2 Connected App credentials
+  sfClientId: process.env.SF_CLIENT_ID ?? "",
+  sfClientSecret: process.env.SF_CLIENT_SECRET ?? "",
+  sfLoginUrl: process.env.SF_LOGIN_URL ?? "https://login.salesforce.com",
+  sfRedirectUri: process.env.SF_REDIRECT_URI ?? "",
 };

@@ -59,3 +59,34 @@ export const gbpMetrics = mysqlTable("gbp_metrics", {
 
 export type GBPMetric = typeof gbpMetrics.$inferSelect;
 export type InsertGBPMetric = typeof gbpMetrics.$inferInsert;
+
+// ─── Salesforce Integration ──────────────────────────────────────────────────
+
+/**
+ * Stores Salesforce OAuth connection credentials.
+ * Only one active connection per org is expected (Skedaddle's Salesforce instance).
+ */
+export const salesforceConnections = mysqlTable("salesforce_connections", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Friendly label for this connection */
+  label: varchar("label", { length: 128 }).notNull().default("Skedaddle Salesforce"),
+  /** Salesforce instance URL (e.g. https://na1.salesforce.com) */
+  instanceUrl: text("instanceUrl").notNull(),
+  /** OAuth2 access token (short-lived, auto-refreshed) */
+  accessToken: text("accessToken").notNull(),
+  /** OAuth2 refresh token (long-lived) */
+  refreshToken: text("refreshToken").notNull(),
+  /** Salesforce user ID that authorized the connection */
+  sfUserId: varchar("sfUserId", { length: 64 }),
+  /** Salesforce org ID */
+  sfOrgId: varchar("sfOrgId", { length: 64 }),
+  /** Connection status */
+  status: mysqlEnum("status", ["active", "expired", "revoked"]).default("active").notNull(),
+  /** Who in our system created this connection */
+  createdByUserId: int("createdByUserId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type SalesforceConnection = typeof salesforceConnections.$inferSelect;
+export type InsertSalesforceConnection = typeof salesforceConnections.$inferInsert;

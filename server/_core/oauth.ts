@@ -11,6 +11,26 @@ function getQueryParam(req: Request, key: string): string | undefined {
 }
 
 export function registerOAuthRoutes(app: Express) {
+  // ─── Salesforce OAuth Callback ─────────────────────────────────────────────
+  app.get("/api/oauth/salesforce/callback", async (req: Request, res: Response) => {
+    const code = getQueryParam(req, "code");
+    if (!code) {
+      res.status(400).json({ error: "Authorization code is required" });
+      return;
+    }
+
+    try {
+      const { handleOAuthCallback } = await import("../salesforceClient");
+      await handleOAuthCallback(code);
+      // Redirect to the Salesforce connection page with success
+      res.redirect(302, "/salesforce?connected=true");
+    } catch (error) {
+      console.error("[Salesforce OAuth] Callback failed", error);
+      res.redirect(302, "/salesforce?error=connection_failed");
+    }
+  });
+
+  // ─── Manus OAuth Callback ──────────────────────────────────────────────────
   app.get("/api/oauth/callback", async (req: Request, res: Response) => {
     const code = getQueryParam(req, "code");
     const state = getQueryParam(req, "state");

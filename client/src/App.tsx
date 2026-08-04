@@ -15,6 +15,7 @@ import Resources from "./pages/Resources";
 import Tools from "./pages/Tools";
 import GbpImageGenerator from "./pages/GbpImageGenerator";
 import Analytics from "./pages/Analytics";
+import SalesforceConnect from "./pages/SalesforceConnect";
 import { Redirect, Route, Switch } from "wouter";
 
 // Protected route — redirects to /login if not authenticated
@@ -67,6 +68,9 @@ function Router() {
       </Route>
       <Route path="/analytics">
         <ProtectedRoute component={Analytics} />
+      </Route>
+      <Route path="/salesforce">
+        <ProtectedRoute component={SalesforceConnect} adminOnly />
       </Route>
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
