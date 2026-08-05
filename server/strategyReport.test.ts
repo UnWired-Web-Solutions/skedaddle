@@ -63,7 +63,17 @@ describe("Strategy Report Router", () => {
     expect(data.topSpeciesNames.length).toBeGreaterThan(0);
     expect(data.topSuburbNames.length).toBeGreaterThan(0);
     expect(data.seasonalTiming).toBeDefined();
-    expect(data.networkCloseRate).toBe(57);
+    expect(data.networkAvgJobValue).toBe(2203);
+    expect(data.subMarkets).toBeDefined();
+    expect(data.subMarkets.length).toBeGreaterThan(0);
+    expect(data.gbpSubListings).toBeDefined();
+    expect(data.suburbPageStatus).toBeDefined();
+    expect(data.currentGbpPostVolume).toBeDefined();
+    // Hamilton should have partial page validation data
+    expect(data.suburbPageStatus).toBe("partial");
+    // Species should have network benchmarks
+    expect(data.species[0].networkAvgJobValue).toBeGreaterThan(0);
+    expect(data.species[0].networkPctRevenue).toBeGreaterThanOrEqual(0);
   });
 
   it("should build territory data for Milwaukee (USD territory)", async () => {

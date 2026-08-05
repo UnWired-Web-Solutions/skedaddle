@@ -23,6 +23,8 @@ export interface TerritoryDataObject {
     total_jobs: number;
     pctRevenue: number;
     avgJobValue: number;
+    networkAvgJobValue: number; // Network-wide benchmark for this species
+    networkPctRevenue: number; // Network-wide % of total revenue for this species
   }>;
   suburbs: Array<{
     suburb: string;
@@ -30,7 +32,7 @@ export interface TerritoryDataObject {
     jobs: number;
     avgJobValue: number;
     pctRevenue: number;
-    hasPage: boolean; // We assume no suburb pages exist unless proven otherwise
+    hasPage: boolean | null; // true = confirmed page, false = confirmed no page, null = unknown
   }>;
   gbp: {
     monthly: Array<{ month: string; searches: number; calls: number; website_clicks: number }>;
@@ -50,7 +52,11 @@ export interface TerritoryDataObject {
   seasonalTiming: string;
   topSpeciesNames: string[];
   topSuburbNames: string[];
-  networkCloseRate: number; // Network average for benchmarking
+  networkAvgJobValue: number; // Network-wide average job value for benchmarking
+  subMarkets: string[]; // Sub-locations that roll up under this territory
+  gbpSubListings: string[]; // GBP listing names for this territory
+  suburbPageStatus: "validated" | "partial" | "unknown"; // Whether page existence data is confirmed
+  currentGbpPostVolume: string; // Derived from actual GBP data
 }
 
 // ─── Section definitions ─────────────────────────────────────────────────────
@@ -96,11 +102,67 @@ const SEASONAL_DATA: Record<string, string> = {
   default: "spring wildlife emergence and denning activity, summer bat maternity season, fall rodent entry pressure, winter attic denning and overwintering",
 };
 
+// ─── Network Species Benchmarks (calculated from all 19 territories) ────────
+
+const NETWORK_SPECIES_BENCHMARKS: Record<string, { avgJobValue: number; pctRevenue: number }> = {
+  "Mice": { avgJobValue: 3207, pctRevenue: 27.5 },
+  "Raccoons": { avgJobValue: 2127, pctRevenue: 22.9 },
+  "Squirrels": { avgJobValue: 1784, pctRevenue: 21.0 },
+  "Bats": { avgJobValue: 2783, pctRevenue: 16.4 },
+  "Birds": { avgJobValue: 864, pctRevenue: 3.7 },
+  "Skunks": { avgJobValue: 2080, pctRevenue: 2.5 },
+  "Rats": { avgJobValue: 2410, pctRevenue: 2.3 },
+  "Red Squirrels": { avgJobValue: 2054, pctRevenue: 1.6 },
+  "Groundhogs": { avgJobValue: 2258, pctRevenue: 0.5 },
+  "Chipmunks": { avgJobValue: 2063, pctRevenue: 0.3 },
+  "Pigeons": { avgJobValue: 1861, pctRevenue: 0.2 },
+};
+const NETWORK_AVG_JOB_VALUE = 2203; // $22.2M / 10,075 jobs
+
+// ─── Known suburb page existence (from curated action plan data) ─────────────
+// true = confirmed page exists, false = confirmed NO page
+
+const KNOWN_SUBURB_PAGES: Record<string, Record<string, boolean>> = {
+  hamilton: {
+    "Guelph": true,
+    "St. Catharines": true,
+    "Oakville": true,
+    "Burlington": true,
+    "Stoney Creek": false,
+    "Grimsby": false,
+  },
+  durham: {
+    "Pickering": true,
+    "Bowmanville": true,
+    "Oshawa": true,
+    "Whitby": true,
+    "Courtice": false,
+    "Clarington": false,
+  },
+  milwaukee: {
+    "Wauwatosa": true,
+    "New Berlin": true,
+    "Waukesha": true,
+    "Brookfield": true,
+    "Menomonee Falls": false,
+    "Mequon": false,
+  },
+  madison: {
+    "Sun Prairie": true,
+    "DeForest": true,
+    "Middleton": true,
+    "Fitchburg": true,
+    "Verona": false,
+    "Waunakee": false,
+  },
+};
+
 // ─── Build Territory Data Object ─────────────────────────────────────────────
 
 export async function buildTerritoryData(territoryId: string): Promise<TerritoryDataObject> {
   const { DASHBOARD_DATA } = await import("../client/src/data/dashboardData");
   const { FRANCHISE_LOCATIONS } = await import("../client/src/data/franchises");
+  const { TERRITORY_GROUPS } = await import("../shared/territoryMapping");
 
   const location = FRANCHISE_LOCATIONS.find((l: any) => l.id === territoryId);
   if (!location) throw new Error(`Territory not found: ${territoryId}`);
@@ -112,26 +174,47 @@ export async function buildTerritoryData(territoryId: string): Promise<Territory
   const totalJobs = dashData.total_jobs;
   const avgJobValue = totalJobs > 0 ? totalRevenue / totalJobs : 0;
 
-  // Enrich species data
+  // Get territory group for sub-market context
+  const territoryGroup = TERRITORY_GROUPS.find((g: any) => g.id === territoryId);
+  const subMarkets = territoryGroup?.ga4Territories || [location.city];
+  const gbpSubListings = territoryGroup?.gbpTerritories || [location.city];
+
+  // Enrich species data with network benchmarks
   const species = dashData.species
     .filter((s: any) => s.total_revenue > 0)
-    .map((s: any) => ({
-      species: s.species,
-      total_revenue: s.total_revenue,
-      total_jobs: s.total_jobs,
-      pctRevenue: totalRevenue > 0 ? (s.total_revenue / totalRevenue) * 100 : 0,
-      avgJobValue: s.total_jobs > 0 ? s.total_revenue / s.total_jobs : 0,
-    }));
+    .map((s: any) => {
+      const benchmark = NETWORK_SPECIES_BENCHMARKS[s.species];
+      return {
+        species: s.species,
+        total_revenue: s.total_revenue,
+        total_jobs: s.total_jobs,
+        pctRevenue: totalRevenue > 0 ? (s.total_revenue / totalRevenue) * 100 : 0,
+        avgJobValue: s.total_jobs > 0 ? s.total_revenue / s.total_jobs : 0,
+        networkAvgJobValue: benchmark?.avgJobValue || NETWORK_AVG_JOB_VALUE,
+        networkPctRevenue: benchmark?.pctRevenue || 0,
+      };
+    });
 
-  // Enrich suburb data
-  const suburbs = dashData.suburbs.map((s: any) => ({
-    suburb: s.suburb,
-    revenue: s.revenue,
-    jobs: s.jobs,
-    avgJobValue: s.jobs > 0 ? s.revenue / s.jobs : 0,
-    pctRevenue: totalRevenue > 0 ? (s.revenue / totalRevenue) * 100 : 0,
-    hasPage: false, // Default assumption: no suburb pages exist
-  }));
+  // Enrich suburb data with page existence validation
+  const knownPages = KNOWN_SUBURB_PAGES[territoryId] || {};
+  const hasAnyKnownPages = Object.keys(knownPages).length > 0;
+  const suburbs = dashData.suburbs.map((s: any) => {
+    // Check if we have validated page data for this suburb
+    const pageStatus = knownPages[s.suburb];
+    return {
+      suburb: s.suburb,
+      revenue: s.revenue,
+      jobs: s.jobs,
+      avgJobValue: s.jobs > 0 ? s.revenue / s.jobs : 0,
+      pctRevenue: totalRevenue > 0 ? (s.revenue / totalRevenue) * 100 : 0,
+      hasPage: pageStatus !== undefined ? pageStatus : null, // null = unknown
+    };
+  });
+
+  // Determine suburb page validation status
+  const suburbPageStatus: "validated" | "partial" | "unknown" = hasAnyKnownPages
+    ? (suburbs.every(s => s.hasPage !== null) ? "validated" : "partial")
+    : "unknown";
 
   // GBP aggregation
   const gbpMonthly = dashData.gbp.monthly || [];
@@ -143,6 +226,18 @@ export async function buildTerritoryData(territoryId: string): Promise<Territory
     : { month: "N/A", calls: 0 };
   const avgMonthlyCalls = gbpMonthly.length > 0 ? totalCalls / gbpMonthly.length : 0;
   const avgMonthlyClicks = gbpMonthly.length > 0 ? totalClicks / gbpMonthly.length : 0;
+
+  // Derive current GBP post volume from actual data
+  // GBP monthly data shows activity level — we estimate post volume from engagement patterns
+  const avgMonthlyActivity = gbpMonthly.length > 0
+    ? Math.round((totalCalls + totalClicks) / gbpMonthly.length)
+    : 0;
+  let currentGbpPostVolume: string;
+  if (avgMonthlyActivity === 0) currentGbpPostVolume = "Not tracked (no engagement data)";
+  else if (avgMonthlyActivity < 20) currentGbpPostVolume = "Low activity (est. 1-3 posts/month)";
+  else if (avgMonthlyActivity < 50) currentGbpPostVolume = "Moderate activity (est. 3-5 posts/month)";
+  else if (avgMonthlyActivity < 100) currentGbpPostVolume = "Active (est. 5-10 posts/month)";
+  else currentGbpPostVolume = "High activity (est. 10+ posts/month)";
 
   // GSC data
   const gscMonthly = dashData.gsc.monthly || [];
@@ -180,7 +275,11 @@ export async function buildTerritoryData(territoryId: string): Promise<Territory
     seasonalTiming: SEASONAL_DATA[location.state] || SEASONAL_DATA["default"],
     topSpeciesNames: species.slice(0, 5).map((s: any) => s.species),
     topSuburbNames: suburbs.slice(0, 8).map((s: any) => s.suburb),
-    networkCloseRate: 57, // Network average from Dave's Ottawa data
+    networkAvgJobValue: NETWORK_AVG_JOB_VALUE,
+    subMarkets,
+    gbpSubListings,
+    suburbPageStatus,
+    currentGbpPostVolume,
   };
 }
 
@@ -243,7 +342,8 @@ TERRITORY DATA:
 - Top suburbs/cities by revenue: ${data.topSuburbNames.slice(0, 6).join(", ")}
 - GBP total calls (available period): ${formatNumber(data.gbp.totalCalls)}
 - GBP total website clicks: ${formatNumber(data.gbp.totalClicks)}
-- Network average close rate: ${data.networkCloseRate}%
+- Network average job value: ${formatCurrency(data.networkAvgJobValue, '$')} (benchmark across all 19 territories)
+- This territory's avg job value: ${formatCurrency(data.avgJobValue, data.currencySymbol)} (${data.avgJobValue > data.networkAvgJobValue ? 'above' : 'below'} network average)
 - Seasonal timing: ${data.seasonalTiming}
 
 Write a compelling 3-4 paragraph executive summary that:
@@ -264,17 +364,43 @@ Return ONLY the paragraph text (no headings, no HTML tags, no markdown). Use pla
 }
 
 async function generateGapAnalysis(data: TerritoryDataObject, priorContext: string): Promise<string> {
-  const suburbsWithoutPages = data.suburbs.filter(s => !s.hasPage).slice(0, 10);
-  const suburbGapList = suburbsWithoutPages
-    .map(s => `${s.suburb}: ${formatCurrency(s.revenue, data.currencySymbol)} revenue, ${s.jobs} jobs — NO dedicated page`)
-    .join("\n");
+  // Separate suburbs by page status
+  const confirmedNoPage = data.suburbs.filter(s => s.hasPage === false).slice(0, 10);
+  const unknownPageStatus = data.suburbs.filter(s => s.hasPage === null).slice(0, 10);
+  const confirmedHasPage = data.suburbs.filter(s => s.hasPage === true);
+
+  let suburbGapList: string;
+  let gapFraming: string;
+
+  if (data.suburbPageStatus === "validated" || data.suburbPageStatus === "partial") {
+    // We have validated data
+    const gapSuburbs = confirmedNoPage.length > 0 ? confirmedNoPage : unknownPageStatus;
+    suburbGapList = gapSuburbs
+      .map(s => `${s.suburb}: ${formatCurrency(s.revenue, data.currencySymbol)} revenue, ${s.jobs} jobs — ${s.hasPage === false ? "CONFIRMED no dedicated page" : "page status unverified"}`)
+      .join("\n");
+    if (confirmedHasPage.length > 0) {
+      suburbGapList += `\n\nSuburbs WITH confirmed pages: ${confirmedHasPage.map(s => `${s.suburb} (${formatCurrency(s.revenue, data.currencySymbol)})`).join(", ")}`;
+    }
+    gapFraming = confirmedNoPage.length > 0
+      ? `${confirmedNoPage.length} suburbs have been CONFIRMED to have no dedicated page despite generating significant revenue. ${confirmedHasPage.length} suburbs do have pages. Focus the gap analysis on the confirmed missing pages.`
+      : `Page status is partially validated. ${unknownPageStatus.length} suburbs have unverified page status. Recommend a content audit to confirm gaps.`;
+  } else {
+    // Unknown status — be honest about it
+    suburbGapList = unknownPageStatus
+      .map(s => `${s.suburb}: ${formatCurrency(s.revenue, data.currencySymbol)} revenue, ${s.jobs} jobs — page status NOT YET AUDITED`)
+      .join("\n");
+    gapFraming = `IMPORTANT: Page existence has NOT been audited for this territory. We cannot confirm which suburbs have pages and which do not. Frame this section as a RECOMMENDED audit and opportunity assessment, not a confirmed gap. Do NOT claim pages don't exist — say they need to be verified.`;
+  }
 
   const prompt = `You are writing the "Content Architecture Gap Analysis" section of a franchise digital marketing strategy document for Skedaddle Humane Wildlife Control — the "${data.name}" territory.
 
 PRIOR CONTEXT (from earlier sections):
 ${priorContext}
 
-SUBURB DATA (suburbs generating revenue but with NO dedicated website page):
+PAGE VALIDATION STATUS: ${data.suburbPageStatus}
+${gapFraming}
+
+SUBURB DATA:
 ${suburbGapList}
 
 TERRITORY TOTALS:
@@ -283,12 +409,12 @@ TERRITORY TOTALS:
 - Top species: ${data.topSpeciesNames.join(", ")}
 
 Write 3-4 paragraphs that:
-1. State the structural gap clearly: despite these suburbs generating significant revenue, NONE have dedicated primary pages on the website
-2. Quantify the opportunity — total revenue from suburbs without pages
+1. ${data.suburbPageStatus === "unknown" ? "Acknowledge that a content audit is needed, then frame the opportunity based on revenue concentration in specific suburbs" : "State the confirmed structural gap: specific suburbs generating revenue have no dedicated pages"}
+2. Quantify the opportunity — total revenue from suburbs without confirmed pages (or needing audit)
 3. Explain WHY this matters for SEO: no local page = no organic ranking signal for high-intent searches like "[species] removal [suburb]"
-4. Position this as "the primary structural gap and clearest opportunity for organic search growth"
+4. ${data.suburbPageStatus === "unknown" ? "Recommend a page audit as the first action item, then position the content build as the primary growth opportunity" : "Position this as the primary structural gap and clearest opportunity for organic search growth"}
 
-STYLE: Analytical, revenue-backed, persuasive. Each suburb mentioned must include its actual revenue figure. The tone should make it obvious that NOT building these pages is leaving money on the table.
+STYLE: Analytical, revenue-backed, persuasive. Each suburb mentioned must include its actual revenue figure. ${data.suburbPageStatus === "unknown" ? "Be honest that page status is unverified — do NOT claim pages don't exist without confirmation." : "The tone should make it obvious that NOT building these pages is leaving money on the table."}
 
 Return ONLY paragraph text (no headings, no HTML, no markdown).`;
 
@@ -493,7 +619,30 @@ Return as numbered list (1. ... 2. ... etc.) with no other formatting.`;
 // ─── Deterministic Template Sections ─────────────────────────────────────────
 
 function buildCurrentCampaignHtml(data: TerritoryDataObject): string {
+  // Determine suburb page status text based on validated data
+  const confirmedPages = data.suburbs.filter(s => s.hasPage === true);
+  const confirmedNoPages = data.suburbs.filter(s => s.hasPage === false);
+  const unknownPages = data.suburbs.filter(s => s.hasPage === null);
+
+  let suburbPageText: string;
+  let suburbPageVolume: string;
+  if (data.suburbPageStatus === "validated" || data.suburbPageStatus === "partial") {
+    suburbPageText = confirmedPages.length > 0
+      ? `${confirmedPages.length} confirmed (${confirmedPages.map(s => s.suburb).join(", ")})`
+      : "None confirmed";
+    suburbPageVolume = `${confirmedPages.length} existing${confirmedNoPages.length > 0 ? `, ${confirmedNoPages.length} confirmed missing` : ""}`;
+  } else {
+    suburbPageText = "Not yet audited";
+    suburbPageVolume = "Unknown \u2014 audit required";
+  }
+
+  // Sub-market context
+  const subMarketNote = data.subMarkets.length > 1
+    ? `<p class="narrative"><strong>Territory coverage:</strong> This territory encompasses ${data.subMarkets.length} sub-markets: ${data.subMarkets.join(", ")}. ${data.gbpSubListings.length > 1 ? `GBP listings active in: ${data.gbpSubListings.join(", ")}.` : `Single GBP listing covers the full territory.`}</p>`
+    : "";
+
   return `
+    ${subMarketNote}
     <table class="data-table">
       <thead>
         <tr>
@@ -506,27 +655,27 @@ function buildCurrentCampaignHtml(data: TerritoryDataObject): string {
       <tbody>
         <tr>
           <td>Google Business Profile</td>
-          <td>Active listing, limited posts</td>
+          <td>Active listing${data.gbpSubListings.length > 1 ? ` (${data.gbpSubListings.length} listings)` : ""}</td>
           <td>General / unstructured</td>
-          <td>3-5 posts/month</td>
+          <td>${data.currentGbpPostVolume}</td>
         </tr>
         <tr>
           <td>Blog</td>
           <td>Educational content</td>
           <td>Generic wildlife articles</td>
-          <td>2-3 posts/month</td>
+          <td>2-3 posts/month (estimated)</td>
         </tr>
         <tr>
           <td>Static Pages</td>
-          <td>Existing species pages only</td>
+          <td>Existing species pages</td>
           <td>Service descriptions</td>
           <td>Existing only</td>
         </tr>
         <tr>
           <td>Suburb/City Pages</td>
-          <td>None</td>
-          <td>—</td>
-          <td>0 pages</td>
+          <td>${suburbPageText}</td>
+          <td>${confirmedPages.length > 0 ? "Location-specific service pages" : "\u2014"}</td>
+          <td>${suburbPageVolume}</td>
         </tr>
         <tr>
           <td>Schema Markup</td>
@@ -537,23 +686,31 @@ function buildCurrentCampaignHtml(data: TerritoryDataObject): string {
         <tr>
           <td>Citation/NAP</td>
           <td>Unknown / unaudited</td>
-          <td>—</td>
+          <td>\u2014</td>
           <td>Not tracked</td>
         </tr>
       </tbody>
     </table>
-    <p class="narrative">The current program keeps the listing active and produces a baseline of educational content, but does not systematically target geographic demand. There are no dedicated suburb or city pages despite significant revenue being generated across multiple communities. The GBP post volume is well below what is needed to maintain consistent local pack visibility during peak wildlife seasons.</p>`;
+    <p class="narrative">The current program maintains an active GBP presence with ${data.currentGbpPostVolume} and generates ${formatNumber(Math.round(data.gbp.avgMonthlyCalls))} calls and ${formatNumber(Math.round(data.gbp.avgMonthlyClicks))} website clicks per month on average. ${confirmedNoPages.length > 0 ? `However, ${confirmedNoPages.length} suburbs generating significant revenue (${confirmedNoPages.map(s => s.suburb).join(", ")}) have no dedicated website pages \u2014 representing the clearest content gap.` : data.suburbPageStatus === "unknown" ? "Suburb page coverage has not been audited \u2014 a content audit is recommended to identify geographic gaps." : "Existing suburb pages provide a foundation, but coverage gaps remain for revenue-generating communities."} The GBP post volume is below what is needed to maintain consistent local pack visibility during peak wildlife seasons.</p>`;
 }
 
 function buildSpeciesTableHtml(data: TerritoryDataObject): string {
-  const rows = data.species.slice(0, 12).map(s => `
+  const rows = data.species.slice(0, 12).map(s => {
+    const diff = s.avgJobValue - s.networkAvgJobValue;
+    const diffPct = s.networkAvgJobValue > 0 ? (diff / s.networkAvgJobValue * 100) : 0;
+    const diffClass = diff >= 0 ? 'highlight' : 'status-none';
+    const diffText = diff >= 0 ? `+${formatPct(diffPct)}` : `${formatPct(diffPct)}`;
+    return `
         <tr>
           <td>${s.species}</td>
           <td class="num">${formatNumber(s.total_jobs)}</td>
           <td class="num">${formatCurrency(s.total_revenue, data.currencySymbol)}</td>
           <td class="num">${formatPct(s.pctRevenue)}</td>
           <td class="num">${formatCurrency(s.avgJobValue, data.currencySymbol)}</td>
-        </tr>`).join("");
+          <td class="num">${formatCurrency(s.networkAvgJobValue, '$')}</td>
+          <td class="${diffClass}">${diffText}</td>
+        </tr>`;
+  }).join("");
 
   return `
     <table class="data-table">
@@ -564,6 +721,8 @@ function buildSpeciesTableHtml(data: TerritoryDataObject): string {
           <th>Closed Revenue</th>
           <th>% of Total</th>
           <th>Avg Job Value</th>
+          <th>Network Avg</th>
+          <th>vs. Network</th>
         </tr>
       </thead>
       <tbody>
@@ -574,21 +733,33 @@ function buildSpeciesTableHtml(data: TerritoryDataObject): string {
           <td class="num"><strong>${formatCurrency(data.totalRevenue, data.currencySymbol)}</strong></td>
           <td class="num"><strong>100%</strong></td>
           <td class="num"><strong>${formatCurrency(data.avgJobValue, data.currencySymbol)}</strong></td>
+          <td class="num"><strong>${formatCurrency(data.networkAvgJobValue, '$')}</strong></td>
+          <td class="${data.avgJobValue >= data.networkAvgJobValue ? 'highlight' : 'status-none'}">${data.avgJobValue >= data.networkAvgJobValue ? '+' : ''}${formatPct((data.avgJobValue - data.networkAvgJobValue) / data.networkAvgJobValue * 100)}</td>
         </tr>
       </tbody>
     </table>`;
 }
 
 function buildSuburbTableHtml(data: TerritoryDataObject): string {
-  const rows = data.suburbs.slice(0, 20).map(s => `
+  const rows = data.suburbs.slice(0, 20).map(s => {
+    let pageStatusHtml: string;
+    if (s.hasPage === true) {
+      pageStatusHtml = `<td class="highlight">Yes</td>`;
+    } else if (s.hasPage === false) {
+      pageStatusHtml = `<td class="status-none">No</td>`;
+    } else {
+      pageStatusHtml = `<td style="color:#999;font-style:italic">Unknown</td>`;
+    }
+    return `
         <tr>
           <td>${s.suburb}</td>
           <td class="num">${formatCurrency(s.revenue, data.currencySymbol)}</td>
           <td class="num">${formatNumber(s.jobs)}</td>
           <td class="num">${formatCurrency(s.avgJobValue, data.currencySymbol)}</td>
           <td class="num">${formatPct(s.pctRevenue)}</td>
-          <td class="status-none">None</td>
-        </tr>`).join("");
+          ${pageStatusHtml}
+        </tr>`;
+  }).join("");
 
   return `
     <table class="data-table">
@@ -648,6 +819,17 @@ function buildGbpDataHtml(data: TerritoryDataObject): string {
 }
 
 function buildScaleComparisonHtml(data: TerritoryDataObject): string {
+  const existingPages = data.suburbs.filter(s => s.hasPage === true).length;
+  const missingPages = data.suburbs.filter(s => s.hasPage === false).length;
+  const unknownPages = data.suburbs.filter(s => s.hasPage === null).length;
+  const currentSuburbText = data.suburbPageStatus === "unknown"
+    ? "Unknown (audit needed)"
+    : `${existingPages} confirmed`;
+  const proposedSuburbCount = missingPages > 0 ? missingPages : Math.min(data.suburbs.length, 12);
+  const suburbChangeText = data.suburbPageStatus === "unknown"
+    ? "Audit + build"
+    : missingPages > 0 ? `+${missingPages} net new` : "Optimization";
+
   return `
     <table class="data-table">
       <thead>
@@ -661,27 +843,27 @@ function buildScaleComparisonHtml(data: TerritoryDataObject): string {
       <tbody>
         <tr>
           <td>GBP Posts / Month</td>
-          <td>3-5</td>
+          <td>${data.currentGbpPostVolume}</td>
           <td>35-40</td>
-          <td class="highlight">+10-12×</td>
+          <td class="highlight">Significant increase</td>
         </tr>
         <tr>
           <td>Blog Posts / Month</td>
-          <td>2-3 (educational)</td>
+          <td>2-3 (educational, estimated)</td>
           <td>3-5 (conversion-oriented)</td>
           <td>Same volume, different content</td>
         </tr>
         <tr>
           <td>Suburb/City Pages</td>
-          <td>0</td>
-          <td>${Math.min(data.suburbs.length, 12)} (phased build)</td>
-          <td class="highlight">Net new</td>
+          <td>${currentSuburbText}</td>
+          <td>${existingPages + proposedSuburbCount} total (phased build)</td>
+          <td class="highlight">${suburbChangeText}</td>
         </tr>
         <tr>
           <td>Species × Location Pages</td>
-          <td>0</td>
+          <td>Unknown</td>
           <td>${Math.min(data.species.length * 3, 20)}+</td>
-          <td class="highlight">Net new</td>
+          <td class="highlight">Build required</td>
         </tr>
         <tr>
           <td>Schema Markup</td>
@@ -1201,16 +1383,46 @@ export async function generateStrategyReport(
   // Step 4: Data Foundation — Species Analysis (Template + context)
   onProgress?.("Building Species Revenue Analysis...", 25);
   const speciesTableHtml = buildSpeciesTableHtml(data);
-  const speciesNarrative = `<p class="narrative">${data.species[0]?.species || "Primary species"} leads with ${formatCurrency(data.species[0]?.total_revenue || 0, data.currencySymbol)} in closed revenue (${formatPct(data.species[0]?.pctRevenue || 0)} of total), followed by ${data.species[1]?.species || "secondary species"} at ${formatCurrency(data.species[1]?.total_revenue || 0, data.currencySymbol)}. The top ${Math.min(data.species.length, 3)} species account for ${formatPct(data.species.slice(0, 3).reduce((sum, s) => sum + s.pctRevenue, 0))} of all closed revenue — content and SEO investment should be weighted accordingly.</p>`;
+  // Build species narrative with network benchmarks
+  const topSpecies = data.species[0];
+  const secondSpecies = data.species[1];
+  const aboveNetworkSpecies = data.species.filter(s => s.avgJobValue > s.networkAvgJobValue);
+  const belowNetworkSpecies = data.species.filter(s => s.avgJobValue < s.networkAvgJobValue && s.total_jobs > 10);
+  let benchmarkNote = "";
+  if (aboveNetworkSpecies.length > 0) {
+    benchmarkNote = ` ${aboveNetworkSpecies.slice(0, 2).map(s => s.species).join(" and ")} ${aboveNetworkSpecies.length === 1 ? "shows" : "show"} average job values above the network benchmark, indicating strong pricing or premium service mix.`;
+  }
+  if (belowNetworkSpecies.length > 0) {
+    benchmarkNote += ` ${belowNetworkSpecies.slice(0, 2).map(s => s.species).join(" and ")} ${belowNetworkSpecies.length === 1 ? "falls" : "fall"} below network average — potential opportunity to improve close rates or upsell.`;
+  }
+  const speciesNarrative = `<p class="narrative">${topSpecies?.species || "Primary species"} leads with ${formatCurrency(topSpecies?.total_revenue || 0, data.currencySymbol)} in closed revenue (${formatPct(topSpecies?.pctRevenue || 0)} of total), followed by ${secondSpecies?.species || "secondary species"} at ${formatCurrency(secondSpecies?.total_revenue || 0, data.currencySymbol)}. The top ${Math.min(data.species.length, 3)} species account for ${formatPct(data.species.slice(0, 3).reduce((sum, s) => sum + s.pctRevenue, 0))} of all closed revenue — content and SEO investment should be weighted accordingly.${benchmarkNote} Network-wide average job value: ${formatCurrency(data.networkAvgJobValue, '$')}; this territory averages ${formatCurrency(data.avgJobValue, data.currencySymbol)} (${data.avgJobValue >= data.networkAvgJobValue ? "above" : "below"} benchmark).</p>`;
   sections.push({ id: "species_analysis", title: "Sales & Species Analysis — Revenue by Species", html: speciesTableHtml + speciesNarrative, isAiGenerated: false });
   priorContext += `Top species: ${data.species.slice(0, 3).map(s => `${s.species} (${formatPct(s.pctRevenue)})`).join(", ")}. `;
 
   // Step 5: Suburb/City Revenue (Template)
   onProgress?.("Building Suburb Revenue Analysis...", 32);
   const suburbTableHtml = buildSuburbTableHtml(data);
-  const suburbNarrative = `<p class="narrative">${data.suburbs[0]?.suburb || "Primary market"} leads with ${formatCurrency(data.suburbs[0]?.revenue || 0, data.currencySymbol)} in closed revenue across ${data.suburbs[0]?.jobs || 0} jobs. The top 5 suburbs account for ${formatPct(data.suburbs.slice(0, 5).reduce((sum, s) => sum + s.pctRevenue, 0))} of total territory revenue. Despite this revenue concentration, none of these suburbs have dedicated website pages — representing the primary content gap.</p>`;
+  // Build suburb narrative based on validated page data
+  const confirmedNoPage = data.suburbs.filter(s => s.hasPage === false);
+  const confirmedHasPage = data.suburbs.filter(s => s.hasPage === true);
+  const unknownPage = data.suburbs.filter(s => s.hasPage === null);
+  let suburbNarrativeText: string;
+  if (data.suburbPageStatus === "validated" || data.suburbPageStatus === "partial") {
+    if (confirmedNoPage.length > 0) {
+      suburbNarrativeText = `${data.suburbs[0]?.suburb || "Primary market"} leads with ${formatCurrency(data.suburbs[0]?.revenue || 0, data.currencySymbol)} in closed revenue across ${data.suburbs[0]?.jobs || 0} jobs. The top 5 suburbs account for ${formatPct(data.suburbs.slice(0, 5).reduce((sum, s) => sum + s.pctRevenue, 0))} of total territory revenue. ${confirmedHasPage.length} suburbs have confirmed dedicated pages (${confirmedHasPage.map(s => s.suburb).join(", ")}), while ${confirmedNoPage.length} revenue-generating suburbs (${confirmedNoPage.map(s => s.suburb).join(", ")}) have no dedicated page — representing a clear content gap.`;
+    } else {
+      suburbNarrativeText = `${data.suburbs[0]?.suburb || "Primary market"} leads with ${formatCurrency(data.suburbs[0]?.revenue || 0, data.currencySymbol)} in closed revenue across ${data.suburbs[0]?.jobs || 0} jobs. The top 5 suburbs account for ${formatPct(data.suburbs.slice(0, 5).reduce((sum, s) => sum + s.pctRevenue, 0))} of total territory revenue. All audited suburbs have confirmed dedicated pages — the focus should shift to content quality and optimization.`;
+    }
+  } else {
+    suburbNarrativeText = `${data.suburbs[0]?.suburb || "Primary market"} leads with ${formatCurrency(data.suburbs[0]?.revenue || 0, data.currencySymbol)} in closed revenue across ${data.suburbs[0]?.jobs || 0} jobs. The top 5 suburbs account for ${formatPct(data.suburbs.slice(0, 5).reduce((sum, s) => sum + s.pctRevenue, 0))} of total territory revenue. Page coverage for these suburbs has not yet been audited — a content audit is recommended to identify which revenue-generating suburbs lack dedicated pages.`;
+  }
+  const suburbNarrative = `<p class="narrative">${suburbNarrativeText}</p>`;
   sections.push({ id: "suburb_revenue", title: "Revenue by City — Top Markets", html: suburbTableHtml + suburbNarrative, isAiGenerated: false });
-  priorContext += `Top suburbs: ${data.suburbs.slice(0, 5).map(s => `${s.suburb} (${formatCurrency(s.revenue, data.currencySymbol)})`).join(", ")}. NONE have dedicated pages. `;
+  // Build accurate prior context for AI sections
+  const pageGapContext = data.suburbPageStatus === "unknown"
+    ? `Page status unknown for most suburbs (audit needed).`
+    : `${confirmedNoPage.length} suburbs confirmed without pages (${confirmedNoPage.map(s => s.suburb).join(", ")}). ${confirmedHasPage.length} have confirmed pages.`;
+  priorContext += `Top suburbs: ${data.suburbs.slice(0, 5).map(s => `${s.suburb} (${formatCurrency(s.revenue, data.currencySymbol)})`).join(", ")}. ${pageGapContext} `;
 
   // Step 6: GBP Performance Data (Template)
   onProgress?.("Building GBP Performance section...", 38);
@@ -1222,7 +1434,8 @@ export async function generateStrategyReport(
   onProgress?.("Writing Gap Analysis...", 45);
   const gapHtml = await generateGapAnalysis(data, priorContext);
   sections.push({ id: "gap_analysis", title: "Content Architecture Gap — The Opportunity", html: gapHtml, isAiGenerated: true });
-  priorContext += `Gap analysis: ${data.suburbs.filter(s => !s.hasPage).length} suburbs generating revenue have NO dedicated pages. Primary structural gap identified. `;
+  const suburbsWithoutPages = data.suburbs.filter(s => s.hasPage === false || s.hasPage === null);
+  priorContext += `Gap analysis: ${data.suburbPageStatus === "unknown" ? "Page audit needed — status unknown for most suburbs" : `${confirmedNoPage.length} suburbs confirmed without pages`}. Primary structural gap identified. `;
 
   // Step 8: Proposed Program (AI)
   onProgress?.("Writing Proposed Program...", 55);

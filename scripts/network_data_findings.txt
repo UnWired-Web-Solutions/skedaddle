@@ -1,0 +1,25 @@
+Network Data Findings (Aug 5, 2026)
+=====================================
+
+Network Totals: Revenue $22.20M, Jobs 10,075
+Network Avg Job Value: $2,203
+
+Key insight: We don't have "close rate" data directly — we only have closed jobs/revenue.
+The close rate (inspections → closed jobs) requires PA/inspection data which is in Salesforce, not in our current dataset.
+Dave's Ottawa doc mentions 57% close rate from Salesforce PA data.
+For now, we can only show "network avg job value by species" as the benchmark — not close rate.
+
+GSC data: Only 2/19 territories have GSC data (Hamilton and Durham likely).
+This means page validation via GSC is limited to those 2 territories.
+For the other 17, we cannot validate suburb pages from our data.
+
+GBP data: All 19 territories have GBP data — good for current campaign metrics.
+
+Species Network Benchmarks:
+- Mice: $3,207 avg job, 27.5% of revenue
+- Raccoons: $2,127 avg job, 22.9% of revenue
+- Squirrels: $1,784 avg job, 21.0% of revenue
+- Bats: $2,783 avg job, 16.4% of revenue
+- Birds: $864 avg job, 3.7% of revenue
+- Skunks: $2,080 avg job, 2.5% of revenue
+- Rats: $2,410 avg job, 2.3% of revenue

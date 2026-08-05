@@ -263,3 +263,18 @@
 - [x] Wire /strategy-report route in App.tsx + sidebar nav
 - [x] Write vitest tests for strategy report router
 - [x] Save checkpoint and deploy
+
+## Strategy Report Accuracy Fixes (Aug 5, 2026)
+- [x] Calculate real network avg job value by species from all 19 territories (replaced hardcoded 57% close rate with $2,203 avg job value benchmark)
+- [x] Add network benchmark column to species table ("vs. Network" comparison)
+- [x] Validate suburb pages via curated action plan data (Hamilton, Durham, Milwaukee, Madison — based on known page builds from action plans, not GSC URL data)
+- [x] Show "Unknown" instead of "None" for unaudited territory suburb pages
+- [x] Fix gap analysis AI prompt to be honest about unknown vs confirmed page status
+- [x] Derive current GBP post volume estimate from GBP engagement data (labeled as estimate — actual post counts not available in ingested data)
+- [x] Fix scale comparison table to use estimated current values (labeled appropriately where data unavailable)
+- [ ] Future: Ingest actual GBP post counts for true post volume tracking
+- [ ] Future: Crawl skedaddlewildlife.com to validate actual suburb page existence via URL matching
+- [x] Add sub-market context from territoryMapping.ts (Hamilton covers 7 sub-locations, etc.)
+- [x] Show sub-market list and GBP listing count in Current Campaign section
+- [x] Update tests to reflect new data structure (60/60 passing)
+- [ ] Filter sessions to species-specific and suburb pages only (not total sessions) — requires GA4 page-level data not yet ingested
