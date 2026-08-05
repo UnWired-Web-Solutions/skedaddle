@@ -237,3 +237,15 @@
 - [x] Wire /salesforce route in App.tsx + sidebar nav (admin only)
 - [x] Write vitest tests for Salesforce router
 - [x] Prepare Monday meeting guide for Barry
+
+## Proposal Generator (Aug 4, 2026)
+- [x] Create server/proposalRouter.ts (tRPC procedures: generate proposal, list territories)
+- [x] Integrate Claude Opus 5 for territory-specific narrative generation
+- [x] Build PDF generation using the Ottawa/Minneapolis proposal template structure
+- [x] Create client/src/pages/ProposalGenerator.tsx (territory selector + generate button + preview)
+- [x] Wire /proposals route in App.tsx + sidebar nav
+- [x] Auto-populate suburb names, revenue, seasonal timing from existing data
+- [x] 3-tier pricing table (Essential $1,750 / Growth $2,000 / Accelerator $2,350)
+- [x] Current vs. New comparison table
+- [x] PDF download functionality
+- [x] Write vitest tests for proposal router

@@ -12,4 +12,6 @@ export const ENV = {
   sfClientSecret: process.env.SF_CLIENT_SECRET ?? "",
   sfLoginUrl: process.env.SF_LOGIN_URL ?? "https://login.salesforce.com",
   sfRedirectUri: process.env.SF_REDIRECT_URI ?? "",
+  // Anthropic API for proposal/report generation
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? "",
 };

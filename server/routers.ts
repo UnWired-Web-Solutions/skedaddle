@@ -5,6 +5,7 @@ import { publicProcedure, router } from "./_core/trpc";
 import { gbpImageRouter } from "./gbpImageRouter";
 import { analyticsRouter } from "./analyticsRouter";
 import { salesforceRouter } from "./salesforceRouter";
+import { proposalRouter } from "./proposalRouter";
 
 export const appRouter = router({
   system: systemRouter,
@@ -19,6 +20,7 @@ export const appRouter = router({
   gbpImage: gbpImageRouter,
   analytics: analyticsRouter,
   salesforce: salesforceRouter,
+  proposal: proposalRouter,
 });
 
 export type AppRouter = typeof appRouter;
