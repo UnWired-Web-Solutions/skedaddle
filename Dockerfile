@@ -1,11 +1,16 @@
 FROM node:22-slim
 
-# Install fonts and Pango for sharp's text rendering (brand overlay on GBP images)
+# Install Chromium (for puppeteer PDF generation), fonts for text rendering
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    chromium \
     fonts-dejavu-core \
+    fonts-noto-cjk \
     fontconfig \
     && rm -rf /var/lib/apt/lists/* \
     && fc-cache -fv
+
+ENV PUPPETEER_SKIP_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 WORKDIR /app
 COPY . .

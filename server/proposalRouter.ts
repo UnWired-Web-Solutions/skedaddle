@@ -549,6 +549,7 @@ function buildProposalHtml(data: ProposalData, narrative: string): string {
 async function generatePdf(html: string): Promise<Buffer> {
   const browser = await puppeteer.launch({
     headless: true,
+    ...(process.env.PUPPETEER_EXECUTABLE_PATH ? { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH } : {}),
     args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
   });
 
