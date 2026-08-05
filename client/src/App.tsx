@@ -17,6 +17,7 @@ import GbpImageGenerator from "./pages/GbpImageGenerator";
 import Analytics from "./pages/Analytics";
 import SalesforceConnect from "./pages/SalesforceConnect";
 import ProposalGenerator from "./pages/ProposalGenerator";
+import StrategyReportGenerator from "./pages/StrategyReportGenerator";
 import { Redirect, Route, Switch } from "wouter";
 
 // Protected route — redirects to /login if not authenticated
@@ -75,6 +76,9 @@ function Router() {
       </Route>
       <Route path="/proposals">
         <ProtectedRoute component={ProposalGenerator} adminOnly />
+      </Route>
+      <Route path="/strategy-report">
+        <ProtectedRoute component={StrategyReportGenerator} adminOnly />
       </Route>
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

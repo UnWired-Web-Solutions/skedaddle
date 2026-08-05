@@ -249,3 +249,17 @@
 - [x] Current vs. New comparison table
 - [x] PDF download functionality
 - [x] Write vitest tests for proposal router
+
+## Strategy Report Generator (Aug 5, 2026)
+- [x] Create server/strategyReportRouter.ts — multi-section generation engine
+- [x] Build territory data object assembler (single source of truth per territory)
+- [x] Build deterministic template sections (tables, comparisons — no AI needed)
+- [x] Build AI narrative sections with sequential context passing (Claude Sonnet 4)
+- [x] Section order matches Dave's gold standard: Exec Summary → Current Campaign → Species → Suburbs → GBP Performance → Gap Analysis → Proposed Program → Scale Comparison → Content Architecture → GBP Strategy → 90-Day Plan → Risks → Recommendations
+- [x] HTML assembly with consistent styling, page breaks, headers
+- [x] PDF generation via Puppeteer (same pipeline as proposal generator)
+- [x] Store generated reports in S3 with download URL
+- [x] Create client/src/pages/StrategyReportGenerator.tsx — territory selector + progress + preview + download
+- [x] Wire /strategy-report route in App.tsx + sidebar nav
+- [x] Write vitest tests for strategy report router
+- [x] Save checkpoint and deploy
