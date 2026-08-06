@@ -14,4 +14,6 @@ export const ENV = {
   sfRedirectUri: process.env.SF_REDIRECT_URI ?? "",
   // Anthropic API for proposal/report generation
   anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? "",
+  // Perplexity Sonar API for real-time web research
+  sonarApiKey: process.env.SONAR_API_KEY ?? "",
 };

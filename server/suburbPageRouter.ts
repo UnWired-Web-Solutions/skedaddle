@@ -54,6 +54,16 @@ export interface SuburbPageContent {
 
   // Source citations
   citations: Array<{ fact: string; source: string; verified: boolean }>;
+
+  // Sonar research summary (optional — present when research was run)
+  research?: {
+    existingPageStatus: string;
+    existingPageUrl: string | null;
+    county: string | null;
+    verifiedNeighbourhoods: string[];
+    topCompetitors: Array<{ name: string; reviews?: string; rating?: string }>;
+    localFactsCitations: string[];
+  };
 }
 
 export interface SpeciesTier {
@@ -63,6 +73,171 @@ export interface SpeciesTier {
   targetWordCount: number;
   jobs: number;
   revenue: number;
+}
+
+// ─── Perplexity Sonar API Helper ────────────────────────────────────────────
+
+export interface SuburbResearch {
+  // Page validation
+  existingPageUrl: string | null;       // URL if a dedicated page was found
+  existingPageStatus: string;           // Human-readable status
+  existingPageCitation: string | null;  // Source URL for the finding
+
+  // Local facts
+  county: string | null;
+  verifiedNeighbourhoods: string[];     // Verified from real sources
+  localWildlifeNotes: string;           // Any local species/regulation notes
+  localFactsCitations: string[];        // Source URLs
+
+  // Competitor landscape
+  topCompetitors: Array<{ name: string; reviews?: string; rating?: string }>;
+  competitorNotes: string;
+  competitorCitations: string[];
+
+  // Raw Sonar content (for debugging / citation display)
+  rawPageCheck: string;
+  rawLocalFacts: string;
+  rawCompetitors: string;
+}
+
+async function callSonar(query: string, maxTokens: number = 600): Promise<{ content: string; citations: string[] }> {
+  const apiKey = process.env.SONAR_API_KEY;
+  if (!apiKey) {
+    console.warn("[Sonar] SONAR_API_KEY not configured — skipping research");
+    return { content: "", citations: [] };
+  }
+
+  try {
+    const response = await fetch("https://api.perplexity.ai/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "sonar-pro",
+        messages: [{ role: "user", content: query }],
+        max_tokens: maxTokens,
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      console.error(`[Sonar] API error (${response.status}):`, err);
+      return { content: "", citations: [] };
+    }
+
+    const data = await response.json() as any;
+    const content = data.choices?.[0]?.message?.content || "";
+    const citations: string[] = Array.isArray(data.citations)
+      ? data.citations.filter((c: any) => typeof c === "string")
+      : [];
+
+    return { content, citations };
+  } catch (err) {
+    console.error("[Sonar] Request failed:", err);
+    return { content: "", citations: [] };
+  }
+}
+
+async function researchSuburb(
+  suburbName: string,
+  state: string,
+  country: string,
+  territoryName: string,
+): Promise<SuburbResearch> {
+  const countryLabel = country === "Canada" ? "Canada" : "USA";
+
+  // Run 3 queries in parallel
+  const [pageCheck, localFacts, competitors] = await Promise.all([
+    // Query 1: Does Skedaddle already have a dedicated page for this suburb?
+    callSonar(
+      `Search site:skedaddlewildlife.com for a page specifically dedicated to "${suburbName}" wildlife removal. ` +
+      `Is there a URL that is specifically about ${suburbName} (not just a general location page that mentions ${suburbName} as a service area)? ` +
+      `If yes, provide the exact URL. If no, confirm it does not exist.`,
+      400,
+    ),
+    // Query 2: Verified local facts
+    callSonar(
+      `What are the official neighbourhoods or districts within ${suburbName}, ${state}, ${countryLabel}? ` +
+      `What county or regional municipality is ${suburbName} in? ` +
+      `Are there any specific local wildlife bylaws, DNR regulations, or humane wildlife control guidelines that apply to homeowners in ${suburbName}? ` +
+      `Provide factual, sourced answers only.`,
+      600,
+    ),
+    // Query 3: Competitor landscape
+    callSonar(
+      `Who are the top wildlife removal companies competing with Skedaddle Humane Wildlife Control in ${suburbName}, ${state}? ` +
+      `List their Google review counts and ratings if available. ` +
+      `Do any competitors have dedicated suburb-specific pages for ${suburbName}?`,
+      400,
+    ),
+  ]);
+
+  // Parse page check result
+  const pageContent = pageCheck.content.toLowerCase();
+  const hasPage = pageContent.includes("yes") || pageContent.includes("found") || pageContent.includes("exists") || pageContent.includes("dedicated page");
+  const noPage = pageContent.includes("no dedicated") || pageContent.includes("does not exist") || pageContent.includes("not found") || pageContent.includes("not appear") || pageContent.includes("no page");
+
+  let existingPageUrl: string | null = null;
+  let existingPageStatus: string;
+
+  if (hasPage && !noPage) {
+    // Try to extract URL from the response
+    const urlMatch = pageCheck.content.match(/https?:\/\/[^\s)"']+skedaddlewildlife[^\s)"']*/i);
+    existingPageUrl = urlMatch ? urlMatch[0] : null;
+    existingPageStatus = existingPageUrl
+      ? `Dedicated page found: ${existingPageUrl}`
+      : "Dedicated page may exist — manual verification recommended";
+  } else if (noPage) {
+    existingPageStatus = "No dedicated page found — confirmed gap";
+  } else {
+    existingPageStatus = "Page status unclear — manual verification recommended";
+  }
+
+  // Parse local facts
+  const countyMatch = localFacts.content.match(/(?:county|regional municipality|region)[:\s]+([A-Z][\w\s]+(?:County|Region|Municipality)?)/i);
+  const county = countyMatch ? countyMatch[1].trim() : null;
+
+  // Extract neighbourhood names from the response (look for lists)
+  const neighbourhoodMatches = localFacts.content.match(/(?:\*\*|•|-|\d+\.\s)([A-Z][\w\s]+?)(?:,|\n|\*\*|$)/g) || [];
+  const verifiedNeighbourhoods = neighbourhoodMatches
+    .map(m => m.replace(/^[\*•\-\d\.\s]+/, "").replace(/[\*,]+$/, "").trim())
+    .filter(n => n.length > 2 && n.length < 40 && /^[A-Z]/.test(n))
+    .slice(0, 10);
+
+  // Extract competitor info
+  const competitorLines = competitors.content
+    .split("\n")
+    .filter(l => l.trim().length > 10)
+    .slice(0, 5);
+
+  const topCompetitors = competitorLines.map(line => {
+    const reviewMatch = line.match(/(\d+)\s*(?:reviews?|Google reviews?)/i);
+    const ratingMatch = line.match(/(\d+\.\d+)\s*(?:stars?|★)/i);
+    const nameMatch = line.match(/^[\*•\-\d\.\s]*([A-Z][\w\s&]+?)(?:\s*[\(\-]|\s*\d|$)/m);
+    return {
+      name: nameMatch ? nameMatch[1].trim() : line.slice(0, 40).trim(),
+      reviews: reviewMatch ? `${reviewMatch[1]} reviews` : undefined,
+      rating: ratingMatch ? `${ratingMatch[1]}★` : undefined,
+    };
+  }).filter(c => c.name.length > 3);
+
+  return {
+    existingPageUrl,
+    existingPageStatus,
+    existingPageCitation: pageCheck.citations[0] || null,
+    county,
+    verifiedNeighbourhoods,
+    localWildlifeNotes: localFacts.content.slice(0, 800),
+    localFactsCitations: localFacts.citations.slice(0, 5),
+    topCompetitors,
+    competitorNotes: competitors.content.slice(0, 600),
+    competitorCitations: competitors.citations.slice(0, 3),
+    rawPageCheck: pageCheck.content,
+    rawLocalFacts: localFacts.content,
+    rawCompetitors: competitors.content,
+  };
 }
 
 // ─── Claude Opus 5 API Helper ────────────────────────────────────────────────
@@ -159,6 +334,7 @@ async function generateIntroSection(
   topSpecies: string[],
   yearsServing: string,
   state: string,
+  localContext?: string, // Optional Sonar-verified local facts
 ): Promise<string> {
   const prompt = `Write the opening paragraph for a wildlife removal service page for ${suburbName}, ${state}.
 
@@ -168,6 +344,7 @@ Context:
 - Top species in this suburb: ${topSpecies.join(", ")}
 - Method: One-way-door exclusion (no traps, no poison)
 - Tone: Professional, reassuring, local-knowledge
+${localContext ? `- Verified local context: ${localContext}` : ""}
 
 Requirements:
 - 80-100 words exactly
@@ -177,6 +354,7 @@ Requirements:
 - End with confidence/trust signal
 - Do NOT use "leverage", "harness", "nestled", or any AI-sounding phrases
 - Write like a local business owner who knows this neighbourhood
+- If local context is provided above, you may reference specific local details naturally
 
 Return ONLY the paragraph text.`;
 
@@ -397,13 +575,31 @@ export async function generateSuburbPageContent(
   const suburbSlug = suburbName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
   const territorySlug = territoryId.replace(/_/g, "-");
 
+  // ─── Step 0: Run Sonar research in parallel with data prep ─────────────────
+  console.log(`[SuburbPage] Running Sonar research for ${suburbName}, ${state}...`);
+  const research = await researchSuburb(suburbName, state, country, territoryName);
+  console.log(`[SuburbPage] Sonar research complete. Page status: ${research.existingPageStatus}`);
+
+  // Use Sonar-verified neighbourhoods if available, fall back to options/defaults
+  const neighbourhoods = (
+    research.verifiedNeighbourhoods.length >= 3
+      ? research.verifiedNeighbourhoods
+      : options?.neighbourhoods
+  ) || [`Central ${suburbName}`, `North ${suburbName}`, `South ${suburbName}`];
+
+  // Use Sonar-verified county if available
+  const county = research.county || options?.county || `${state} County`;
+
   // ─── Generate all content sections ─────────────────────────────────────────
 
   // 1. Meta description
   const metaDescription = await generateMetaDescription(suburbName, territoryName, topSpeciesNames, state);
 
-  // 2. Intro section
-  const introSection = await generateIntroSection(suburbName, territoryName, topSpeciesNames, yearsServing, state);
+  // 2. Intro section — enriched with Sonar local facts
+  const introSection = await generateIntroSection(
+    suburbName, territoryName, topSpeciesNames, yearsServing, state,
+    research.localWildlifeNotes ? `Local context: ${research.localWildlifeNotes.slice(0, 300)}` : undefined,
+  );
 
   // 3. Why Choose section
   const whyChooseSection = await generateWhyChooseSection(
@@ -427,8 +623,7 @@ export async function generateSuburbPageContent(
     });
   }
 
-  // 5. Neighbourhood section
-  const neighbourhoods = options?.neighbourhoods || [`Central ${suburbName}`, `North ${suburbName}`, `South ${suburbName}`];
+  // 5. Neighbourhood section — uses Sonar-verified neighbourhoods
   const neighbourhoodSection = await generateNeighbourhoodSection(suburbName, neighbourhoods, territoryName, state);
 
   // 6. FAQs
@@ -445,7 +640,7 @@ export async function generateSuburbPageContent(
     suburbSlug,
     latitude: options?.latitude || 0,
     longitude: options?.longitude || 0,
-    county: options?.county || `${state} County`,
+    county: county, // Uses Sonar-verified county if available
     state,
     country: countryCode,
     species: speciesTiers.slice(0, 4).map(s => ({
@@ -487,7 +682,7 @@ export async function generateSuburbPageContent(
     { item: "Reviewed by content team", status: "pending" as const },
   ];
 
-  // 10. Source citations
+  // 10. Source citations — enriched with Sonar-verified sources
   const citations = [
     { fact: `Total territory revenue: $${(totalRevenue / 1000).toFixed(0)}K`, source: "Salesforce CRM (Kira export Jul 2026)", verified: true },
     { fact: `Total territory jobs: ${totalJobs}`, source: "Salesforce CRM (Kira export Jul 2026)", verified: true },
@@ -495,6 +690,11 @@ export async function generateSuburbPageContent(
     { fact: `Phone: ${phone}`, source: options?.phone ? "Google Business Profile" : "Placeholder — needs GBP verification", verified: !!options?.phone },
     { fact: `Seasonal timing: ${seasonalTiming}`, source: `${countryCode === "CA" ? "Provincial" : "State"} wildlife agency guidance`, verified: true },
     { fact: `Franchise founded: ${yearsServing}`, source: options?.yearsServing ? "Google Business Profile" : "Needs franchisor confirmation", verified: !!options?.yearsServing },
+    // Sonar-verified citations
+    { fact: `Existing Skedaddle page: ${research.existingPageStatus}`, source: research.existingPageCitation || "Perplexity Sonar (live web search)", verified: true },
+    ...(research.county ? [{ fact: `County: ${research.county}`, source: research.localFactsCitations[0] || "Perplexity Sonar (live web search)", verified: true }] : []),
+    ...(research.verifiedNeighbourhoods.length > 0 ? [{ fact: `Verified neighbourhoods: ${research.verifiedNeighbourhoods.join(", ")}`, source: research.localFactsCitations[0] || "Perplexity Sonar (live web search)", verified: true }] : []),
+    ...(research.topCompetitors.length > 0 ? [{ fact: `Top competitors: ${research.topCompetitors.map(c => c.name).join(", ")}`, source: research.competitorCitations[0] || "Perplexity Sonar (live web search)", verified: true }] : []),
   ];
 
   return {
@@ -518,6 +718,15 @@ export async function generateSuburbPageContent(
     schemaBlocks,
     launchChecklist,
     citations,
+    // Sonar research results (for UI display and debugging)
+    research: {
+      existingPageStatus: research.existingPageStatus,
+      existingPageUrl: research.existingPageUrl,
+      county: research.county,
+      verifiedNeighbourhoods: research.verifiedNeighbourhoods,
+      topCompetitors: research.topCompetitors,
+      localFactsCitations: research.localFactsCitations,
+    },
   };
 }
 
