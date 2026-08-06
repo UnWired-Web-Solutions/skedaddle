@@ -285,7 +285,7 @@ export async function buildTerritoryData(territoryId: string): Promise<Territory
 
 // ─── Claude API helper ───────────────────────────────────────────────────────
 
-async function callClaude(prompt: string, model: string = "claude-sonnet-4-20250514", maxTokens: number = 4000): Promise<string> {
+async function callClaude(prompt: string, model: string = "claude-opus-5", maxTokens: number = 4000): Promise<string> {
   const apiKey = ENV.anthropicApiKey;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured");
 
