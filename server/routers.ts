@@ -7,6 +7,7 @@ import { analyticsRouter } from "./analyticsRouter";
 import { salesforceRouter } from "./salesforceRouter";
 import { proposalRouter } from "./proposalRouter";
 import { strategyReportRouter } from "./strategyReportRouter";
+import { suburbPageRouter } from "./suburbPageRouter";
 
 export const appRouter = router({
   system: systemRouter,
@@ -23,6 +24,7 @@ export const appRouter = router({
   salesforce: salesforceRouter,
   proposal: proposalRouter,
   strategyReport: strategyReportRouter,
+  suburbPage: suburbPageRouter,
 });
 
 export type AppRouter = typeof appRouter;

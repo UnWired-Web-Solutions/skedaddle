@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { int, json, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -89,4 +89,32 @@ export const salesforceConnections = mysqlTable("salesforce_connections", {
 });
 
 export type SalesforceConnection = typeof salesforceConnections.$inferSelect;
+
+// ─── Suburb Page Content Generator ───────────────────────────────────────────
+
+/**
+ * Stores generated suburb page content for the approval workflow.
+ * Status: draft → in_review → approved → exported
+ */
+export const suburbPages = mysqlTable("suburb_pages", {
+  id: int("id").autoincrement().primaryKey(),
+  territoryId: varchar("territoryId", { length: 64 }).notNull(),
+  suburbName: varchar("suburbName", { length: 128 }).notNull(),
+  suburbSlug: varchar("suburbSlug", { length: 128 }).notNull(),
+  status: mysqlEnum("status", ["draft", "in_review", "approved", "exported"]).default("draft").notNull(),
+  contentJson: text("contentJson"), // Full SuburbPageContent as JSON
+  schemaJson: text("schemaJson"), // JSON-LD schema blocks
+  metaTitle: varchar("metaTitle", { length: 256 }),
+  metaDescription: text("metaDescription"),
+  h1: varchar("h1", { length: 256 }),
+  wordCount: int("wordCount"),
+  speciesTiers: text("speciesTiers"), // JSON array of {species, tier, words}
+  reviewedBy: varchar("reviewedBy", { length: 128 }),
+  reviewerNotes: text("reviewerNotes"),
+  generatedAt: timestamp("generatedAt").defaultNow().notNull(),
+  approvedAt: timestamp("approvedAt"),
+});
+
+export type SuburbPage = typeof suburbPages.$inferSelect;
+export type InsertSuburbPage = typeof suburbPages.$inferInsert;
 export type InsertSalesforceConnection = typeof salesforceConnections.$inferInsert;

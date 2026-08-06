@@ -278,3 +278,21 @@
 - [x] Show sub-market list and GBP listing count in Current Campaign section
 - [x] Update tests to reflect new data structure (60/60 passing)
 - [ ] Filter sessions to species-specific and suburb pages only (not total sessions) — requires GA4 page-level data not yet ingested
+
+## Suburb Page Content Generator (Aug 5, 2026)
+- [ ] Save Prior Lake template as schema reference in project
+- [ ] Create server/suburbPageRouter.ts — content generation engine (Claude Opus 5)
+- [ ] Build parameterized JSON-LD schema template (8 blocks from Prior Lake pattern)
+- [ ] Build species-weighted body copy generator (Tier 1: 130-150 words, Tier 2: 80-100, Tier 3: 40-60)
+- [ ] Build meta title/description generator
+- [ ] Build neighbourhood/AEO direct-answer section generator
+- [ ] Build FAQ generator with verified data references
+- [ ] Build source citation system (GBP, Salesforce, website, municipal, "confirm with franchisor")
+- [ ] Create DB table: suburb_pages (id, territory_id, suburb, status, content_json, schema_json, meta, reviewer notes)
+- [ ] Create client/src/pages/SuburbPageGenerator.tsx — territory/suburb selector + generate + preview
+- [ ] Build approval workflow UI (draft → in_review → approved → exported)
+- [ ] Build rendered preview with source citations highlighted
+- [ ] Build export function (structured markdown/HTML for WordPress)
+- [ ] Wire /suburb-pages route in App.tsx + sidebar nav
+- [ ] Write vitest tests
+- [ ] Save checkpoint and deploy
