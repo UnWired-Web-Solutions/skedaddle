@@ -37,6 +37,7 @@ const TOP_NAV: NavItem[] = [
   { label: "Resources", href: "/resources", icon: <BookOpen size={16} />, adminOnly: true },
   { label: "Proposals", href: "/proposals", icon: <FileText size={16} />, adminOnly: true },
   { label: "Strategy Reports", href: "/strategy-report", icon: <FileBarChart size={16} />, adminOnly: true },
+  { label: "Suburb Pages", href: "/suburb-pages", icon: <FileText size={16} />, adminOnly: true },
   { label: "Salesforce", href: "/salesforce", icon: <Cloud size={16} />, adminOnly: true },
 ];
 
