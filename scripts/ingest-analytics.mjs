@@ -2,7 +2,7 @@
  * ingest-analytics.mjs — Parse GA4 and GBP CSV exports from the Skedaddle Franchise Analysis
  * spreadsheet and insert into the analytics database tables.
  *
- * Usage: node scripts/ingest-analytics.mjs
+ * Usage: node scripts/ingest-analytics.mjs --ga4 ./page_breakdown.csv --gbp ./gbp_data.csv --replace
  */
 
 import { readFileSync } from "fs";
@@ -12,6 +12,23 @@ import mysql from "mysql2/promise";
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
   console.error("DATABASE_URL not set");
+  process.exit(1);
+}
+
+function readArg(name) {
+  const index = process.argv.indexOf(name);
+  return index >= 0 ? process.argv[index + 1] : undefined;
+}
+
+const ga4Path = readArg("--ga4") || process.env.GA4_CSV_PATH;
+const gbpPath = readArg("--gbp") || process.env.GBP_CSV_PATH;
+const replaceExisting = process.argv.includes("--replace");
+if (!ga4Path || !gbpPath) {
+  console.error("Provide --ga4 and --gbp CSV paths (or GA4_CSV_PATH / GBP_CSV_PATH).");
+  process.exit(1);
+}
+if (!replaceExisting) {
+  console.error("Refusing to replace analytics tables without the explicit --replace flag.");
   process.exit(1);
 }
 
@@ -195,20 +212,23 @@ function parseGBPCSV(filepath) {
 
 async function main() {
   console.log("Parsing GA4 CSV...");
-  const ga4Rows = parseGA4CSV("/home/ubuntu/spreadsheet_export/page_breakdown.csv");
+  const ga4Rows = parseGA4CSV(ga4Path);
   console.log(`  → ${ga4Rows.length} GA4 session records`);
 
   console.log("Parsing GBP CSV...");
-  const gbpRows = parseGBPCSV("/home/ubuntu/spreadsheet_export/gbp_data.csv");
+  const gbpRows = parseGBPCSV(gbpPath);
   console.log(`  → ${gbpRows.length} GBP metric records`);
 
   console.log("Connecting to database...");
   const conn = await mysql.createConnection(DATABASE_URL);
 
-  // Clear existing data
-  console.log("Clearing existing analytics data...");
-  await conn.execute("DELETE FROM ga4_sessions");
-  await conn.execute("DELETE FROM gbp_metrics");
+  await conn.beginTransaction();
+  try {
+    // Replacement is explicit and atomic: readers see either the old complete
+    // import or the new complete import, never half-populated tables.
+    console.log("Replacing existing analytics data in a transaction...");
+    await conn.execute("DELETE FROM ga4_sessions");
+    await conn.execute("DELETE FROM gbp_metrics");
 
   // Insert GA4 data in batches
   console.log("Inserting GA4 sessions...");
@@ -238,7 +258,12 @@ async function main() {
     );
     process.stdout.write(`  ${Math.min(i + gbpBatchSize, gbpRows.length)}/${gbpRows.length}\r`);
   }
-  console.log(`  ✓ Inserted ${gbpRows.length} GBP records`);
+    console.log(`  ✓ Inserted ${gbpRows.length} GBP records`);
+    await conn.commit();
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  }
 
   // Summary
   const [ga4Count] = await conn.execute("SELECT COUNT(*) as cnt FROM ga4_sessions");

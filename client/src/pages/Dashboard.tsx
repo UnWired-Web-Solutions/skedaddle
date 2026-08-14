@@ -110,6 +110,9 @@ export default function Dashboard() {
     ? data.gsc.monthly[data.gsc.monthly.length - 1].clicks - data.gsc.monthly[data.gsc.monthly.length - 2].clicks
     : 0;
   const hasGbp     = data.gbp.monthly.length > 0;
+  const gbpPeriod = hasGbp
+    ? `${data.gbp.monthly[0].month} to ${data.gbp.monthly[data.gbp.monthly.length - 1].month}`
+    : "No GBP data";
 
   // Pie chart data — top 6 species
   const pieData = data.species.slice(0, 6).map(s => ({
@@ -136,7 +139,7 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-        <div style={{ color: "#ffffff60", fontSize: 12 }}>Data: Salesforce{hasGsc ? " + GSC" : ""}{hasGbp ? " + GBP" : ""} · Updated July 2026</div>
+        <div style={{ color: "#ffffff60", fontSize: 12 }}>Data: Salesforce snapshot (Jul 24, 2026){hasGsc ? " + GSC" : ""}{hasGbp ? " + GBP" : ""}</div>
       </div>
 
       <div style={{ padding: "32px 32px 48px", maxWidth: 1200, margin: "0 auto" }}>
@@ -196,16 +199,16 @@ export default function Dashboard() {
         {/* ── Close Rate Benchmark ── */}
         <div style={{ background: CREAM, borderRadius: 10, padding: 24, border: `1px solid ${MIST}`, marginBottom: 32 }}>
           <SectionHeader
-            title="Close Rate by Species — Network Benchmark"
-            subtitle="Your species revenue vs. network-wide PA close rate. Source: Looker Studio Salesforce data (all territories)."
+            title="Network Close-Rate Context by Species"
+            subtitle="Territory revenue and jobs shown beside network PA close rates. Territory-level PAs are not available, so this is context—not a territory-vs-network comparison."
           />
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: `2px solid ${MIST}` }}>
                   <th style={{ textAlign: "left", padding: "8px 12px", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Species</th>
-                  <th style={{ textAlign: "right", padding: "8px 12px", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Your Revenue</th>
-                  <th style={{ textAlign: "right", padding: "8px 12px", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Your Jobs</th>
+                  <th style={{ textAlign: "right", padding: "8px 12px", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Territory Revenue</th>
+                  <th style={{ textAlign: "right", padding: "8px 12px", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Closed Jobs</th>
                   <th style={{ textAlign: "right", padding: "8px 12px", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Network Close Rate</th>
                   <th style={{ textAlign: "left", padding: "8px 12px", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Close Rate Bar</th>
                 </tr>
@@ -254,10 +257,7 @@ export default function Dashboard() {
             </table>
           </div>
           <div style={{ marginTop: 12, fontSize: 11, color: "#999", display: "flex", gap: 16 }}>
-            <span style={{ color: SAGE, fontWeight: 600 }}>■</span> ≥55% strong
-            <span style={{ color: GOLD, fontWeight: 600 }}>■</span> 45–54% average
-            <span style={{ color: RUST, fontWeight: 600 }}>■</span> &lt;45% opportunity
-            <span style={{ marginLeft: 8 }}>Network avg: ~52% | Source: Looker Studio Salesforce (all territories, trailing period)</span>
+            <span>Network benchmarks only. Add territory PA and sale counts before making close-rate recommendations. Source: Looker Studio Salesforce (all territories, trailing period).</span>
           </div>
         </div>
 
@@ -346,7 +346,7 @@ export default function Dashboard() {
 
         {/* ── Row 4: GBP Performance ── */}
         {hasGbp && <div style={{ background: CREAM, borderRadius: 10, padding: 24, border: `1px solid ${MIST}` }}>
-          <SectionHeader title="Google Business Profile Performance" subtitle="Searches, calls, and website clicks — Oct 2024 to Jun 2026" />
+          <SectionHeader title="Google Business Profile Performance" subtitle={`Searches, calls, and website clicks — ${gbpPeriod}`} />
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={gbpChart} margin={{ top: 0, right: 0, left: 0, bottom: 40 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e0dbd0" />
@@ -357,7 +357,6 @@ export default function Dashboard() {
               <Bar dataKey="searches" name="Searches" fill={SAGE} radius={[3, 3, 0, 0]} />
               <Bar dataKey="calls" name="Calls" fill={GOLD} radius={[3, 3, 0, 0]} />
               <Bar dataKey="website_clicks" name="Website Clicks" fill={RUST} radius={[3, 3, 0, 0]} />
-            </BarChart>
           </ResponsiveContainer>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginTop: 20 }}>
             {[

@@ -1,6 +1,8 @@
 // Skedaddle Franchise Portal — Location Data
 // Last updated: July 28, 2026 — rebuilt from verified Salesforce exports (Kira Dowd, Jul 24).
 // Revenue data: Jul 2025 - Jun 2026 trailing 12 months. NO fabricated data.
+import { DASHBOARD_DATA, type LocationDashboard } from "./dashboardData";
+
 export interface FranchiseLocation {
   id: string;
   name: string;
@@ -29,7 +31,7 @@ export interface FranchiseLocation {
   tags: string[];
 }
 
-export const FRANCHISE_LOCATIONS: FranchiseLocation[] = [
+const LOCATION_METADATA: FranchiseLocation[] = [
   { id: "hamilton", name: "Skedaddle Hamilton", city: "Hamilton", state: "ON", country: "CA", region: "Ontario", driveUrl: "", fullReportUrl: "/manus-storage/hamilton_strategy_dashboard_a818c861.html", status: "active", lastUpdated: "2026-07-28", kpis: { totalRevenue: 4205749.92, totalJobs: 2000, avgJobValue: 2103, topSpecies: "Raccoons", gbpRating: null, sessionsTrend: "up", networkRank: 1, networkTotal: 19 }, tags: ["dashboard-ready", "full-data"] },
   { id: "durham", name: "Skedaddle Durham", city: "Whitby", state: "ON", country: "CA", region: "Ontario", driveUrl: "", fullReportUrl: "/manus-storage/durham_strategy_dashboard_0d2eb5b0.html", status: "active", lastUpdated: "2026-07-28", kpis: { totalRevenue: 4083486.61, totalJobs: 1463, avgJobValue: 2791, topSpecies: "Mice", gbpRating: null, sessionsTrend: "flat", networkRank: 2, networkTotal: 19 }, tags: ["dashboard-ready", "full-data"] },
   { id: "ottawa", name: "Skedaddle Ottawa", city: "Ottawa", state: "ON", country: "CA", region: "Ontario", driveUrl: "", fullReportUrl: "/manus-storage/ottawa_strategy_dashboard_aad8be27.html", status: "active", lastUpdated: "2026-07-28", kpis: { totalRevenue: 2999469.45, totalJobs: 1399, avgJobValue: 2144, topSpecies: "Mice", gbpRating: null, sessionsTrend: "flat", networkRank: 3, networkTotal: 19 }, tags: ["dashboard-ready", "full-data"] },
@@ -50,6 +52,41 @@ export const FRANCHISE_LOCATIONS: FranchiseLocation[] = [
   { id: "l-windsor", name: "Skedaddle Windsor", city: "Windsor", state: "ON", country: "CA", region: "Ontario", driveUrl: "", fullReportUrl: "/manus-storage/l-windsor_strategy_dashboard_2c4a01f3.html", status: "active", lastUpdated: "2026-07-28", kpis: { totalRevenue: 89868.6, totalJobs: 47, avgJobValue: 1912, topSpecies: "Raccoons", gbpRating: null, sessionsTrend: "flat", networkRank: 18, networkTotal: 19 }, tags: ["dashboard-ready", "full-data"] },
   { id: "barrie-north", name: "Skedaddle Barrie North", city: "Barrie", state: "ON", country: "CA", region: "Ontario", driveUrl: "", fullReportUrl: "/manus-storage/barrie-north_strategy_dashboard_81f140c8.html", status: "pending", lastUpdated: "2026-07-28", kpis: { totalRevenue: 0, totalJobs: 0, avgJobValue: 0, topSpecies: "Unknown", gbpRating: null, sessionsTrend: "up", networkRank: 19, networkTotal: 19 }, tags: ["awaiting-data"] },
 ];
+
+function deriveActivityTrend(data?: LocationDashboard): "up" | "down" | "flat" {
+  const series = data?.gsc.monthly.length ? data.gsc.monthly.map(month => month.clicks) :
+    data?.gbp.monthly.length ? data.gbp.monthly.map(month => month.calls + month.website_clicks) : [];
+  if (series.length < 2) return "flat";
+  const current = series[series.length - 1];
+  const previous = series[series.length - 2];
+  if (!previous) return current > 0 ? "up" : "flat";
+  const change = (current - previous) / previous;
+  if (change >= 0.05) return "up";
+  if (change <= -0.05) return "down";
+  return "flat";
+}
+
+/**
+ * Territory metadata lives here; performance values always come from the same
+ * dashboard snapshot used by dashboards and reports. This prevents overview
+ * cards, rankings, and detail pages from silently drifting apart.
+ */
+export const FRANCHISE_LOCATIONS: FranchiseLocation[] = LOCATION_METADATA.map(location => {
+  const data = DASHBOARD_DATA[location.id];
+  if (!data) return location;
+
+  return {
+    ...location,
+    kpis: {
+      ...location.kpis,
+      totalRevenue: data.total_revenue,
+      totalJobs: data.total_jobs,
+      avgJobValue: data.total_jobs > 0 ? Math.round(data.total_revenue / data.total_jobs) : 0,
+      topSpecies: data.species[0]?.species || "Unknown",
+      sessionsTrend: deriveActivityTrend(data),
+    },
+  };
+});
 
 export const REGIONS = Array.from(new Set(FRANCHISE_LOCATIONS.map((f) => f.region))).sort();
 

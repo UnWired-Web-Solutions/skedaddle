@@ -68,7 +68,7 @@ describe("Strategy Report Router", () => {
     expect(data.subMarkets.length).toBeGreaterThan(0);
     expect(data.gbpSubListings).toBeDefined();
     expect(data.suburbPageStatus).toBeDefined();
-    expect(data.currentGbpPostVolume).toBeDefined();
+    expect(data.currentGbpPostVolume).toBe("Not provided");
     // Hamilton should have partial page validation data
     expect(data.suburbPageStatus).toBe("partial");
     // Species should have network benchmarks
@@ -123,5 +123,6 @@ describe("Strategy Report Router", () => {
   it("should export strategyReportRouter with correct procedures", async () => {
     const { strategyReportRouter } = await import("./strategyReportRouter");
     expect(strategyReportRouter).toBeDefined();
+    expect((strategyReportRouter as any)._def.procedures.exportPdf).toBeDefined();
   });
 });

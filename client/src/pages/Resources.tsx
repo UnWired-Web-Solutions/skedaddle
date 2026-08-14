@@ -13,17 +13,10 @@ const RESOURCES = [
     ],
   },
   {
-    category: "Templates & Checklists",
-    items: [
-      { label: "Pest Expansion Page Template (Markdown)", url: "#", type: "doc", note: "Available in SkedaddleOperationalTools_v1.zip" },
-      { label: "GBP Audit Checklist (Markdown)", url: "#", type: "doc", note: "Available in SkedaddleOperationalTools_v1.zip" },
-    ],
-  },
-  {
     category: "Data & Scripts",
     items: [
       { label: "SkedaddleDashboardGenerator_v2.zip", url: "https://drive.google.com/drive/folders/1F-kHnF6nhw1tCDBSLEr396WioMHjqxzD", type: "drive", note: "Dashboard generation scripts" },
-      { label: "SkedaddleOperationalTools_v1.zip", url: "https://drive.google.com/drive/folders/1F-kHnF6nhw1tCDBSLEr396WioMHjqxzD", type: "drive", note: "All 5 operational tools" },
+      { label: "Legacy tool archive", url: "https://drive.google.com/drive/folders/1F-kHnF6nhw1tCDBSLEr396WioMHjqxzD", type: "drive", note: "Archived scripts; use portal Tools for current workflows" },
     ],
   },
 ];

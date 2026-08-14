@@ -6,6 +6,27 @@ import puppeteer from "puppeteer";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+const strategyConfigSchema = z.object({
+  currentGbpPostsPerMonth: z.number().int().nonnegative(),
+  currentBlogPostsPerMonth: z.number().int().nonnegative(),
+  proposedGbpPostsPerMonth: z.number().int().nonnegative(),
+  proposedBlogPostsPerMonth: z.number().int().nonnegative(),
+  proposedSuburbPages: z.number().int().nonnegative(),
+  proposedSpeciesLocationPages: z.number().int().nonnegative(),
+  campaignNotes: z.string().max(3000).default(""),
+});
+export type StrategyConfig = z.infer<typeof strategyConfigSchema>;
+
+const DEFAULT_STRATEGY_CONFIG: StrategyConfig = {
+  currentGbpPostsPerMonth: 0,
+  currentBlogPostsPerMonth: 0,
+  proposedGbpPostsPerMonth: 0,
+  proposedBlogPostsPerMonth: 0,
+  proposedSuburbPages: 0,
+  proposedSpeciesLocationPages: 0,
+  campaignNotes: "",
+};
+
 export interface TerritoryDataObject {
   id: string;
   name: string;
@@ -56,7 +77,13 @@ export interface TerritoryDataObject {
   subMarkets: string[]; // Sub-locations that roll up under this territory
   gbpSubListings: string[]; // GBP listing names for this territory
   suburbPageStatus: "validated" | "partial" | "unknown"; // Whether page existence data is confirmed
-  currentGbpPostVolume: string; // Derived from actual GBP data
+  currentGbpPostVolume: string;
+  currentBlogPostVolume: string;
+  proposedGbpPostsPerMonth: number;
+  proposedBlogPostsPerMonth: number;
+  proposedSuburbPages: number;
+  proposedSpeciesLocationPages: number;
+  campaignNotes: string;
 }
 
 // ─── Section definitions ─────────────────────────────────────────────────────
@@ -159,7 +186,10 @@ const KNOWN_SUBURB_PAGES: Record<string, Record<string, boolean>> = {
 
 // ─── Build Territory Data Object ─────────────────────────────────────────────
 
-export async function buildTerritoryData(territoryId: string): Promise<TerritoryDataObject> {
+export async function buildTerritoryData(
+  territoryId: string,
+  config: StrategyConfig = DEFAULT_STRATEGY_CONFIG,
+): Promise<TerritoryDataObject> {
   const { DASHBOARD_DATA } = await import("../client/src/data/dashboardData");
   const { FRANCHISE_LOCATIONS } = await import("../client/src/data/franchises");
   const { TERRITORY_GROUPS } = await import("../shared/territoryMapping");
@@ -227,17 +257,14 @@ export async function buildTerritoryData(territoryId: string): Promise<Territory
   const avgMonthlyCalls = gbpMonthly.length > 0 ? totalCalls / gbpMonthly.length : 0;
   const avgMonthlyClicks = gbpMonthly.length > 0 ? totalClicks / gbpMonthly.length : 0;
 
-  // Derive current GBP post volume from actual data
-  // GBP monthly data shows activity level — we estimate post volume from engagement patterns
-  const avgMonthlyActivity = gbpMonthly.length > 0
-    ? Math.round((totalCalls + totalClicks) / gbpMonthly.length)
-    : 0;
-  let currentGbpPostVolume: string;
-  if (avgMonthlyActivity === 0) currentGbpPostVolume = "Not tracked (no engagement data)";
-  else if (avgMonthlyActivity < 20) currentGbpPostVolume = "Low activity (est. 1-3 posts/month)";
-  else if (avgMonthlyActivity < 50) currentGbpPostVolume = "Moderate activity (est. 3-5 posts/month)";
-  else if (avgMonthlyActivity < 100) currentGbpPostVolume = "Active (est. 5-10 posts/month)";
-  else currentGbpPostVolume = "High activity (est. 10+ posts/month)";
+  // Engagement does not reveal publishing volume. Campaign volumes are explicit
+  // report inputs and remain "not provided" when the operator has not confirmed them.
+  const currentGbpPostVolume = config.currentGbpPostsPerMonth > 0
+    ? `${config.currentGbpPostsPerMonth} posts/month (confirmed input)`
+    : "Not provided";
+  const currentBlogPostVolume = config.currentBlogPostsPerMonth > 0
+    ? `${config.currentBlogPostsPerMonth} posts/month (confirmed input)`
+    : "Not provided";
 
   // GSC data
   const gscMonthly = dashData.gsc.monthly || [];
@@ -280,6 +307,12 @@ export async function buildTerritoryData(territoryId: string): Promise<Territory
     gbpSubListings,
     suburbPageStatus,
     currentGbpPostVolume,
+    currentBlogPostVolume,
+    proposedGbpPostsPerMonth: config.proposedGbpPostsPerMonth,
+    proposedBlogPostsPerMonth: config.proposedBlogPostsPerMonth,
+    proposedSuburbPages: config.proposedSuburbPages,
+    proposedSpeciesLocationPages: config.proposedSpeciesLocationPages,
+    campaignNotes: config.campaignNotes,
   };
 }
 
@@ -329,6 +362,12 @@ function formatPct(n: number): string {
   return `${n.toFixed(1)}%`;
 }
 
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, character => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;",
+  } as Record<string, string>)[character] || character);
+}
+
 // ─── Section Generators ──────────────────────────────────────────────────────
 
 async function generateExecutiveSummary(data: TerritoryDataObject): Promise<string> {
@@ -342,8 +381,8 @@ TERRITORY DATA:
 - Top suburbs/cities by revenue: ${data.topSuburbNames.slice(0, 6).join(", ")}
 - GBP total calls (available period): ${formatNumber(data.gbp.totalCalls)}
 - GBP total website clicks: ${formatNumber(data.gbp.totalClicks)}
-- Network average job value: ${formatCurrency(data.networkAvgJobValue, '$')} (benchmark across all 19 territories)
-- This territory's avg job value: ${formatCurrency(data.avgJobValue, data.currencySymbol)} (${data.avgJobValue > data.networkAvgJobValue ? 'above' : 'below'} network average)
+- This territory's average job value: ${formatCurrency(data.avgJobValue, data.currencySymbol)}
+- Do not compare average job value across CAD and USD territories without an exchange-rate snapshot
 - Seasonal timing: ${data.seasonalTiming}
 
 Write a compelling 3-4 paragraph executive summary that:
@@ -434,11 +473,17 @@ TERRITORY DATA:
 - Top species: ${data.topSpeciesNames.join(", ")}
 - Seasonal timing: ${data.seasonalTiming}
 - Country: ${data.country}
+- Confirmed current GBP posts/month: ${data.currentGbpPostVolume}
+- Approved proposed GBP posts/month: ${data.proposedGbpPostsPerMonth || "Not provided"}
+- Approved proposed blog posts/month: ${data.proposedBlogPostsPerMonth || "Not provided"}
+- Approved suburb-page build: ${data.proposedSuburbPages || "Not provided"}
+- Approved species × location build: ${data.proposedSpeciesLocationPages || "Not provided"}
+- Campaign notes: ${data.campaignNotes || "None provided"}
 
 Write 4-5 paragraphs describing the proposed full program across these four areas:
-1. GBP Optimization & Post Program: Scale from current low volume to 30-40 posts/month using a 4-stream model (species-driven, suburb/neighbourhood, proof/trust, seasonal/educational)
-2. Website Content Architecture: Build dedicated suburb pages in revenue order, species pages optimized for AEO/GEO, hub-and-spoke model
-3. Blog Content Reorientation: Shift from generic educational content to conversion-oriented, species×suburb×season combinations
+1. GBP Optimization & Post Program: Use only the approved proposed volume above; if none is provided, recommend confirming capacity instead of inventing a number
+2. Website Content Architecture: Use the approved page counts above and prioritize them in revenue order
+3. Blog Content Reorientation: Use only the approved blog volume above; distinguish a content recommendation from an agreed deliverable
 4. Local SEO Foundation: Schema markup, NAP citation audit, internal linking, rank tracking
 
 For each area, be specific about what changes and why, referencing the territory's actual suburbs and species.
@@ -492,6 +537,8 @@ GBP DATA:
 - Average monthly calls: ${Math.round(data.gbp.avgMonthlyCalls)}
 - Average monthly clicks: ${Math.round(data.gbp.avgMonthlyClicks)}
 - Months of data: ${data.gbp.monthly.length}
+- Confirmed current publishing volume: ${data.currentGbpPostVolume}
+- Approved proposed publishing volume: ${data.proposedGbpPostsPerMonth || "Not provided"}
 
 TERRITORY CONTEXT:
 - Top species: ${data.topSpeciesNames.join(", ")}
@@ -500,7 +547,7 @@ TERRITORY CONTEXT:
 
 Write a detailed GBP strategy section covering:
 1. Current GBP performance baseline (use the actual numbers above)
-2. The four-stream post framework: species-driven posts (14-16/month), suburb/neighbourhood posts (12-14/month), proof/trust posts (5-6/month), seasonal/educational posts (4-5/month) = 35-40 total posts/month
+2. A four-stream post framework sized to the approved proposed volume above. Do not invent a volume when it is not provided
 3. Species focus by month calendar (which species to emphasize in which months based on the seasonal timing)
 4. Suburb rotation schedule (rotate through top suburbs in posts to build local relevance)
 5. GBP and website alignment: posts should link to corresponding suburb/species pages once built
@@ -526,24 +573,21 @@ TERRITORY DATA:
 - Seasonal timing: ${data.seasonalTiming}
 - Country: ${data.country}
 
-Write a detailed month-by-month 90-day plan with specific tasks organized by category. Each month should have 4 categories: Content & SEO, GBP, Local SEO/Technical, and Conversion/Sales Enablement.
+Write a focused month-by-month 90-day plan. Each month must contain 3-5 total priorities, not a long backlog. Every priority must include an owner role, a concrete deliverable, and a measurable outcome.
 
-MONTH 1 should focus on: foundation work (technical audit, schema, citation audit, first 2-3 suburb pages, GBP scaling to 35-40 posts, hub page refresh)
+MONTH 1 should focus on: measurement baseline, confirmed technical gaps, and the approved campaign volumes
 
 MONTH 2 should focus on: expansion (next batch of suburb pages, species×location pages, review velocity, seasonal content aligned to the territory's wildlife calendar)
 
 MONTH 3 should focus on: optimization (review Month 1-2 data, build remaining suburb pages, species×location variants, identify best-performing content, prepare next quarter's strategy)
 
-For each month, list 4-6 specific tasks per category. Tasks should reference actual suburb names and species from this territory.
+Tasks should reference actual suburb names and species from this territory, but must not claim a page is missing unless its status is confirmed.
 
 STYLE: Actionable and specific. Each task should be concrete enough that someone could check it off a list. No vague "optimize content" — instead "Publish dedicated suburb page for ${data.topSuburbNames[0]} targeting [species] removal [suburb] keywords."
 
 Return ONLY the text content. Format as:
 Month 1 — Foundation
-Content & SEO: [tasks separated by semicolons]
-GBP: [tasks separated by semicolons]
-Local SEO: [tasks separated by semicolons]
-Conversion: [tasks separated by semicolons]
+Priorities: [3-5 tasks separated by semicolons; each includes owner, deliverable, outcome]
 
 Month 2 — Expansion
 [same format]
@@ -556,7 +600,7 @@ Month 3 — Optimization
 }
 
 async function generateRisksAndMitigations(data: TerritoryDataObject, priorContext: string): Promise<string> {
-  const prompt = `You are writing the "Key Risks and Mitigations" section of a franchise digital marketing strategy for Skedaddle Humane Wildlife Control — the "${data.name}" territory.
+  const prompt = `You are writing the "Delivery Dependencies and Mitigations" section of a franchise digital marketing strategy for Skedaddle Humane Wildlife Control — the "${data.name}" territory.
 
 PRIOR CONTEXT:
 ${priorContext}
@@ -567,18 +611,11 @@ TERRITORY DATA:
 - Top suburbs: ${data.topSuburbNames.slice(0, 6).join(", ")}
 - GBP calls: ${formatNumber(data.gbp.totalCalls)}
 
-Identify 5-7 territory-specific risks and provide a mitigation for each. Risks should be realistic and tied to this territory's data. Examples of risk categories:
-- Species pages lacking conversion content (high traffic but low close rate)
-- Suburb pages being too thin/generic to rank
-- GBP post volume not producing engagement
-- Seasonal timing misalignment
-- Content built too early before technical SEO foundation is solid
-- Revenue concentration in few suburbs creating fragility
-- Close rate below network average for key species
+Identify 4-6 delivery dependencies and data gaps. Do not characterize revenue concentration as fragility and do not discuss territory close rate because territory proposal/appointment counts are unavailable. Focus on page-status verification, approved production capacity, tracking coverage, local-fact review, seasonal timing, and ownership.
 
 For each risk, provide: the risk statement, its potential impact, and a specific mitigation action.
 
-STYLE: Direct and practical. Each risk should feel real and specific to this territory, not generic. Mitigations should be actionable.
+STYLE: Neutral, direct, and practical. Do not manufacture negative performance claims.
 
 Return as plain text in this format (one per line):
 RISK: [risk statement] | IMPACT: [impact] | MITIGATION: [mitigation action]`;
@@ -622,7 +659,6 @@ function buildCurrentCampaignHtml(data: TerritoryDataObject): string {
   // Determine suburb page status text based on validated data
   const confirmedPages = data.suburbs.filter(s => s.hasPage === true);
   const confirmedNoPages = data.suburbs.filter(s => s.hasPage === false);
-  const unknownPages = data.suburbs.filter(s => s.hasPage === null);
 
   let suburbPageText: string;
   let suburbPageVolume: string;
@@ -661,9 +697,9 @@ function buildCurrentCampaignHtml(data: TerritoryDataObject): string {
         </tr>
         <tr>
           <td>Blog</td>
-          <td>Educational content</td>
-          <td>Generic wildlife articles</td>
-          <td>2-3 posts/month (estimated)</td>
+          <td>Campaign input</td>
+          <td>Confirm format and purpose</td>
+          <td>${data.currentBlogPostVolume}</td>
         </tr>
         <tr>
           <td>Static Pages</td>
@@ -679,9 +715,9 @@ function buildCurrentCampaignHtml(data: TerritoryDataObject): string {
         </tr>
         <tr>
           <td>Schema Markup</td>
-          <td>Basic / limited</td>
-          <td>LocalBusiness only</td>
-          <td>Minimal</td>
+          <td>Not yet audited</td>
+          <td>Confirm current implementation</td>
+          <td>Unknown</td>
         </tr>
         <tr>
           <td>Citation/NAP</td>
@@ -691,15 +727,11 @@ function buildCurrentCampaignHtml(data: TerritoryDataObject): string {
         </tr>
       </tbody>
     </table>
-    <p class="narrative">The current program maintains an active GBP presence with ${data.currentGbpPostVolume} and generates ${formatNumber(Math.round(data.gbp.avgMonthlyCalls))} calls and ${formatNumber(Math.round(data.gbp.avgMonthlyClicks))} website clicks per month on average. ${confirmedNoPages.length > 0 ? `However, ${confirmedNoPages.length} suburbs generating significant revenue (${confirmedNoPages.map(s => s.suburb).join(", ")}) have no dedicated website pages \u2014 representing the clearest content gap.` : data.suburbPageStatus === "unknown" ? "Suburb page coverage has not been audited \u2014 a content audit is recommended to identify geographic gaps." : "Existing suburb pages provide a foundation, but coverage gaps remain for revenue-generating communities."} The GBP post volume is below what is needed to maintain consistent local pack visibility during peak wildlife seasons.</p>`;
+    <p class="narrative">The confirmed campaign inputs are ${data.currentGbpPostVolume} for GBP and ${data.currentBlogPostVolume} for blog content. During the available performance period, GBP generated ${formatNumber(Math.round(data.gbp.avgMonthlyCalls))} calls and ${formatNumber(Math.round(data.gbp.avgMonthlyClicks))} website clicks per month on average; engagement is not used to infer publishing volume. ${confirmedNoPages.length > 0 ? `${confirmedNoPages.length} suburbs generating significant revenue (${confirmedNoPages.map(s => s.suburb).join(", ")}) are confirmed without dedicated pages.` : data.suburbPageStatus === "unknown" ? "Suburb page coverage has not been audited; page recommendations remain provisional until the audit is complete." : "Existing suburb pages provide a foundation, with remaining confirmed gaps shown above."} ${data.campaignNotes ? `Campaign notes: ${escapeHtml(data.campaignNotes)}` : ""}</p>`;
 }
 
 function buildSpeciesTableHtml(data: TerritoryDataObject): string {
   const rows = data.species.slice(0, 12).map(s => {
-    const diff = s.avgJobValue - s.networkAvgJobValue;
-    const diffPct = s.networkAvgJobValue > 0 ? (diff / s.networkAvgJobValue * 100) : 0;
-    const diffClass = diff >= 0 ? 'highlight' : 'status-none';
-    const diffText = diff >= 0 ? `+${formatPct(diffPct)}` : `${formatPct(diffPct)}`;
     return `
         <tr>
           <td>${s.species}</td>
@@ -707,8 +739,6 @@ function buildSpeciesTableHtml(data: TerritoryDataObject): string {
           <td class="num">${formatCurrency(s.total_revenue, data.currencySymbol)}</td>
           <td class="num">${formatPct(s.pctRevenue)}</td>
           <td class="num">${formatCurrency(s.avgJobValue, data.currencySymbol)}</td>
-          <td class="num">${formatCurrency(s.networkAvgJobValue, '$')}</td>
-          <td class="${diffClass}">${diffText}</td>
         </tr>`;
   }).join("");
 
@@ -721,8 +751,6 @@ function buildSpeciesTableHtml(data: TerritoryDataObject): string {
           <th>Closed Revenue</th>
           <th>% of Total</th>
           <th>Avg Job Value</th>
-          <th>Network Avg</th>
-          <th>vs. Network</th>
         </tr>
       </thead>
       <tbody>
@@ -733,8 +761,6 @@ function buildSpeciesTableHtml(data: TerritoryDataObject): string {
           <td class="num"><strong>${formatCurrency(data.totalRevenue, data.currencySymbol)}</strong></td>
           <td class="num"><strong>100%</strong></td>
           <td class="num"><strong>${formatCurrency(data.avgJobValue, data.currencySymbol)}</strong></td>
-          <td class="num"><strong>${formatCurrency(data.networkAvgJobValue, '$')}</strong></td>
-          <td class="${data.avgJobValue >= data.networkAvgJobValue ? 'highlight' : 'status-none'}">${data.avgJobValue >= data.networkAvgJobValue ? '+' : ''}${formatPct((data.avgJobValue - data.networkAvgJobValue) / data.networkAvgJobValue * 100)}</td>
         </tr>
       </tbody>
     </table>`;
@@ -820,15 +846,9 @@ function buildGbpDataHtml(data: TerritoryDataObject): string {
 
 function buildScaleComparisonHtml(data: TerritoryDataObject): string {
   const existingPages = data.suburbs.filter(s => s.hasPage === true).length;
-  const missingPages = data.suburbs.filter(s => s.hasPage === false).length;
-  const unknownPages = data.suburbs.filter(s => s.hasPage === null).length;
   const currentSuburbText = data.suburbPageStatus === "unknown"
     ? "Unknown (audit needed)"
     : `${existingPages} confirmed`;
-  const proposedSuburbCount = missingPages > 0 ? missingPages : Math.min(data.suburbs.length, 12);
-  const suburbChangeText = data.suburbPageStatus === "unknown"
-    ? "Audit + build"
-    : missingPages > 0 ? `+${missingPages} net new` : "Optimization";
 
   return `
     <table class="data-table">
@@ -844,26 +864,26 @@ function buildScaleComparisonHtml(data: TerritoryDataObject): string {
         <tr>
           <td>GBP Posts / Month</td>
           <td>${data.currentGbpPostVolume}</td>
-          <td>35-40</td>
-          <td class="highlight">Significant increase</td>
+          <td>${data.proposedGbpPostsPerMonth || "Not provided"}</td>
+          <td class="highlight">${data.proposedGbpPostsPerMonth ? "Approved input" : "Confirm capacity"}</td>
         </tr>
         <tr>
           <td>Blog Posts / Month</td>
-          <td>2-3 (educational, estimated)</td>
-          <td>3-5 (conversion-oriented)</td>
-          <td>Same volume, different content</td>
+          <td>${data.currentBlogPostVolume}</td>
+          <td>${data.proposedBlogPostsPerMonth || "Not provided"}</td>
+          <td>${data.proposedBlogPostsPerMonth ? "Approved input" : "Confirm scope"}</td>
         </tr>
         <tr>
           <td>Suburb/City Pages</td>
           <td>${currentSuburbText}</td>
-          <td>${existingPages + proposedSuburbCount} total (phased build)</td>
-          <td class="highlight">${suburbChangeText}</td>
+          <td>${data.proposedSuburbPages || "Not provided"}</td>
+          <td class="highlight">${data.proposedSuburbPages ? "Approved build count" : "Audit, then confirm scope"}</td>
         </tr>
         <tr>
           <td>Species × Location Pages</td>
           <td>Unknown</td>
-          <td>${Math.min(data.species.length * 3, 20)}+</td>
-          <td class="highlight">Build required</td>
+          <td>${data.proposedSpeciesLocationPages || "Not provided"}</td>
+          <td class="highlight">${data.proposedSpeciesLocationPages ? "Approved build count" : "Confirm scope"}</td>
         </tr>
         <tr>
           <td>Schema Markup</td>
@@ -1360,11 +1380,12 @@ function formatRecommendationsHtml(rawText: string): string {
 
 export async function generateStrategyReport(
   territoryId: string,
+  config: StrategyConfig = DEFAULT_STRATEGY_CONFIG,
   onProgress?: (section: string, pct: number) => void
 ): Promise<{ html: string; pdfUrl?: string; sections: SectionResult[] }> {
   // Step 1: Build territory data object
   onProgress?.("Building territory data...", 5);
-  const data = await buildTerritoryData(territoryId);
+  const data = await buildTerritoryData(territoryId, config);
 
   const sections: SectionResult[] = [];
   let priorContext = "";
@@ -1383,19 +1404,10 @@ export async function generateStrategyReport(
   // Step 4: Data Foundation — Species Analysis (Template + context)
   onProgress?.("Building Species Revenue Analysis...", 25);
   const speciesTableHtml = buildSpeciesTableHtml(data);
-  // Build species narrative with network benchmarks
+  // Build species narrative in the territory's own currency.
   const topSpecies = data.species[0];
   const secondSpecies = data.species[1];
-  const aboveNetworkSpecies = data.species.filter(s => s.avgJobValue > s.networkAvgJobValue);
-  const belowNetworkSpecies = data.species.filter(s => s.avgJobValue < s.networkAvgJobValue && s.total_jobs > 10);
-  let benchmarkNote = "";
-  if (aboveNetworkSpecies.length > 0) {
-    benchmarkNote = ` ${aboveNetworkSpecies.slice(0, 2).map(s => s.species).join(" and ")} ${aboveNetworkSpecies.length === 1 ? "shows" : "show"} average job values above the network benchmark, indicating strong pricing or premium service mix.`;
-  }
-  if (belowNetworkSpecies.length > 0) {
-    benchmarkNote += ` ${belowNetworkSpecies.slice(0, 2).map(s => s.species).join(" and ")} ${belowNetworkSpecies.length === 1 ? "falls" : "fall"} below network average — potential opportunity to improve close rates or upsell.`;
-  }
-  const speciesNarrative = `<p class="narrative">${topSpecies?.species || "Primary species"} leads with ${formatCurrency(topSpecies?.total_revenue || 0, data.currencySymbol)} in closed revenue (${formatPct(topSpecies?.pctRevenue || 0)} of total), followed by ${secondSpecies?.species || "secondary species"} at ${formatCurrency(secondSpecies?.total_revenue || 0, data.currencySymbol)}. The top ${Math.min(data.species.length, 3)} species account for ${formatPct(data.species.slice(0, 3).reduce((sum, s) => sum + s.pctRevenue, 0))} of all closed revenue — content and SEO investment should be weighted accordingly.${benchmarkNote} Network-wide average job value: ${formatCurrency(data.networkAvgJobValue, '$')}; this territory averages ${formatCurrency(data.avgJobValue, data.currencySymbol)} (${data.avgJobValue >= data.networkAvgJobValue ? "above" : "below"} benchmark).</p>`;
+  const speciesNarrative = `<p class="narrative">${topSpecies?.species || "Primary species"} leads with ${formatCurrency(topSpecies?.total_revenue || 0, data.currencySymbol)} in closed revenue (${formatPct(topSpecies?.pctRevenue || 0)} of total), followed by ${secondSpecies?.species || "secondary species"} at ${formatCurrency(secondSpecies?.total_revenue || 0, data.currencySymbol)}. The top ${Math.min(data.species.length, 3)} species account for ${formatPct(data.species.slice(0, 3).reduce((sum, s) => sum + s.pctRevenue, 0))} of closed revenue, so content prioritization should follow this territory demand mix. Average job value is shown descriptively in ${data.currency}; it is not used as a close-rate proxy or compared across currencies.</p>`;
   sections.push({ id: "species_analysis", title: "Sales & Species Analysis — Revenue by Species", html: speciesTableHtml + speciesNarrative, isAiGenerated: false });
   priorContext += `Top species: ${data.species.slice(0, 3).map(s => `${s.species} (${formatPct(s.pctRevenue)})`).join(", ")}. `;
 
@@ -1405,7 +1417,6 @@ export async function generateStrategyReport(
   // Build suburb narrative based on validated page data
   const confirmedNoPage = data.suburbs.filter(s => s.hasPage === false);
   const confirmedHasPage = data.suburbs.filter(s => s.hasPage === true);
-  const unknownPage = data.suburbs.filter(s => s.hasPage === null);
   let suburbNarrativeText: string;
   if (data.suburbPageStatus === "validated" || data.suburbPageStatus === "partial") {
     if (confirmedNoPage.length > 0) {
@@ -1434,7 +1445,6 @@ export async function generateStrategyReport(
   onProgress?.("Writing Gap Analysis...", 45);
   const gapHtml = await generateGapAnalysis(data, priorContext);
   sections.push({ id: "gap_analysis", title: "Content Architecture Gap — The Opportunity", html: gapHtml, isAiGenerated: true });
-  const suburbsWithoutPages = data.suburbs.filter(s => s.hasPage === false || s.hasPage === null);
   priorContext += `Gap analysis: ${data.suburbPageStatus === "unknown" ? "Page audit needed — status unknown for most suburbs" : `${confirmedNoPage.length} suburbs confirmed without pages`}. Primary structural gap identified. `;
 
   // Step 8: Proposed Program (AI)
@@ -1464,10 +1474,10 @@ export async function generateStrategyReport(
   sections.push({ id: "ninety_day_plan", title: "90-Day Action Plan", html: ninetyDayHtml, isAiGenerated: true });
 
   // Step 13: Risks & Mitigations (AI)
-  onProgress?.("Writing Risks & Mitigations...", 88);
+  onProgress?.("Writing Delivery Dependencies...", 88);
   const risksRaw = await generateRisksAndMitigations(data, priorContext);
   const risksHtml = formatRisksHtml(risksRaw);
-  sections.push({ id: "risks", title: "Key Risks and Mitigations", html: risksHtml, isAiGenerated: true });
+  sections.push({ id: "risks", title: "Delivery Dependencies and Mitigations", html: risksHtml, isAiGenerated: true });
 
   // Step 14: Summary of Recommendations (AI)
   onProgress?.("Writing Recommendations...", 93);
@@ -1530,22 +1540,22 @@ export const strategyReportRouter = router({
 
   // Generate strategy report (returns HTML for preview)
   preview: adminProcedure
-    .input(z.object({ territoryId: z.string() }))
+    .input(z.object({ territoryId: z.string(), config: strategyConfigSchema }))
     .mutation(async ({ input }) => {
-      const result = await generateStrategyReport(input.territoryId);
+      const result = await generateStrategyReport(input.territoryId, input.config);
       return { html: result.html, sectionCount: result.sections.length };
     }),
 
   // Generate strategy report + PDF
   generate: adminProcedure
-    .input(z.object({ territoryId: z.string() }))
+    .input(z.object({ territoryId: z.string(), config: strategyConfigSchema }))
     .mutation(async ({ input }) => {
       const { DASHBOARD_DATA } = await import("../client/src/data/dashboardData");
       const dashData = DASHBOARD_DATA[input.territoryId];
       if (!dashData) throw new Error(`No data for territory: ${input.territoryId}`);
 
       // Generate the full report
-      const result = await generateStrategyReport(input.territoryId);
+      const result = await generateStrategyReport(input.territoryId, input.config);
 
       // Generate PDF
       const pdfBuffer = await generatePdf(result.html);
@@ -1556,9 +1566,20 @@ export const strategyReportRouter = router({
 
       return {
         url,
+        html: result.html,
         territoryName: dashData.name,
         sectionCount: result.sections.length,
         generatedAt: new Date().toISOString(),
       };
+    }),
+
+  // Render the exact reviewed HTML instead of re-running every AI section.
+  exportPdf: adminProcedure
+    .input(z.object({ territoryId: z.string(), html: z.string().min(1).max(3_000_000) }))
+    .mutation(async ({ input }) => {
+      const pdfBuffer = await generatePdf(input.html);
+      const filename = `strategy-reports/${input.territoryId}_strategy_report_${Date.now()}.pdf`;
+      const { url } = await storagePut(filename, pdfBuffer, "application/pdf");
+      return { url, generatedAt: new Date().toISOString() };
     }),
 });

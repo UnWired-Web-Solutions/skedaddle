@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { publicProcedure, router } from "./_core/trpc";
+import { adminProcedure, router } from "./_core/trpc";
 import { ENV } from "./_core/env";
 import { storagePut } from "./storage";
 import puppeteer from "puppeteer";
@@ -17,6 +17,34 @@ interface ProposalData {
   topSuburbs: string[];
   topSpecies: string[];
   seasonalTiming: string;
+}
+
+const proposalConfigSchema = z.object({
+  currentMonthlyPrice: z.number().nonnegative(),
+  currentBlogPosts: z.number().int().nonnegative(),
+  currentGbpPosts: z.number().int().nonnegative(),
+  essentialPrice: z.number().nonnegative(),
+  essentialBlogPosts: z.number().int().nonnegative(),
+  essentialGbpPosts: z.number().int().nonnegative(),
+  growthPrice: z.number().nonnegative(),
+  growthBlogPosts: z.number().int().nonnegative(),
+  growthGbpPosts: z.number().int().nonnegative(),
+  acceleratorPrice: z.number().nonnegative(),
+  acceleratorBlogPosts: z.number().int().nonnegative(),
+  acceleratorGbpPosts: z.number().int().nonnegative(),
+  scopeNotes: z.string().min(1).max(2000),
+});
+type ProposalConfig = z.infer<typeof proposalConfigSchema>;
+
+const proposalInputSchema = z.object({
+  territoryId: z.string(),
+  config: proposalConfigSchema,
+});
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, character => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;",
+  } as Record<string, string>)[character] || character);
 }
 
 // ─── Seasonal data by region ─────────────────────────────────────────────────
@@ -101,9 +129,10 @@ Return ONLY the paragraph text, no quotes or formatting.`;
 
 // ─── HTML Template ───────────────────────────────────────────────────────────
 
-function buildProposalHtml(data: ProposalData, narrative: string): string {
+function buildProposalHtml(data: ProposalData, narrative: string, config: ProposalConfig): string {
   const suburbList = data.topSuburbs.slice(0, 6).join(", ");
   const seasonalTiming = data.seasonalTiming;
+  const money = (amount: number) => (data.currency === "CAD" ? "CA$" : "$") + amount.toLocaleString("en-US");
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -398,7 +427,7 @@ function buildProposalHtml(data: ProposalData, narrative: string): string {
   </div>
   
   <h2>Investment — Per Location Pricing</h2>
-  <p>All three packages include the full program: location, suburb, neighborhood and species page creation, quarterly content strategy, GBP post program, quarterly performance calls, and a monthly analytics reporting folder. The difference between tiers is the monthly GBP post volume — more posts means more consistent local pack presence and higher call volume through ${data.territoryName}'s peak wildlife seasons.</p>
+  <p>The prices and monthly content volumes below are the confirmed commercial inputs for this territory. Package inclusions, exclusions, and rollout limits are governed by the approved scope notes; volume alone is not presented as a guarantee of visibility or call growth.</p>
   
   <table class="pricing-table">
     <thead>
@@ -411,24 +440,24 @@ function buildProposalHtml(data: ProposalData, narrative: string): string {
     <tbody>
       <tr>
         <td class="tier-name">Essential</td>
-        <td>25 posts / month</td>
-        <td class="price">$1,750 / location</td>
+        <td>${config.essentialGbpPosts} posts / month</td>
+        <td class="price">${money(config.essentialPrice)} / location</td>
       </tr>
       <tr>
         <td class="tier-name">Growth</td>
-        <td>30 posts / month</td>
-        <td class="price">$2,000 / location</td>
+        <td>${config.growthGbpPosts} posts / month</td>
+        <td class="price">${money(config.growthPrice)} / location</td>
       </tr>
       <tr>
         <td class="tier-name">Accelerator</td>
-        <td>40 posts / month</td>
-        <td class="price">$2,350 / location</td>
+        <td>${config.acceleratorGbpPosts} posts / month</td>
+        <td class="price">${money(config.acceleratorPrice)} / location</td>
       </tr>
     </tbody>
   </table>
   
   <div class="includes-box">
-    <strong>Every package includes:</strong> All location, suburb, neighborhood & species page creation · Quarterly content strategy · Monthly GBP post program · Quarterly strategy calls · Monthly analytics reporting folder per location.
+    <strong>Approved scope notes:</strong> ${escapeHtml(config.scopeNotes)}
   </div>
   
   <div class="footer">Unwired Web Solutions | uws@unwiredwebsolutions.com | Confidential — Franchise Use Only</div>
@@ -458,24 +487,24 @@ function buildProposalHtml(data: ProposalData, narrative: string): string {
     <tbody>
       <tr>
         <td>Monthly Investment</td>
-        <td>$1,000 / location</td>
-        <td>$1,750 / location</td>
-        <td>$2,000 / location</td>
-        <td>$2,350 / location</td>
+        <td>${money(config.currentMonthlyPrice)} / location</td>
+        <td>${money(config.essentialPrice)} / location</td>
+        <td>${money(config.growthPrice)} / location</td>
+        <td>${money(config.acceleratorPrice)} / location</td>
       </tr>
       <tr>
         <td>Blog Posts / Month</td>
-        <td>3</td>
-        <td class="dash">—</td>
-        <td class="dash">—</td>
-        <td class="dash">—</td>
+        <td>${config.currentBlogPosts}</td>
+        <td>${config.essentialBlogPosts}</td>
+        <td>${config.growthBlogPosts}</td>
+        <td>${config.acceleratorBlogPosts}</td>
       </tr>
       <tr>
         <td>GBP Posts / Month</td>
-        <td>3</td>
-        <td>25</td>
-        <td>30</td>
-        <td>40</td>
+        <td>${config.currentGbpPosts}</td>
+        <td>${config.essentialGbpPosts}</td>
+        <td>${config.growthGbpPosts}</td>
+        <td>${config.acceleratorGbpPosts}</td>
       </tr>
       <tr>
         <td>Species Page Rewrites</td>
@@ -571,7 +600,7 @@ async function generatePdf(html: string): Promise<Buffer> {
 
 export const proposalRouter = router({
   // Get available territories for proposal generation
-  getTerritories: publicProcedure.query(async () => {
+  getTerritories: adminProcedure.query(async () => {
     // Import franchise data dynamically to avoid circular deps
     const { DASHBOARD_DATA } = await import("../client/src/data/dashboardData");
     const { FRANCHISE_LOCATIONS } = await import("../client/src/data/franchises");
@@ -589,8 +618,8 @@ export const proposalRouter = router({
   }),
 
   // Generate a proposal for a specific territory
-  generate: publicProcedure
-    .input(z.object({ territoryId: z.string() }))
+  generate: adminProcedure
+    .input(proposalInputSchema)
     .mutation(async ({ input }) => {
       const { DASHBOARD_DATA } = await import("../client/src/data/dashboardData");
       const { FRANCHISE_LOCATIONS } = await import("../client/src/data/franchises");
@@ -619,7 +648,7 @@ export const proposalRouter = router({
       const narrative = await generateProposalNarrative(proposalData);
 
       // Build HTML
-      const html = buildProposalHtml(proposalData, narrative);
+      const html = buildProposalHtml(proposalData, narrative, input.config);
 
       // Generate PDF
       const pdfBuffer = await generatePdf(html);
@@ -630,14 +659,15 @@ export const proposalRouter = router({
 
       return {
         url,
+        html,
         territoryName: dashData.name,
         generatedAt: new Date().toISOString(),
       };
     }),
 
   // Preview HTML (for in-browser preview without PDF generation)
-  preview: publicProcedure
-    .input(z.object({ territoryId: z.string() }))
+  preview: adminProcedure
+    .input(proposalInputSchema)
     .mutation(async ({ input }) => {
       const { DASHBOARD_DATA } = await import("../client/src/data/dashboardData");
       const { FRANCHISE_LOCATIONS } = await import("../client/src/data/franchises");
@@ -662,8 +692,18 @@ export const proposalRouter = router({
       };
 
       const narrative = await generateProposalNarrative(proposalData);
-      const html = buildProposalHtml(proposalData, narrative);
+      const html = buildProposalHtml(proposalData, narrative, input.config);
 
       return { html, narrative };
+    }),
+
+  // Export the exact reviewed preview; no second AI call can change the copy.
+  exportPdf: adminProcedure
+    .input(z.object({ territoryId: z.string(), html: z.string().min(1).max(1_500_000) }))
+    .mutation(async ({ input }) => {
+      const pdfBuffer = await generatePdf(input.html);
+      const filename = `proposals/${input.territoryId}_franchise_proposal_${Date.now()}.pdf`;
+      const { url } = await storagePut(filename, pdfBuffer, "application/pdf");
+      return { url, generatedAt: new Date().toISOString() };
     }),
 });

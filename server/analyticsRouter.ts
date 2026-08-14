@@ -59,6 +59,32 @@ export const analyticsRouter = router({
     };
   }),
 
+  /** Latest imported period, used by dashboards instead of hard-coded dates. */
+  getLatestPeriod: publicProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return null;
+
+    const [ga4Latest] = await db
+      .select({ period: sql<number>`MAX(${ga4Sessions.year} * 100 + ${ga4Sessions.month})` })
+      .from(ga4Sessions);
+    const [gbpLatest] = await db
+      .select({ period: sql<number>`MAX(${gbpMetrics.year} * 100 + ${gbpMetrics.month})` })
+      .from(gbpMetrics);
+
+    const decode = (period: number | null | undefined) => period
+      ? { year: Math.floor(Number(period) / 100), month: Number(period) % 100 }
+      : null;
+    const ga4 = decode(ga4Latest?.period);
+    const gbp = decode(gbpLatest?.period);
+    // Use the latest period covered by both feeds (the earlier feed boundary)
+    // so default reports do not silently pair a current metric with a missing one.
+    const latest = [ga4, gbp]
+      .filter((period): period is { year: number; month: number } => Boolean(period))
+      .sort((a, b) => (a.year * 100 + a.month) - (b.year * 100 + b.month))[0] || null;
+
+    return { ga4, gbp, latest };
+  }),
+
   /**
    * Get monthly trend data for charts — aggregates all sub-locations under a parent territory.
    */
@@ -230,7 +256,7 @@ export const analyticsRouter = router({
       const [ga4Summary] = await db
         .select({ total: sql<number>`SUM(sessions)` })
         .from(ga4Sessions)
-        .where(and(...ga4Conditions, eq(ga4Sessions.pageType, "total")));
+        .where(and(...ga4Conditions, inArray(ga4Sessions.pageType, ["species_pages", "location_page"])));
 
       const gbpSummary = await db
         .select({
@@ -289,7 +315,7 @@ export const analyticsRouter = router({
               inArray(ga4Sessions.territory, group.ga4Territories),
               eq(ga4Sessions.year, year),
               eq(ga4Sessions.month, month),
-              eq(ga4Sessions.pageType, "total"),
+              inArray(ga4Sessions.pageType, ["species_pages", "location_page"]),
             ));
 
           const [prevRow] = await db
@@ -299,7 +325,7 @@ export const analyticsRouter = router({
               inArray(ga4Sessions.territory, group.ga4Territories),
               eq(ga4Sessions.year, prevYear),
               eq(ga4Sessions.month, month),
-              eq(ga4Sessions.pageType, "total"),
+              inArray(ga4Sessions.pageType, ["species_pages", "location_page"]),
             ));
 
           const current = Number(currentRow?.sessions || 0);
@@ -317,8 +343,8 @@ export const analyticsRouter = router({
                 type: "warning",
                 territory: group.name,
                 territoryId: group.id,
-                metric: "sessions",
-                message: `Sessions dropped ${Math.abs(pct).toFixed(0)}% (${prev.toLocaleString()} → ${current.toLocaleString()})`,
+                metric: "priority_page_sessions",
+                message: `Species + location page sessions dropped ${Math.abs(pct).toFixed(0)}% (${prev.toLocaleString()} → ${current.toLocaleString()})`,
                 currentValue: current,
                 previousValue: prev,
                 changePercent: pct,
@@ -328,8 +354,8 @@ export const analyticsRouter = router({
                 type: "success",
                 territory: group.name,
                 territoryId: group.id,
-                metric: "sessions",
-                message: `Sessions grew ${pct.toFixed(0)}% (${prev.toLocaleString()} → ${current.toLocaleString()})`,
+                metric: "priority_page_sessions",
+                message: `Species + location page sessions grew ${pct.toFixed(0)}% (${prev.toLocaleString()} → ${current.toLocaleString()})`,
                 currentValue: current,
                 previousValue: prev,
                 changePercent: pct,

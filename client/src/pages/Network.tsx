@@ -11,11 +11,14 @@ const SAGE_GREEN = "oklch(0.32 0.09 145)";
 const GOLD = "oklch(0.68 0.14 80)";
 const MIST = "oklch(0.88 0.012 80)";
 
-// Top 15 markets by T12 revenue (active territories only, sorted by revenue)
-const TOP_15 = FRANCHISE_LOCATIONS
-  .filter(f => f.status === "active" && f.kpis.totalRevenue > 0)
-  .sort((a, b) => b.kpis.totalRevenue - a.kpis.totalRevenue)
-  .slice(0, 15);
+// Rank only within a shared currency. Comparing CAD and USD without an
+// exchange-rate snapshot produces a misleading network leaderboard.
+const RANKED_MARKETS = (["CA", "US"] as const).flatMap(country =>
+  FRANCHISE_LOCATIONS
+    .filter(f => f.country === country && f.status === "active" && f.kpis.totalRevenue > 0)
+    .sort((a, b) => b.kpis.totalRevenue - a.kpis.totalRevenue)
+    .map((location, index) => ({ location, currencyRank: index + 1 })),
+);
 
 const fmt$ = (n: number, country: "CA" | "US") => {
   const currency = country === "CA" ? "CAD" : "USD";
@@ -51,7 +54,7 @@ export default function Network() {
           <div className="mt-3" style={{ borderTop: "2px solid oklch(0.32 0.09 145)", width: "48px" }} />
         </div>
 
-        {/* ── Top 15 Markets ── */}
+        {/* ── Market rankings ── */}
         <div className="mb-10">
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp size={16} style={{ color: SAGE_GREEN }} />
@@ -59,7 +62,7 @@ export default function Network() {
               className="text-xs font-semibold tracking-widest uppercase"
               style={{ color: SAGE_GREEN, fontFamily: "Inter, sans-serif" }}
             >
-              Top 15 Markets — T12 Revenue
+              Market Rankings by Currency — T12 Revenue
             </h2>
           </div>
           <div
@@ -80,7 +83,7 @@ export default function Network() {
                 </tr>
               </thead>
               <tbody>
-                {TOP_15.map((loc, i) => (
+                {RANKED_MARKETS.map(({ location: loc, currencyRank }, i) => (
                   <tr
                     key={loc.id}
                     style={{
@@ -92,11 +95,11 @@ export default function Network() {
                       <span
                         className="text-sm font-bold"
                         style={{
-                          color: i === 0 ? "oklch(0.68 0.14 80)" : i < 3 ? SAGE_GREEN : "oklch(0.52 0.016 80)",
+                          color: currencyRank === 1 ? "oklch(0.68 0.14 80)" : currencyRank <= 3 ? SAGE_GREEN : "oklch(0.52 0.016 80)",
                           fontFamily: "'Playfair Display', Georgia, serif",
                         }}
                       >
-                        #{i + 1}
+                        #{currencyRank} {loc.country === "CA" ? "CAD" : "USD"}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -134,7 +137,7 @@ export default function Network() {
             </table>
           </div>
           <div className="mt-2 text-xs" style={{ color: "oklch(0.65 0.010 80)", fontFamily: "Inter, sans-serif" }}>
-            Revenue figures are trailing 12 months from Salesforce. CAD and USD are not normalized — figures reflect each territory's local currency.
+            Revenue figures are trailing 12 months from Salesforce. Rankings restart for CAD and USD so unlike currencies are never compared.
           </div>
         </div>
 

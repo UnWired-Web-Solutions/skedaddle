@@ -411,7 +411,7 @@ async function generateSpeciesSection(
 
 Context:
 - Species: ${species}
-- Revenue weight: ${revenuePercent}% of this territory's business
+- Territory demand weight: ${revenuePercent}% of territory revenue. This is not suburb-level species data
 - Tier: ${tier} (${tier === 1 ? "primary species — full treatment" : tier === 2 ? "secondary species — moderate treatment" : "minor species — brief mention"})
 - Location: ${suburbName}, ${state}, ${country === "US" ? "United States" : "Canada"}
 - Seasonal timing: ${seasonalTiming}
@@ -422,6 +422,7 @@ Requirements:
 - Exactly ${targetWords} words (±10 words)
 - ${tier === 1 ? "Full H3-level section: how they get in, what Skedaddle does, seasonal timing, local context" : tier === 2 ? "Moderate section: brief entry behavior, Skedaddle's approach, link to species page" : "Brief mention: one sentence on the species + link to main species page"}
 - Reference how this species specifically affects homes in ${suburbName}
+- Do not claim this species, a job count, or revenue was observed in ${suburbName}; describe it as a territory-priority service and use general local housing context
 - Include seasonal timing for when this species is most active
 - ${country === "CA" ? "Use Canadian spelling (behaviour, neighbour)" : "Use American spelling"}
 - No AI-sounding language — write like a technician explaining to a homeowner
@@ -528,6 +529,7 @@ export async function generateSuburbPageContent(
     county?: string;
     yearsServing?: string;
     franchiseFoundedYear?: string;
+    gbpUrl?: string;
   },
 ): Promise<SuburbPageContent> {
   const { DASHBOARD_DATA } = await import("../client/src/data/dashboardData");
@@ -545,11 +547,16 @@ export async function generateSuburbPageContent(
   const countryCode = location.country as "US" | "CA";
   const state = location.state;
   const territoryName = dashData.name;
-  const phone = options?.phone || "(888) 888-8888"; // Default — should be overridden
-  const yearsServing = options?.yearsServing || "2020";
+  const phone = options?.phone || "";
+  const yearsServing = options?.yearsServing || "";
+  const CANADIAN_REGULATORS: Record<string, string> = {
+    ON: "Ontario Ministry of Natural Resources",
+    QC: "Québec Ministère de l'Environnement, de la Lutte contre les changements climatiques, de la Faune et des Parcs",
+    BC: "British Columbia Ministry of Water, Land and Resource Stewardship",
+  };
   const regulatoryBody = countryCode === "CA"
-    ? "Ontario Ministry of Natural Resources and Forestry (MNRF)"
-    : `${state} Department of Natural Resources`;
+    ? CANADIAN_REGULATORS[state] || `${state} provincial wildlife authority`
+    : `${state} wildlife authority`;
 
   // Seasonal timing
   const SEASONAL_DATA: Record<string, string> = {
@@ -580,15 +587,14 @@ export async function generateSuburbPageContent(
   const research = await researchSuburb(suburbName, state, country, territoryName);
   console.log(`[SuburbPage] Sonar research complete. Page status: ${research.existingPageStatus}`);
 
-  // Use Sonar-verified neighbourhoods if available, fall back to options/defaults
-  const neighbourhoods = (
-    research.verifiedNeighbourhoods.length >= 3
-      ? research.verifiedNeighbourhoods
-      : options?.neighbourhoods
-  ) || [`Central ${suburbName}`, `North ${suburbName}`, `South ${suburbName}`];
+  // Explicit operator input wins. Research suggestions remain evidence to review,
+  // never a source of invented placeholder neighbourhoods.
+  const neighbourhoods = options?.neighbourhoods?.length
+    ? options.neighbourhoods
+    : research.verifiedNeighbourhoods;
 
   // Use Sonar-verified county if available
-  const county = research.county || options?.county || `${state} County`;
+  const county = options?.county || research.county || "";
 
   // ─── Generate all content sections ─────────────────────────────────────────
 
@@ -634,12 +640,12 @@ export async function generateSuburbPageContent(
     territoryName,
     territorySlug,
     franchisePhone: phone,
-    franchiseFoundedYear: options?.franchiseFoundedYear || "2020",
+    franchiseFoundedYear: options?.franchiseFoundedYear || yearsServing,
     parentOrgFoundedYear: "1989",
     suburbName,
     suburbSlug,
-    latitude: options?.latitude || 0,
-    longitude: options?.longitude || 0,
+    latitude: options?.latitude ?? 0,
+    longitude: options?.longitude ?? 0,
     county: county, // Uses Sonar-verified county if available
     state,
     country: countryCode,
@@ -651,21 +657,16 @@ export async function generateSuburbPageContent(
     })),
     neighbourhoods,
     nearbyCities: options?.nearbyCities || [],
-    hours: {
-      weekday: { opens: "06:30", closes: "20:00" },
-      saturday: { opens: "07:00", closes: "16:00" },
-      sunday: { opens: "09:00", closes: "15:00" },
-    },
     faqs: faqSection,
-    gbpUrl: `https://www.google.com/maps/search/?api=1&query=Skedaddle+${territoryName}`,
+    gbpUrl: options?.gbpUrl || "",
   };
   const schemaBlocks = buildSuburbSchema(schemaParams);
 
   // 8. Trust chips
   const trustChips = [
-    `Over ${Math.round(totalJobs / dashData.suburbs.length)} inspections in ${suburbName} in the last 12 months`,
     `Serving ${suburbName} since ${yearsServing}`,
-    `Lifetime warranty on all sealed entry points`,
+    "Humane exclusion and prevention-focused service",
+    "Local business details confirmed before generation",
   ];
 
   // 9. Launch checklist
@@ -673,7 +674,7 @@ export async function generateSuburbPageContent(
     { item: "Meta title under 60 characters", status: "ready" as const },
     { item: "Meta description under 155 characters", status: metaDescription.length <= 155 ? "ready" as const : "needs_review" as const },
     { item: "H1 includes suburb name", status: "ready" as const },
-    { item: "All species sections match revenue weighting", status: "ready" as const },
+    { item: "Species sections match territory revenue weighting and avoid suburb-level demand claims", status: "ready" as const },
     { item: "Internal links to species pages verified", status: "needs_review" as const },
     { item: "Phone number verified against GBP", status: options?.phone ? "ready" as const : "pending" as const },
     { item: "NAP consistent with GBP listing", status: options?.phone ? "ready" as const : "pending" as const },
@@ -686,15 +687,15 @@ export async function generateSuburbPageContent(
   const citations = [
     { fact: `Total territory revenue: $${(totalRevenue / 1000).toFixed(0)}K`, source: "Salesforce CRM (Kira export Jul 2026)", verified: true },
     { fact: `Total territory jobs: ${totalJobs}`, source: "Salesforce CRM (Kira export Jul 2026)", verified: true },
-    { fact: `Top species: ${topSpeciesNames.join(", ")}`, source: "Salesforce CRM species report", verified: true },
+    { fact: `Territory-priority species: ${topSpeciesNames.join(", ")}`, source: "Salesforce CRM territory species report (not suburb-level)", verified: true },
     { fact: `Phone: ${phone}`, source: options?.phone ? "Google Business Profile" : "Placeholder — needs GBP verification", verified: !!options?.phone },
-    { fact: `Seasonal timing: ${seasonalTiming}`, source: `${countryCode === "CA" ? "Provincial" : "State"} wildlife agency guidance`, verified: true },
+    { fact: `Seasonal timing: ${seasonalTiming}`, source: "Curated regional planning guidance — reviewer confirmation required", verified: false },
     { fact: `Franchise founded: ${yearsServing}`, source: options?.yearsServing ? "Google Business Profile" : "Needs franchisor confirmation", verified: !!options?.yearsServing },
     // Sonar-verified citations
-    { fact: `Existing Skedaddle page: ${research.existingPageStatus}`, source: research.existingPageCitation || "Perplexity Sonar (live web search)", verified: true },
-    ...(research.county ? [{ fact: `County: ${research.county}`, source: research.localFactsCitations[0] || "Perplexity Sonar (live web search)", verified: true }] : []),
-    ...(research.verifiedNeighbourhoods.length > 0 ? [{ fact: `Verified neighbourhoods: ${research.verifiedNeighbourhoods.join(", ")}`, source: research.localFactsCitations[0] || "Perplexity Sonar (live web search)", verified: true }] : []),
-    ...(research.topCompetitors.length > 0 ? [{ fact: `Top competitors: ${research.topCompetitors.map(c => c.name).join(", ")}`, source: research.competitorCitations[0] || "Perplexity Sonar (live web search)", verified: true }] : []),
+    { fact: `Existing Skedaddle page: ${research.existingPageStatus}`, source: research.existingPageCitation || "Perplexity Sonar research — reviewer confirmation required", verified: false },
+    ...(research.county ? [{ fact: `Research-suggested county: ${research.county}`, source: research.localFactsCitations[0] || "Perplexity Sonar research — reviewer confirmation required", verified: false }] : []),
+    ...(research.verifiedNeighbourhoods.length > 0 ? [{ fact: `Research-suggested neighbourhoods: ${research.verifiedNeighbourhoods.join(", ")}`, source: research.localFactsCitations[0] || "Perplexity Sonar research — reviewer confirmation required", verified: false }] : []),
+    ...(research.topCompetitors.length > 0 ? [{ fact: `Research-suggested competitors: ${research.topCompetitors.map(c => c.name).join(", ")}`, source: research.competitorCitations[0] || "Perplexity Sonar research — reviewer confirmation required", verified: false }] : []),
   ];
 
   return {
@@ -762,14 +763,15 @@ export const suburbPageRouter = router({
     .input(z.object({
       territoryId: z.string(),
       suburbName: z.string(),
-      neighbourhoods: z.array(z.string()).optional(),
+      neighbourhoods: z.array(z.string().min(2)).min(1),
       nearbyCities: z.array(z.string()).optional(),
-      phone: z.string().optional(),
-      latitude: z.number().optional(),
-      longitude: z.number().optional(),
-      county: z.string().optional(),
-      yearsServing: z.string().optional(),
-      franchiseFoundedYear: z.string().optional(),
+      phone: z.string().min(7),
+      latitude: z.number().min(-90).max(90),
+      longitude: z.number().min(-180).max(180),
+      county: z.string().min(2),
+      yearsServing: z.string().regex(/^\d{4}$/),
+      franchiseFoundedYear: z.string().regex(/^\d{4}$/),
+      gbpUrl: z.string().url(),
     }))
     .mutation(async ({ input }) => {
       const content = await generateSuburbPageContent(input.territoryId, input.suburbName, {
@@ -781,6 +783,7 @@ export const suburbPageRouter = router({
         county: input.county,
         yearsServing: input.yearsServing,
         franchiseFoundedYear: input.franchiseFoundedYear,
+        gbpUrl: input.gbpUrl,
       });
 
       // Store in database

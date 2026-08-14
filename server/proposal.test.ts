@@ -94,19 +94,12 @@ describe("Proposal Generator", () => {
       expect(html).toContain(mockNarrative);
     });
 
-    it("should include correct pricing tiers", () => {
-      const tiers = [
-        { name: "Essential", price: 1750, posts: 25 },
-        { name: "Growth", price: 2000, posts: 30 },
-        { name: "Accelerator", price: 2350, posts: 40 },
-      ];
-
-      expect(tiers[0].price).toBe(1750);
-      expect(tiers[1].price).toBe(2000);
-      expect(tiers[2].price).toBe(2350);
-      expect(tiers[0].posts).toBe(25);
-      expect(tiers[1].posts).toBe(30);
-      expect(tiers[2].posts).toBe(40);
+    it("should expose exact-preview PDF export", async () => {
+      const { proposalRouter } = await import("./proposalRouter");
+      const procedures = (proposalRouter as any)._def.procedures;
+      expect(procedures.preview).toBeDefined();
+      expect(procedures.generate).toBeDefined();
+      expect(procedures.exportPdf).toBeDefined();
     });
   });
 
