@@ -63,6 +63,66 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+function ResearchProgressCard({ suburbName }: { suburbName: string }) {
+  const researchSteps = [
+    "Checking whether a dedicated Skedaddle page already exists",
+    "Researching local neighbourhoods, county, and guidance",
+    "Reviewing the local competitor landscape",
+  ];
+
+  return (
+    <div
+      className="rounded-sm border p-6"
+      style={{ borderColor: "oklch(0.82 0.08 145)", background: "oklch(0.975 0.018 145)" }}
+      aria-live="polite"
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+          style={{ background: "oklch(0.32 0.09 145)", color: "white" }}
+        >
+          <Loader2 size={16} className="animate-spin" />
+        </div>
+        <div>
+          <h2 className="text-base font-semibold" style={{ color: "oklch(0.22 0.07 145)", fontFamily: "Inter, sans-serif" }}>
+            Researching with Sonar…
+          </h2>
+          <p className="mt-1 text-sm leading-relaxed" style={{ color: "oklch(0.35 0.04 145)", fontFamily: "Inter, sans-serif" }}>
+            Before Claude Opus 5 drafts the {suburbName} page, the system runs live web research and preserves the resulting source URLs for review.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 space-y-3 border-t pt-4" style={{ borderColor: "oklch(0.84 0.06 145)" }}>
+        {researchSteps.map((step, index) => (
+          <div key={step} className="flex items-center gap-3 text-sm" style={{ color: "oklch(0.32 0.04 145)", fontFamily: "Inter, sans-serif" }}>
+            <span
+              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold"
+              style={{ background: "oklch(0.90 0.07 145)", color: "oklch(0.28 0.09 145)" }}
+            >
+              {index + 1}
+            </span>
+            <span>{step}</span>
+          </div>
+        ))}
+        <div className="flex items-center gap-3 pt-1 text-sm" style={{ color: "oklch(0.45 0.04 145)", fontFamily: "Inter, sans-serif" }}>
+          <span
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold"
+            style={{ background: "oklch(0.94 0.04 145)", color: "oklch(0.38 0.07 145)" }}
+          >
+            4
+          </span>
+          <span>Drafting the source-labelled content package with Claude Opus 5</span>
+        </div>
+      </div>
+
+      <p className="mt-5 text-xs leading-relaxed" style={{ color: "oklch(0.48 0.03 145)", fontFamily: "Inter, sans-serif" }}>
+        Research findings are suggestions with citations, not automatically verified publishing facts. Review the citations before approval.
+      </p>
+    </div>
+  );
+}
+
 // ─── Content Preview ─────────────────────────────────────────────────────────
 
 function ContentPreview({ content }: { content: GeneratedContent }) {
@@ -504,7 +564,7 @@ export default function SuburbPageGenerator() {
                   {generateMutation.isPending ? (
                     <span className="flex items-center justify-center gap-2">
                       <Loader2 size={14} className="animate-spin" />
-                      Generating review draft...
+                      Researching with Sonar…
                     </span>
                   ) : (
                     <span className="flex items-center justify-center gap-2">
@@ -524,7 +584,9 @@ export default function SuburbPageGenerator() {
 
             {/* Right: Preview */}
             <div className="lg:col-span-2">
-              {generatedContent ? (
+              {generateMutation.isPending ? (
+                <ResearchProgressCard suburbName={selectedSuburb} />
+              ) : generatedContent ? (
                 <div className="rounded-sm border" style={{ borderColor: "oklch(0.88 0.012 80)", background: "oklch(1 0 0)" }}>
                   {/* Preview header */}
                   <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: "oklch(0.93 0.008 80)" }}>

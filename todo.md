@@ -304,7 +304,7 @@
 - [x] Parse Sonar responses into structured SuburbResearch object
 - [x] Inject Sonar research into Claude Opus 5 prompts (intro, neighbourhood sections)
 - [x] Update citation system to include Sonar source URLs (page status, county, neighbourhoods, competitors)
-- [ ] Add research status indicator to frontend UI (shows "Researching with Sonar..." during generation) — deferred to next session
+- [x] Add research status indicator to frontend UI (shows "Researching with Sonar..." during generation, including its research steps and reviewer guidance)
 - [x] Add SONAR_API_KEY to env.ts and verified in environment
 - [x] Write tests for Sonar integration (73/73 passing)
 - [x] Deploy
