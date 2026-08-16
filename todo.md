@@ -308,3 +308,8 @@
 - [x] Add SONAR_API_KEY to env.ts and verified in environment
 - [x] Write tests for Sonar integration (73/73 passing)
 - [x] Deploy
+
+## Repository Review (Aug 6, 2026)
+- [x] Inspect and review GPT's recent repository additions — branch `codex/product-coherence-reporting` found; requires a small JSX fix before it can be merged
+- [x] Fix, validate, and merge the approved `codex/product-coherence-reporting` branch — repaired the GBP chart JSX, TypeScript clean, 73/73 tests passing
+- [x] Create and commit a comprehensive GPT collaboration brief for the Skedaddle portal

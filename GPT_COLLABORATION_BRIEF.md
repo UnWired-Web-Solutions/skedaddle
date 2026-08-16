@@ -1,0 +1,243 @@
+# Skedaddle Franchise Portal — GPT Collaboration Brief
+
+> **Purpose:** This document brings a collaborating GPT agent up to speed on the Skedaddle Franchise Portal. Read it before proposing code, changing data, generating client-facing content, or modifying the live project.
+
+## 1. Mission and Operating Context
+
+The portal is an internal, login-protected operating system for **Skedaddle Humane Wildlife Control**. It is being built by Unwired Web Solutions (UWS) for Dave Henderson and the Skedaddle team. The immediate business objective is to help Dave sell, deliver, and operationalize territory-level digital marketing programs across the franchise network.
+
+The portal currently supports territory dashboards, data-backed strategy materials, proposals, GBP image creation, suburb-page generation, and the beginning of a Salesforce integration. It is not a public consumer website. The primary working users are Dave and Ay Bello, with future review involvement expected from Rachel, Sarah, and Tristan.
+
+| Item | Current state |
+|---|---|
+| Live domains | `skedaddle.manus.space` and `skedash-5fbc2yka.manus.space` |
+| Project directory | `/home/ubuntu/skedaddle-dashboards` |
+| GitHub remote | `user_github` → `aybello/skedaddle` |
+| Deployment model | Every successful checkpoint auto-publishes to production |
+| Main branch at handoff | `main` at checkpoint `e9aaf937` |
+| Current GPT branch | `codex/product-coherence-reporting` at `8413ba6` |
+
+## 2. Non-Negotiable Data Rules
+
+### Never fabricate, estimate, or silently infer business data
+
+This is the most important project rule. Missing data must be displayed as **Pending**, **Unknown**, **Not provided**, or **Needs confirmation**. Do not convert engagement volume into an estimated publishing volume. Do not invent page existence, location facts, review counts, jobs, revenue, GA4 traffic, GSC performance, GBP performance, service areas, or competitor claims.
+
+Kira’s verified Salesforce exports corrected several past report errors, including material revenue errors for London, Hamilton, Durham, Ottawa, Denver, and Atlanta North. Those corrections established the following hierarchy:
+
+| Priority | Data source | Appropriate use |
+|---|---|---|
+| 1 | Kira’s verified Salesforce exports | Revenue, completed jobs, property assessments, territory and species performance |
+| 2 | Direct Salesforce API once authorized | Live operational data, close-rate analysis, inspection counts, trust chips |
+| 3 | Direct GSC and GA4 APIs once access is granted | Page validation, search performance, page-level traffic, YoY analysis |
+| 4 | Verified Google Business Profile data/API | GBP locations, NAP, hours, posts, reviews, calls, clicks, discovery metrics |
+| 5 | Perplexity Sonar research | Web-grounded research suggestions with source URLs; requires content-team review before publishing |
+| 6 | Historic Looker Studio exports | Reference only; do not use as a substitute for verified Salesforce data where they conflict |
+
+> **Do not represent Sonar output as a confirmed business fact solely because it has citations.** It is valuable research, but local facts, regulations, competitors, and page status still require appropriate review before publication.
+
+### Currency and comparison discipline
+
+The network contains Canadian and United States territories. Do not compare average job value, revenue, or similar financial metrics across CAD and USD without an explicit exchange-rate snapshot and stated methodology. Avoid territory-level close-rate claims unless territory-level property assessment/appointment denominators are available.
+
+## 3. Current Product Surface
+
+The React app routes are in `client/src/App.tsx`; tRPC modules are wired in `server/routers.ts`.
+
+| Module | Route / server router | Current purpose |
+|---|---|---|
+| Territory overview | `/` | Territory cards and portal entry point |
+| Territory dashboard | `/dashboard/:id` | Salesforce, GSC, GBP, and chart-based performance views where data exists |
+| Network view | `/network` | Network-level territory context |
+| Analytics | `/analytics` / `analyticsRouter` | DashThis-replacement direction, including page-performance reporting |
+| GBP Image Generator | `/gbp-images` / `gbpImageRouter` | Creates GBP post images using GPT Image 2 and a review process |
+| Salesforce | `/salesforce` / `salesforceRouter` | OAuth connection status, schema exploration, SOQL console; waiting for Connected App credentials |
+| Proposals | `/proposals` / `proposalRouter` | Territory-specific branded three-page proposal preview and PDF export |
+| Strategy Reports | `/strategy-report` / `strategyReportRouter` | Multi-section, per-territory strategy report preview and PDF generator |
+| Suburb Pages | `/suburb-pages` / `suburbPageRouter` | Draft → review → approve → export SEO suburb-page content and JSON-LD |
+
+### Technology stack
+
+The portal uses React 19, TypeScript, Vite, Tailwind 4, Express 4, tRPC 11, Drizzle ORM, MySQL/TiDB, S3 storage helpers, Puppeteer, Vitest, and a custom local authentication layer. Generated files such as PDFs are stored in S3; do not store file bytes in database columns.
+
+The portal does **not** use the default Manus OAuth user records for its primary login. The UI uses a custom `AuthContext` username/password system. Existing server-side procedure choices must be tested in this environment; do not assume default Manus `adminProcedure`/`protectedProcedure` behavior will match the custom login state without verification.
+
+## 4. What Is Already Built
+
+### Territory dashboards and historic reports
+
+The portal contains 18 active territories with verified Salesforce-derived territory data where available. Earlier static HTML reports were regenerated after the Jul. 24 verified Salesforce exports. Barrie North remains pending because the verified export did not include it. Do not recreate missing values for Barrie North.
+
+Dashboard data is primarily located in:
+
+```text
+client/src/data/dashboardData.ts
+client/src/data/franchises.ts
+shared/territoryMapping.ts
+client/src/data/actionPlans.ts
+```
+
+### Proposal Generator
+
+The proposal generator creates a territory-specific, branded short proposal. It uses a direct Anthropic integration, renders a reviewed HTML document through Puppeteer, and stores the PDF in S3. The production Dockerfile includes Chromium specifically for this pipeline.
+
+### Strategy Report Generator
+
+The strategy generator is a per-territory long-form report engine intended to follow Dave’s Ottawa gold-standard strategy document. It assembles deterministic tables from structured data, then generates strategic narrative sections sequentially so they retain context.
+
+The intended sequence is:
+
+1. Executive summary
+2. Current campaign baseline
+3. Data foundation and species analysis
+4. Revenue by suburb and page-coverage status
+5. Gap analysis
+6. Proposed program and scale comparison
+7. Content architecture
+8. GBP strategy
+9. 90-day action plan
+10. Delivery dependencies and mitigations
+11. Recommendations
+
+The strategy generator was updated to use `claude-opus-5` for client-facing narrative. Its data integrity must remain deterministic: revenue, jobs, species, suburb names, and tables come from structured inputs, not LLM output.
+
+### Suburb Page Content Generator
+
+The suburb-page generator turns a selected territory and suburb into a WordPress-ready content package. It includes metadata, title structure, trust-chip candidates, NAP details, species-weighted content sections, neighbourhood/AEO content, FAQs, a launch checklist, citations, and an eight-block JSON-LD template.
+
+Species content is weighted by verified territory revenue contribution:
+
+| Species tier | Revenue share | Target content depth |
+|---|---:|---|
+| Tier 1 | 15% or higher | 130–150 words |
+| Tier 2 | 5% to <15% | 80–100 words |
+| Tier 3 | Below 5% | 40–60 words |
+
+The approval state is `draft → in_review → approved → exported`. Never bypass the review state or describe a generated page as ready to publish unless all external facts, NAP details, local claims, and schema inputs have been checked.
+
+### Perplexity Sonar research layer
+
+`server/suburbPageRouter.ts` now runs three Sonar queries before content generation:
+
+1. **Page validation:** Searches `site:skedaddlewildlife.com` to assess whether a dedicated suburb page appears to exist.
+2. **Local facts:** Looks for neighbourhoods, county/regional municipality, and relevant local wildlife information.
+3. **Competitor landscape:** Finds potential competitors and publicly available review/rating context.
+
+Sonar provides research candidates and source URLs. It should enhance a content brief, not silently create verified facts. The UI should eventually display a clear **“Researching with Sonar…”** progress state.
+
+### GBP Image Generator
+
+The GBP Image Generator is production-capable for **GBP posts**. It uses GPT Image 2, structured prompt preparation, species-aware scenes, vision QA retries, resizing, and Skedaddle overlay treatment. AI-generated images must **never** be uploaded into the consumer-facing GBP photo/gallery area. They are permissible for GBP posts, subject to approval.
+
+## 5. AI and API Standards
+
+### Model-selection policy
+
+Cost is not a limiting factor. Always select the current best model for the job. Do not default to mini, Haiku, or legacy versions just because they are cheaper.
+
+| Task | Preferred model/provider |
+|---|---|
+| Client-facing reports, strategy narratives, proposals, suburb-page body copy | Direct Anthropic `claude-opus-5` |
+| Structured extraction, classification, compact formatting | Direct Anthropic `claude-sonnet-5` |
+| Image generation | GPT Image 2 through the built-in Forge image service |
+| Fresh web-grounded research | Perplexity `sonar-pro` |
+| Vision / generation QA | Best available vision-capable model at time of implementation |
+| Deep structured reasoning or alternate quality check | Latest direct GPT or Gemini model when it is better suited; inspect the available model catalog first |
+
+The project has direct access to Anthropic, OpenAI, Perplexity, and built-in Forge services. Credentials must remain server-side. Never write an API key, token, password, or real user credential into source code, documentation, test fixtures, logs, or client-side variables.
+
+### Direct integrations already available
+
+| Integration | Status | Constraint |
+|---|---|---|
+| Anthropic API | Active | Use direct API for Claude content generation |
+| Perplexity Sonar API | Active | Treat outputs as cited research requiring review |
+| OpenAI API | Active | Use latest appropriate direct model when needed |
+| Forge image service | Active | GPT Image 2 used for GBP images |
+| Salesforce OAuth | Code complete; not connected | Requires Connected App credentials and Barry’s authorization |
+| GA4 | Account accessible, target property blocked | Ares/IME must grant `uws@unwiredwebsolutions.com` access to property `p394014501` |
+| GSC API | Not configured | Requires a Google Cloud service account and property permissions |
+| GBP API | Not configured | Required for post automation and verified GBP records |
+| WordPress REST API | Not configured | Required before any auto-publishing workflow |
+
+## 6. Required Accuracy and Content Rules
+
+1. Do not claim a dedicated suburb page is missing unless the page status is verified. Use **Unknown** or **Needs audit** otherwise.
+2. Do not infer GBP post volume from calls, clicks, impressions, or engagement. Ask for a confirmed campaign input.
+3. Do not infer a local number of inspections from territory-wide jobs. If a suburb-specific count is unavailable, show pending or ask for the Salesforce query.
+4. Do not generate fictional user reviews, ratings, or testimonials in any code, content, fixtures, or reports.
+5. Do not use current total sessions as the central report KPI when species-page and location-page performance is the actual business question.
+6. Clearly label estimated, historic, verified, pending, and research-suggested data.
+7. Generated prose should be natural, specific, and professional. Avoid generic AI phrasing and do not pad reports with filler.
+8. A model may draft narrative; it must not become the source of business facts.
+
+## 7. Important Reference Material
+
+The following sources are authoritative context. They may be outside the repository but are available in the broader project environment.
+
+| Source | Purpose |
+|---|---|
+| `/home/ubuntu/projects/uws-work-2c9ba727/session_memory.md` | Running project history and session log; read before work begins |
+| `/home/ubuntu/upload/Ottawa_Franchise_Digital_Marketing_Sales_Strategy.pdf` | Dave’s 55-page gold-standard strategy document |
+| `/home/ubuntu/ottawa_strategy_full_structure.md` | Extracted target structure and notes for the Ottawa report |
+| `/home/ubuntu/upload/MN_Franchise_Marketing_Strategy_Spring2026.txt` | Second example of how the strategy structure adapts by territory |
+| `/home/ubuntu/dave_report_feedback_notes.md` | Dave’s specific report-quality feedback |
+| `/home/ubuntu/dave_openclaw_prompt_analysis.md` | Quarterly-performance-report thinking and structure |
+| `server/templates/suburbPageSchema.ts` | Validated Prior Lake-derived JSON-LD pattern |
+| `server/suburbPageRouter.ts` | Content, research, citations, and approval-flow implementation |
+| `server/strategyReportRouter.ts` | Long-form strategy-report implementation |
+
+## 8. Current Priorities and Dependencies
+
+The work should proceed in this order unless Dave or Ay changes it.
+
+| Priority | Workstream | Current next action |
+|---:|---|---|
+| 1 | Report reliability | Incorporate the reporting-coherence branch after validation; test a real territory report with confirmed campaign inputs |
+| 2 | Suburb page delivery | End-to-end test a real page, beginning with a known territory/suburb; review research, local facts, schema, citations, and export |
+| 3 | Search and analytics data | Obtain GSC service-account access and GA4 property access for genuine page-level validation |
+| 4 | GBP automation | Build a review-first content calendar and approval queue; do not auto-post until GBP API OAuth and safeguards are complete |
+| 5 | Salesforce direct data | Complete Barry’s Connected App authorization, then inspect schema and build only verified extraction queries |
+| 6 | WordPress publishing | Add only after an approved review state and confirmed WordPress REST API scope/permissions |
+
+### Work explicitly waiting on people or access
+
+* **Barry:** Salesforce Connected App credentials and authorization.
+* **Ares / IME:** GA4 Viewer/Analyst access for the Skedaddle Wildlife property.
+* **Dave / Ryan:** GSC service-account permission; Google Business Profile API direction; WordPress API details.
+* **Kira:** Any further verified Salesforce exports, including missing Barrie North data.
+
+## 9. Active GPT Branch: Product Coherence and Reporting
+
+GPT has prepared `codex/product-coherence-reporting`. Its intended improvements are valuable and mostly align with the data rules in this brief:
+
+* Replaces inferred GBP publishing volume and generic blog volume with explicit confirmed inputs or **Not provided**.
+* Makes proposed GBP, blog, and page-build volumes operator-entered campaign values rather than invented recommendations presented as commitments.
+* Removes CAD/USD average-job-value comparisons without an exchange-rate methodology.
+* Reframes assumptions as delivery dependencies and data gaps rather than unsupported negative performance claims.
+* Uses more cautious treatment of Sonar-derived local facts, competitors, and page status.
+* Improves proposal export so the PDF uses the reviewed HTML rather than triggering a second, potentially different AI call.
+* Removes a fabricated page-image URL from JSON-LD and requires more explicit suburb-page inputs.
+
+### Merge status at handoff
+
+The branch is a clean descendant of `main`, but it initially failed TypeScript validation because `client/src/pages/Dashboard.tsx` was missing a closing `</BarChart>` tag. That defect has been repaired in an isolated review worktree. It still needs a full type-check and test run before a merge to `main`.
+
+## 10. Collaboration Protocol
+
+1. Read this brief, `session_memory.md`, `todo.md`, and the relevant code before making changes.
+2. Begin each feature by writing a clear plan and adding verifiable unchecked tasks to `todo.md`.
+3. Keep changes small and coherent. Avoid broad rewrites of working features.
+4. When changing database schema, update Drizzle schema first, generate a migration, review it, apply it through the approved database workflow, and test it.
+5. Run `npx tsc --noEmit` and `npx vitest run` after changes. Add/update Vitest tests for every changed feature.
+6. Visually verify changed portal pages before presenting them as complete.
+7. Do not merge, deploy, publish, send email, post content, or execute an external side effect without explicit approval where required.
+8. Before a checkpoint, read `todo.md`, mark completed items, and preserve unfinished work as unchecked.
+9. Every checkpoint is live production deployment. Treat it as a release.
+10. Keep GitHub synchronized. Do not use `git reset --hard`; use the portal checkpoint/rollback workflow if recovery is needed.
+
+## 11. Suggested First Actions for a Collaborating GPT
+
+First, complete the validation and merge of the reporting-coherence branch once the repaired `Dashboard.tsx` passes TypeScript and tests. Second, add a transparent Sonar research progress state to the Suburb Page UI. Third, generate one real suburb page and one strategy report with **confirmed** campaign inputs, then have Ay/Dave review the output before scaling.
+
+Do not start GBP auto-posting, WordPress publishing, Salesforce data extraction, or broad live-data claims until the corresponding credentials, authorization, and review safeguards are in place.
