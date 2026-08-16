@@ -357,6 +357,7 @@ export default function Dashboard() {
               <Bar dataKey="searches" name="Searches" fill={SAGE} radius={[3, 3, 0, 0]} />
               <Bar dataKey="calls" name="Calls" fill={GOLD} radius={[3, 3, 0, 0]} />
               <Bar dataKey="website_clicks" name="Website Clicks" fill={RUST} radius={[3, 3, 0, 0]} />
+            </BarChart>
           </ResponsiveContainer>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginTop: 20 }}>
             {[
