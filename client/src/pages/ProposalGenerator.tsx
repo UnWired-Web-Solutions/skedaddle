@@ -4,6 +4,22 @@ import { trpc } from "@/lib/trpc";
 import { Download, FileText, Loader2, Sparkles } from "lucide-react";
 import { useState } from "react";
 
+interface ProposalConfig {
+  currentMonthlyPrice: number;
+  currentBlogPosts: number;
+  currentGbpPosts: number;
+  essentialPrice: number;
+  essentialBlogPosts: number;
+  essentialGbpPosts: number;
+  growthPrice: number;
+  growthBlogPosts: number;
+  growthGbpPosts: number;
+  acceleratorPrice: number;
+  acceleratorBlogPosts: number;
+  acceleratorGbpPosts: number;
+  scopeNotes: string;
+}
+
 export default function ProposalGenerator() {
   const { user } = useAuth();
   const [selectedTerritory, setSelectedTerritory] = useState<string>("");
@@ -11,11 +27,31 @@ export default function ProposalGenerator() {
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [termsConfirmed, setTermsConfirmed] = useState(false);
+  const [config, setConfig] = useState<ProposalConfig>({
+    currentMonthlyPrice: 0, currentBlogPosts: 0, currentGbpPosts: 0,
+    essentialPrice: 0, essentialBlogPosts: 0, essentialGbpPosts: 0,
+    growthPrice: 0, growthBlogPosts: 0, growthGbpPosts: 0,
+    acceleratorPrice: 0, acceleratorBlogPosts: 0, acceleratorGbpPosts: 0,
+    scopeNotes: "",
+  });
 
   const { data: territories, isLoading: loadingTerritories } =
     trpc.proposal.getTerritories.useQuery();
 
   const generateMutation = trpc.proposal.generate.useMutation({
+    onSuccess: (data) => {
+      setPdfUrl(data.url);
+      setPreviewHtml(data.html);
+      setGenerating(false);
+    },
+    onError: (err) => {
+      setError(err.message);
+      setGenerating(false);
+    },
+  });
+
+  const exportMutation = trpc.proposal.exportPdf.useMutation({
     onSuccess: (data) => {
       setPdfUrl(data.url);
       setGenerating(false);
@@ -38,23 +74,33 @@ export default function ProposalGenerator() {
   });
 
   const handlePreview = () => {
-    if (!selectedTerritory) return;
+    if (!selectedTerritory || !termsConfirmed) return;
     setGenerating(true);
     setError(null);
     setPdfUrl(null);
     setPreviewHtml(null);
-    previewMutation.mutate({ territoryId: selectedTerritory });
+    previewMutation.mutate({ territoryId: selectedTerritory, config });
   };
 
   const handleGeneratePdf = () => {
-    if (!selectedTerritory) return;
+    if (!selectedTerritory || !termsConfirmed) return;
     setGenerating(true);
     setError(null);
     setPdfUrl(null);
-    generateMutation.mutate({ territoryId: selectedTerritory });
+    if (previewHtml) {
+      exportMutation.mutate({ territoryId: selectedTerritory, html: previewHtml });
+    } else {
+      generateMutation.mutate({ territoryId: selectedTerritory, config });
+    }
   };
 
   const selectedTerritoryData = territories?.find((t) => t.id === selectedTerritory);
+  const updateNumber = (key: keyof ProposalConfig, value: string) => {
+    setConfig(previous => ({ ...previous, [key]: Math.max(0, Number(value) || 0) }));
+    setTermsConfirmed(false);
+    setPreviewHtml(null);
+    setPdfUrl(null);
+  };
 
   const formatRevenue = (revenue: number, id: string) => {
     const territory = territories?.find((t) => t.id === id);
@@ -136,6 +182,7 @@ export default function ProposalGenerator() {
                   value={selectedTerritory}
                   onChange={(e) => {
                     setSelectedTerritory(e.target.value);
+                    setTermsConfirmed(false);
                     setPreviewHtml(null);
                     setPdfUrl(null);
                     setError(null);
@@ -180,17 +227,86 @@ export default function ProposalGenerator() {
             </div>
           )}
 
+          {selectedTerritory && (
+            <div className="mt-5 border-t pt-5" style={{ borderColor: "oklch(0.90 0.008 80)" }}>
+              <div className="flex items-start justify-between gap-4 mb-3">
+                <div>
+                  <h3 className="text-sm font-bold" style={{ color: "oklch(0.18 0.015 65)" }}>Confirm commercial assumptions</h3>
+                  <p className="text-xs mt-1" style={{ color: "oklch(0.52 0.016 80)" }}>
+                    These values are proposal inputs, not inferred from Salesforce. Prices use the territory currency.
+                  </p>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs" style={{ fontFamily: "Inter, sans-serif" }}>
+                  <thead>
+                    <tr style={{ color: "oklch(0.52 0.016 80)" }}>
+                      <th className="text-left py-2">Plan</th>
+                      <th className="text-left py-2">Monthly price</th>
+                      <th className="text-left py-2">Blogs / month</th>
+                      <th className="text-left py-2">GBP posts / month</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {([
+                      ["Current", "currentMonthlyPrice", "currentBlogPosts", "currentGbpPosts"],
+                      ["Essential", "essentialPrice", "essentialBlogPosts", "essentialGbpPosts"],
+                      ["Growth", "growthPrice", "growthBlogPosts", "growthGbpPosts"],
+                      ["Accelerator", "acceleratorPrice", "acceleratorBlogPosts", "acceleratorGbpPosts"],
+                    ] as Array<[string, keyof ProposalConfig, keyof ProposalConfig, keyof ProposalConfig]>).map(([label, priceKey, blogKey, gbpKey]) => (
+                      <tr key={label} style={{ borderTop: "1px solid oklch(0.93 0.008 80)" }}>
+                        <td className="py-2 pr-3 font-semibold">{label}</td>
+                        {[priceKey, blogKey, gbpKey].map(key => (
+                          <td key={key} className="py-2 pr-3">
+                            <input
+                              type="number"
+                              min="0"
+                              value={config[key] as number}
+                              onChange={event => updateNumber(key, event.target.value)}
+                              className="w-28 border rounded-sm px-2 py-1.5"
+                              style={{ borderColor: "oklch(0.88 0.012 80)" }}
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <label className="block mt-3">
+                <span className="text-xs font-medium" style={{ color: "oklch(0.52 0.016 80)" }}>Approved scope notes</span>
+                <textarea
+                  value={config.scopeNotes}
+                  onChange={event => {
+                    setConfig(previous => ({ ...previous, scopeNotes: event.target.value }));
+                    setTermsConfirmed(false);
+                    setPreviewHtml(null);
+                    setPdfUrl(null);
+                  }}
+                  placeholder="Required: approved inclusions, exclusions, rollout limits, and franchise-specific terms."
+                  className="mt-1 w-full border rounded-sm px-3 py-2 text-sm"
+                  rows={3}
+                  style={{ borderColor: "oklch(0.88 0.012 80)" }}
+                />
+              </label>
+              <label className="flex items-start gap-2 mt-3 text-xs" style={{ color: "oklch(0.35 0.015 65)" }}>
+                <input type="checkbox" checked={termsConfirmed} disabled={!config.scopeNotes.trim()} onChange={event => setTermsConfirmed(event.target.checked)} className="mt-0.5" />
+                <span>I confirmed these prices, deliverable volumes, currency, and scope for this territory.</span>
+              </label>
+            </div>
+          )}
+
           {/* Action buttons */}
           <div className="flex gap-3 mt-5">
             <button
               onClick={handlePreview}
-              disabled={!selectedTerritory || generating}
+              disabled={!selectedTerritory || !termsConfirmed || generating}
               className="flex items-center gap-2 px-4 py-2 rounded-sm text-sm font-semibold transition-all"
               style={{
-                background: selectedTerritory && !generating ? "oklch(0.97 0.012 80)" : "oklch(0.94 0.008 80)",
+                background: selectedTerritory && termsConfirmed && !generating ? "oklch(0.97 0.012 80)" : "oklch(0.94 0.008 80)",
                 border: "1px solid oklch(0.88 0.012 80)",
-                color: selectedTerritory && !generating ? "oklch(0.32 0.09 145)" : "oklch(0.65 0.010 80)",
-                cursor: selectedTerritory && !generating ? "pointer" : "not-allowed",
+                color: selectedTerritory && termsConfirmed && !generating ? "oklch(0.32 0.09 145)" : "oklch(0.65 0.010 80)",
+                cursor: selectedTerritory && termsConfirmed && !generating ? "pointer" : "not-allowed",
                 fontFamily: "Inter, sans-serif",
               }}
             >
@@ -204,16 +320,16 @@ export default function ProposalGenerator() {
 
             <button
               onClick={handleGeneratePdf}
-              disabled={!selectedTerritory || generating}
+              disabled={!selectedTerritory || !termsConfirmed || generating}
               className="flex items-center gap-2 px-4 py-2 rounded-sm text-sm font-semibold transition-all"
               style={{
-                background: selectedTerritory && !generating ? "oklch(0.32 0.09 145)" : "oklch(0.65 0.010 80)",
+                background: selectedTerritory && termsConfirmed && !generating ? "oklch(0.32 0.09 145)" : "oklch(0.65 0.010 80)",
                 color: "white",
-                cursor: selectedTerritory && !generating ? "pointer" : "not-allowed",
+                cursor: selectedTerritory && termsConfirmed && !generating ? "pointer" : "not-allowed",
                 fontFamily: "Inter, sans-serif",
               }}
             >
-              {generating && generateMutation.isPending ? (
+              {generating && (generateMutation.isPending || exportMutation.isPending) ? (
                 <Loader2 size={14} className="animate-spin" />
               ) : (
                 <FileText size={14} />
@@ -229,7 +345,7 @@ export default function ProposalGenerator() {
               style={{ color: "oklch(0.42 0.09 145)", fontFamily: "Inter, sans-serif" }}
             >
               <Loader2 size={14} className="animate-spin" />
-              Generating proposal with Claude Opus 5... This takes 15-30 seconds.
+              {exportMutation.isPending ? "Exporting the reviewed preview..." : "Generating proposal narrative and layout... This takes 15-30 seconds."}
             </div>
           )}
 
@@ -365,7 +481,7 @@ export default function ProposalGenerator() {
               <p>
                 <strong style={{ color: "oklch(0.32 0.015 65)" }}>2.</strong> Click
                 "Preview Proposal" to generate a branded 3-page proposal with
-                territory-specific data and AI-written narrative (Claude Opus 5).
+                territory-specific data and AI-written narrative.
               </p>
               <p>
                 <strong style={{ color: "oklch(0.32 0.015 65)" }}>3.</strong> Review the
@@ -373,7 +489,7 @@ export default function ProposalGenerator() {
               </p>
               <p>
                 <strong style={{ color: "oklch(0.32 0.015 65)" }}>4.</strong> Send the
-                PDF to the franchise owner after your strategy meeting.
+                PDF to the franchise owner after your strategy meeting. The PDF is rendered from the exact preview you reviewed.
               </p>
             </div>
             <div
@@ -381,9 +497,7 @@ export default function ProposalGenerator() {
               style={{ color: "oklch(0.65 0.010 80)", fontFamily: "Inter, sans-serif" }}
             >
               The proposal auto-fills suburb names, revenue figures, seasonal timing, and
-              species data from the territory's Salesforce data. The opening narrative is
-              written fresh each time by Claude Opus 5 to sound natural and
-              territory-specific.
+              species data from the territory snapshot. Commercial terms always come from the confirmed inputs above; the opening narrative is generated once per draft.
             </div>
           </div>
         )}

@@ -4,6 +4,16 @@ import { useAuth } from "@/contexts/AuthContext";
 import { trpc } from "@/lib/trpc";
 import { FileText, Download, Loader2, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
 
+interface StrategyConfig {
+  currentGbpPostsPerMonth: number;
+  currentBlogPostsPerMonth: number;
+  proposedGbpPostsPerMonth: number;
+  proposedBlogPostsPerMonth: number;
+  proposedSuburbPages: number;
+  proposedSpeciesLocationPages: number;
+  campaignNotes: string;
+}
+
 export default function StrategyReportGenerator() {
   const { user } = useAuth();
   const [selectedTerritory, setSelectedTerritory] = useState("");
@@ -14,6 +24,15 @@ export default function StrategyReportGenerator() {
   const [progress, setProgress] = useState(0);
   const [progressLabel, setProgressLabel] = useState("");
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [config, setConfig] = useState<StrategyConfig>({
+    currentGbpPostsPerMonth: 0,
+    currentBlogPostsPerMonth: 0,
+    proposedGbpPostsPerMonth: 0,
+    proposedBlogPostsPerMonth: 0,
+    proposedSuburbPages: 0,
+    proposedSpeciesLocationPages: 0,
+    campaignNotes: "",
+  });
 
   // Fetch territories
   const { data: territories, isLoading: loadingTerritories } = trpc.strategyReport.getTerritories.useQuery();
@@ -55,6 +74,7 @@ export default function StrategyReportGenerator() {
     },
     onSuccess: (data) => {
       setPdfUrl(data.url);
+      setPreviewHtml(data.html);
       setProgress(100);
       setProgressLabel(`Complete — PDF ready (${data.sectionCount} sections)`);
       setIsGenerating(false);
@@ -63,6 +83,24 @@ export default function StrategyReportGenerator() {
       setError(err.message || "Failed to generate report");
       setIsGenerating(false);
       setProgress(0);
+    },
+  });
+
+  const exportMutation = trpc.strategyReport.exportPdf.useMutation({
+    onMutate: () => {
+      setIsGenerating(true);
+      setError(null);
+      setProgressLabel("Exporting reviewed preview...");
+    },
+    onSuccess: (data) => {
+      setPdfUrl(data.url);
+      setProgress(100);
+      setProgressLabel("Complete — reviewed PDF ready");
+      setIsGenerating(false);
+    },
+    onError: (err) => {
+      setError(err.message || "Failed to export report");
+      setIsGenerating(false);
     },
   });
 
@@ -81,7 +119,7 @@ export default function StrategyReportGenerator() {
       { pct: 72, label: "Writing Content Architecture..." },
       { pct: 78, label: "Writing GBP Strategy..." },
       { pct: 85, label: "Writing 90-Day Action Plan..." },
-      { pct: 90, label: "Writing Risks & Mitigations..." },
+      { pct: 90, label: "Writing Delivery Dependencies..." },
       { pct: 95, label: "Writing Recommendations..." },
       { pct: 97, label: "Assembling document..." },
     ];
@@ -106,7 +144,7 @@ export default function StrategyReportGenerator() {
     if ((window as any).__strategyProgressInterval) {
       clearInterval((window as any).__strategyProgressInterval);
     }
-    previewMutation.mutate({ territoryId: selectedTerritory });
+    previewMutation.mutate({ territoryId: selectedTerritory, config });
   }
 
   function handleGeneratePdf() {
@@ -114,7 +152,11 @@ export default function StrategyReportGenerator() {
     if ((window as any).__strategyProgressInterval) {
       clearInterval((window as any).__strategyProgressInterval);
     }
-    generateMutation.mutate({ territoryId: selectedTerritory });
+    if (previewHtml) {
+      exportMutation.mutate({ territoryId: selectedTerritory, html: previewHtml });
+    } else {
+      generateMutation.mutate({ territoryId: selectedTerritory, config });
+    }
   }
 
   function handleReset() {
@@ -128,18 +170,6 @@ export default function StrategyReportGenerator() {
     setProgress(0);
     setProgressLabel("");
     setIsGenerating(false);
-  }
-
-  // Write HTML to iframe
-  function writeToIframe(html: string) {
-    if (iframeRef.current) {
-      const doc = iframeRef.current.contentDocument;
-      if (doc) {
-        doc.open();
-        doc.write(html);
-        doc.close();
-      }
-    }
   }
 
   // Admin gate
@@ -156,6 +186,11 @@ export default function StrategyReportGenerator() {
   }
 
   const selectedTerritoryData = territories?.find(t => t.id === selectedTerritory);
+  const updateConfigNumber = (key: keyof StrategyConfig, value: string) => {
+    setConfig(previous => ({ ...previous, [key]: Math.max(0, Number(value) || 0) }));
+    setPreviewHtml(null);
+    setPdfUrl(null);
+  };
 
   return (
     <PortalLayout>
@@ -178,8 +213,7 @@ export default function StrategyReportGenerator() {
             className="text-sm"
             style={{ color: "oklch(0.52 0.016 80)", fontFamily: "Inter, sans-serif" }}
           >
-            Generate a comprehensive 40-55 page franchise digital marketing strategy document for any territory.
-            Matches Dave's gold standard format with data-backed narrative, gap analysis, and detailed action plans.
+            Generate a reviewable territory strategy from verified demand/performance data and explicitly confirmed campaign inputs.
           </p>
           <div className="mt-3" style={{ borderTop: "2px solid oklch(0.32 0.09 145)", width: "48px" }} />
         </div>
@@ -226,6 +260,52 @@ export default function StrategyReportGenerator() {
                   </option>
                 ))}
               </select>
+
+              {selectedTerritory && (
+                <div className="border-t pt-4" style={{ borderColor: "oklch(0.90 0.008 80)" }}>
+                  <h3 className="text-sm font-bold" style={{ color: "oklch(0.18 0.015 65)" }}>Confirm campaign scope</h3>
+                  <p className="text-xs mt-1 mb-3" style={{ color: "oklch(0.52 0.016 80)" }}>
+                    Zero means “not provided.” The report will flag the gap instead of inventing a publishing or page-build volume.
+                  </p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {([
+                      ["Current GBP / month", "currentGbpPostsPerMonth"],
+                      ["Current blogs / month", "currentBlogPostsPerMonth"],
+                      ["Proposed GBP / month", "proposedGbpPostsPerMonth"],
+                      ["Proposed blogs / month", "proposedBlogPostsPerMonth"],
+                      ["Proposed suburb pages", "proposedSuburbPages"],
+                      ["Proposed species × location", "proposedSpeciesLocationPages"],
+                    ] as Array<[string, keyof StrategyConfig]>).map(([label, key]) => (
+                      <label key={key}>
+                        <span className="text-xs" style={{ color: "oklch(0.52 0.016 80)" }}>{label}</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={config[key] as number}
+                          onChange={event => updateConfigNumber(key, event.target.value)}
+                          className="mt-1 block w-full border rounded-sm px-3 py-2 text-sm"
+                          style={{ borderColor: "oklch(0.88 0.012 80)" }}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  <label className="block mt-3">
+                    <span className="text-xs" style={{ color: "oklch(0.52 0.016 80)" }}>Confirmed program notes</span>
+                    <textarea
+                      value={config.campaignNotes}
+                      onChange={event => {
+                        setConfig(previous => ({ ...previous, campaignNotes: event.target.value }));
+                        setPreviewHtml(null);
+                        setPdfUrl(null);
+                      }}
+                      rows={3}
+                      placeholder="Current deliverables, approved scope, exclusions, owners, or capacity constraints."
+                      className="mt-1 block w-full border rounded-sm px-3 py-2 text-sm"
+                      style={{ borderColor: "oklch(0.88 0.012 80)" }}
+                    />
+                  </label>
+                </div>
+              )}
 
               {selectedTerritory && !isGenerating && (
                 <div className="flex gap-3">
@@ -296,7 +376,7 @@ export default function StrategyReportGenerator() {
               {progressLabel} ({progress}%)
             </p>
             <p className="text-xs mt-1" style={{ color: "oklch(0.65 0.010 80)", fontFamily: "Inter, sans-serif" }}>
-              This takes 2-4 minutes. Each section is generated sequentially with shared context for coherence.
+              Initial generation can take 2-4 minutes. Exporting an approved preview does not re-run the narrative.
             </p>
           </div>
         )}
@@ -410,8 +490,7 @@ export default function StrategyReportGenerator() {
                   Step 1: Data Assembly
                 </div>
                 <p className="text-xs" style={{ color: "oklch(0.52 0.016 80)" }}>
-                  Territory revenue, species, suburb, GBP, and GSC data is assembled into a single source of truth.
-                  All numbers come directly from verified Salesforce exports.
+                  Salesforce demand, GBP, GSC, and confirmed campaign inputs are assembled with their sources kept distinct.
                 </p>
               </div>
               <div>
@@ -422,8 +501,7 @@ export default function StrategyReportGenerator() {
                   Step 2: Section Generation
                 </div>
                 <p className="text-xs" style={{ color: "oklch(0.52 0.016 80)" }}>
-                  14 sections generated sequentially. Data tables are deterministic (no AI). Narrative sections use
-                  Claude with shared context — each section knows what prior sections established.
+                  13 sections are assembled. Data tables are deterministic; narrative sections use the established territory facts and confirmed scope.
                 </p>
               </div>
               <div>
@@ -434,8 +512,7 @@ export default function StrategyReportGenerator() {
                   Step 3: Document Assembly
                 </div>
                 <p className="text-xs" style={{ color: "oklch(0.52 0.016 80)" }}>
-                  All sections assembled into a branded HTML document matching Dave's gold standard format.
-                  Exported to PDF via Puppeteer for print-ready delivery.
+                  Review the branded HTML draft, then export that exact draft to PDF without regenerating it.
                 </p>
               </div>
             </div>
@@ -445,7 +522,7 @@ export default function StrategyReportGenerator() {
                 <strong style={{ color: "oklch(0.42 0.09 145)" }}>Section order (Dave's gold standard):</strong>{" "}
                 Executive Summary → Current Campaign → Species Analysis → Suburb Revenue → GBP Performance →
                 Gap Analysis → Proposed Program → Scale Comparison → Content Architecture → GBP Strategy →
-                90-Day Action Plan → Risks & Mitigations → Recommendations
+                90-Day Action Plan → Delivery Dependencies → Recommendations
               </p>
             </div>
           </div>

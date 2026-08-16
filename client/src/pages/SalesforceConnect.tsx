@@ -87,13 +87,13 @@ export default function SalesforceConnect() {
             className="text-3xl font-bold mb-2"
             style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "oklch(0.18 0.015 65)" }}
           >
-            Salesforce Connection
+            Salesforce Setup & Query Console
           </h1>
           <p
             className="text-sm"
             style={{ color: "oklch(0.52 0.016 80)", fontFamily: "Inter, sans-serif" }}
           >
-            Connect to Skedaddle's Salesforce instance to pull PA inspections, revenue data, species breakdown, and close rates.
+            Authorize and inspect the Salesforce schema or run administrative SOQL queries. This console does not yet sync results into portal dashboards or reports.
           </p>
           <div className="mt-3" style={{ borderTop: "2px solid oklch(0.32 0.09 145)", width: "48px" }} />
         </div>

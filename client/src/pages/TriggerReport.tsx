@@ -8,6 +8,7 @@
 import { useParams, Link } from "wouter";
 import { DASHBOARD_DATA, type LocationDashboard } from "@/data/dashboardData";
 import { useEffect } from "react";
+import { trpc } from "@/lib/trpc";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 const fmt$ = (n: number, currency?: "CAD" | "USD") => {
@@ -17,11 +18,9 @@ const fmt$ = (n: number, currency?: "CAD" | "USD") => {
   return `$${n.toFixed(0)}${suffix}`;
 };
 
-const fmtPct = (n: number) => n >= 0 ? `↑ +${n.toFixed(0)}%` : `↓ ${n.toFixed(0)}%`;
-
 // Determine season from current month
-function getSeason(): { emoji: string; name: string; note: string } {
-  const m = new Date().getMonth(); // 0-indexed
+function getSeason(month = new Date().getMonth() + 1): { emoji: string; name: string; note: string } {
+  const m = month - 1;
   if (m >= 2 && m <= 4)  return { emoji: "🌱", name: "Spring",      note: "Peak denning season for raccoons and squirrels. Bat maternity colonies forming. Highest call volume period." };
   if (m >= 5 && m <= 7)  return { emoji: "🌿", name: "Mid-Summer",  note: "Continued bat maternity season. Squirrel and mouse activity building toward fall. Pre-fall content now." };
   if (m >= 8 && m <= 10) return { emoji: "🍂", name: "Fall",        note: "Mice and squirrel entry season begins. Highest urgency for exclusion content. GBP posts should focus on prevention." };
@@ -29,38 +28,64 @@ function getSeason(): { emoji: string; name: string; note: string } {
 }
 
 // Generate action cards from data
-function generateActions(data: LocationDashboard, season: ReturnType<typeof getSeason>) {
-  const actions = [];
+function generateActions(data: LocationDashboard, season: ReturnType<typeof getSeason>, yoy: any) {
+  const actions: Array<{ priority: string; priorityColor: string; title: string; detail: string }> = [];
   const topSpecies = data.species[0];
   const topSuburb = data.suburbs[0];
 
-  if (topSpecies) {
+  const value = (rows: any[] | undefined, key: string, kind: "pageType" | "metricType") =>
+    Number(rows?.find(row => row[kind] === key)?.sessions ?? rows?.find(row => row[kind] === key)?.value ?? 0);
+  const currentSessions = value(yoy?.ga4.current, "species_pages", "pageType") + value(yoy?.ga4.current, "location_page", "pageType");
+  const previousSessions = value(yoy?.ga4.previous, "species_pages", "pageType") + value(yoy?.ga4.previous, "location_page", "pageType");
+  const currentCalls = value(yoy?.gbp.current, "calls", "metricType");
+  const previousCalls = value(yoy?.gbp.previous, "calls", "metricType");
+
+  if (previousSessions > 0) {
+    const change = ((currentSessions - previousSessions) / previousSessions) * 100;
     actions.push({
-      priority: "🔥 High",
-      priorityColor: "#b85c38",
-      title: `Amplify ${topSpecies.species} content this month`,
-      detail: `${topSpecies.species} is the top revenue species at ${fmt$(topSpecies.total_revenue, data.currency)} for ${data.name}. Post 3 additional ${topSpecies.species.toLowerCase()}-focused GBP updates this week and ensure the ${topSpecies.species.toLowerCase()} species page is linked from the location homepage.`,
+      priority: change < 0 ? "⚠ Performance" : "✓ Performance",
+      priorityColor: change < 0 ? "#b85c38" : "#1a7a3e",
+      title: `${change < 0 ? "Investigate" : "Build on"} ${Math.abs(change).toFixed(0)}% YoY change in priority-page sessions`,
+      detail: `Species and location pages recorded ${currentSessions.toLocaleString()} sessions versus ${previousSessions.toLocaleString()} in the same month last year. Review page-level changes before assigning corrective work.`,
     });
   }
 
-  if (topSuburb) {
-    const oppSuburbs = data.suburbs.slice(1, 3);
+  if (previousCalls > 0) {
+    const change = ((currentCalls - previousCalls) / previousCalls) * 100;
     actions.push({
-      priority: "🆕 New Opportunity",
-      priorityColor: "#1a4a2e",
-      title: `Create suburb pages for ${oppSuburbs.map((s: { suburb: string }) => s.suburb).join(" and ")}`,
-      detail: `${oppSuburbs.map((s: { suburb: string; revenue: number }) => `${s.suburb} (${fmt$(s.revenue, data.currency)})`).join(" and ")} are top revenue suburbs. Use the Suburb Brief Generator to create content specs for dedicated species pages targeting these areas.`,
+      priority: change < 0 ? "⚠ GBP" : "✓ GBP",
+      priorityColor: change < 0 ? "#b85c38" : "#1a7a3e",
+      title: `${change < 0 ? "Review" : "Sustain"} GBP call performance`,
+      detail: `GBP generated ${currentCalls.toLocaleString()} calls versus ${previousCalls.toLocaleString()} in the same month last year (${change >= 0 ? "+" : ""}${change.toFixed(0)}%). Confirm profile activity and call tracking before changing volume.`,
     });
   }
 
   actions.push({
-    priority: "📅 Seasonal",
+    priority: topSpecies && topSuburb ? "🎯 Demand Priority" : "📅 Seasonal",
     priorityColor: "#4a7c59",
-    title: `Execute ${season.emoji} ${season.name} content push`,
-    detail: season.note,
+    title: topSpecies && topSuburb ? `Validate ${topSpecies.species} coverage in ${topSuburb.suburb}` : `Plan the ${season.name} content cycle`,
+    detail: topSpecies && topSuburb
+      ? `${topSpecies.species} and ${topSuburb.suburb} lead the verified T12 demand snapshot. Audit current pages and local facts before creating content. Seasonal context: ${season.note}`
+      : season.note,
   });
 
-  return actions;
+  if (actions.length < 3) {
+    actions.unshift({
+      priority: "ℹ Data",
+      priorityColor: "#666",
+      title: "Complete the monthly analytics import",
+      detail: "A valid same-month year-over-year comparison is not available yet. Import and verify GA4 and GBP data before describing movement as a trend.",
+    });
+  }
+  if (actions.length < 3) {
+    actions.push({
+      priority: "📅 Seasonal",
+      priorityColor: "#4a7c59",
+      title: `Prepare the ${season.name} measurement plan`,
+      detail: `${season.note} Define the page, GBP, and call metrics that will determine whether the work succeeded.`,
+    });
+  }
+  return actions.slice(0, 3);
 }
 
 // ─── styles (matching original HTML report exactly) ──────────────────────────
@@ -197,9 +222,17 @@ export default function TriggerReport() {
   const params = useParams<{ id: string }>();
   const id = params.id?.toLowerCase() || "";
   const data = DASHBOARD_DATA[id];
-  const season = getSeason();
+  const latestPeriodQuery = trpc.analytics.getLatestPeriod.useQuery();
+  const latestPeriod = latestPeriodQuery.data?.latest;
+  const reportYear = latestPeriod?.year ?? new Date().getFullYear();
+  const reportMonth = latestPeriod?.month ?? new Date().getMonth() + 1;
+  const yoyQuery = trpc.analytics.getYoYComparison.useQuery(
+    { territoryId: id, year: reportYear, month: reportMonth },
+    { enabled: Boolean(data && latestPeriod) },
+  );
+  const season = getSeason(reportMonth);
   const today = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-  const monthYear = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const monthYear = new Date(reportYear, reportMonth - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
   useEffect(() => {
     if (data) document.title = `Monthly Trigger Report — ${data.name} — ${monthYear}`;
@@ -216,10 +249,9 @@ export default function TriggerReport() {
     );
   }
 
-  const actions = generateActions(data, season);
+  const actions = generateActions(data, season, yoyQuery.data);
   const topSuburbs = data.suburbs.slice(0, 5);
-  // Mark all as "new" since we only have one period of data
-  const newSuburbs = data.suburbs.slice(0, 3);
+  const prioritySuburbs = data.suburbs.slice(0, 3);
 
   return (
     <>
@@ -299,33 +331,33 @@ export default function TriggerReport() {
           {/* Two-column: Species Trends + Suburb Intelligence */}
           <div style={S.twoCol}>
 
-            {/* Species Trends */}
+            {/* Species demand */}
             <div style={{ marginBottom: 0 }}>
-              <div style={S.sectionTitle}>Species Trends</div>
+              <div style={S.sectionTitle}>Species Demand — T12 Snapshot</div>
               <table style={S.table}>
                 <thead>
                   <tr>
                     <th style={S.th}>Species</th>
                     <th style={S.th}>Revenue</th>
                     <th style={S.th}>Jobs</th>
-                    <th style={S.th}>Change</th>
+                    <th style={S.th}>Revenue Share</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.species.map((s, i) => (
-                    <tr key={i} className="trending">
+                    <tr key={i}>
                       <td style={S.td}>{s.species}</td>
                       <td style={S.td}>{fmt$(s.total_revenue, data.currency)}</td>
                       <td style={S.td}>{s.total_jobs || "—"}</td>
-                      <td style={{ ...S.td, color: "#1a7a3e", fontWeight: 600 }}>
-                        {i === 0 ? "↑ Top" : i < 3 ? "↑ Strong" : "→ Stable"}
+                      <td style={{ ...S.td, color: "#1a4a2e", fontWeight: 600 }}>
+                        {data.total_revenue > 0 ? `${((s.total_revenue / data.total_revenue) * 100).toFixed(1)}%` : "—"}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
               <p style={{ fontSize: 11, color: "#aaa", fontFamily: "Arial, sans-serif", marginTop: 6 }}>
-                ↑ trending · ↓ declining vs prior period
+                Ranked by verified trailing-12-month revenue; this table does not imply month-over-month movement.
               </p>
             </div>
 
@@ -351,11 +383,11 @@ export default function TriggerReport() {
                 </tbody>
               </table>
 
-              <div style={{ ...S.sectionTitle, marginTop: 16 }}>New Suburbs (First Job)</div>
+              <div style={{ ...S.sectionTitle, marginTop: 16 }}>Priority Suburbs — T12 Demand</div>
               <ul style={{ paddingLeft: 18, fontFamily: "Arial, sans-serif", fontSize: 13 }}>
-                {newSuburbs.map((s, i) => (
+                {prioritySuburbs.map((s, i) => (
                   <li key={i} style={{ marginBottom: 4 }}>
-                    <strong>{s.suburb}</strong> — first job recorded: {fmt$(s.revenue, data.currency)}
+                    <strong>{s.suburb}</strong> — {fmt$(s.revenue, data.currency)} across {s.jobs} closed jobs
                   </li>
                 ))}
               </ul>
@@ -383,7 +415,7 @@ export default function TriggerReport() {
           {/* Footer */}
           <div style={S.footer}>
             <span>Skedaddle Franchise Portal · skedaddle.manus.space</span>
-            <span>Data source: Salesforce trailing period export · {monthYear}</span>
+            <span>{latestPeriod ? `Sources: Salesforce T12 demand snapshot · GA4/GBP YoY through ${monthYear}` : "Source: Salesforce T12 demand snapshot · Analytics comparison unavailable"}</span>
           </div>
 
         </div>

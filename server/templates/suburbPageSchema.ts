@@ -38,7 +38,7 @@ export interface SuburbSchemaParams {
   nearbyCities: string[];
 
   // GBP hours
-  hours: {
+  hours?: {
     weekday: { opens: string; closes: string };
     saturday: { opens: string; closes: string };
     sunday: { opens: string; closes: string };
@@ -78,7 +78,6 @@ export function buildSuburbSchema(params: SuburbSchemaParams): object[] {
     "url": baseUrl,
     "telephone": params.franchisePhone,
     "priceRange": "$$",
-    "image": `https://www.skedaddlewildlife.com/wp-content/uploads/og-${params.territorySlug}-${params.suburbSlug}.jpg`,
     "logo": "https://www.skedaddlewildlife.com/wp-content/uploads/2021/02/skedaddle-logo.png",
     "foundingDate": params.franchiseFoundedYear,
     "parentOrganization": {
@@ -98,7 +97,7 @@ export function buildSuburbSchema(params: SuburbSchemaParams): object[] {
     },
     "hasMap": `https://www.google.com/maps/search/?api=1&query=Skedaddle+${params.territoryName}`,
     "sameAs": sameAs,
-    "openingHoursSpecification": [
+    ...(params.hours ? { "openingHoursSpecification": [
       {
         "@type": "OpeningHoursSpecification",
         "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
@@ -117,7 +116,7 @@ export function buildSuburbSchema(params: SuburbSchemaParams): object[] {
         "opens": params.hours.sunday.opens,
         "closes": params.hours.sunday.closes,
       },
-    ],
+    ] } : {}),
     "serviceArea": {
       "@type": "GeoCircle",
       "geoMidpoint": {

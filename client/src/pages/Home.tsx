@@ -228,7 +228,7 @@ export default function Home() {
               fontFamily: "Inter, sans-serif",
             }}
           >
-            <strong style={{ color: "oklch(0.32 0.09 145)" }}>Admin note:</strong> All 19 territories now have complete strategy dashboards with Salesforce revenue data, GBP performance metrics, species breakdowns, and suburb rankings. Reports updated July 23, 2026.
+            <strong style={{ color: "oklch(0.32 0.09 145)" }}>Admin note:</strong> {completeLocations.length} of {FRANCHISE_LOCATIONS.length} territories have a current dashboard snapshot. Analytics coverage varies by source and territory; locations still awaiting data remain listed on the Network page.
           </div>
         )}
       </div>

@@ -30,7 +30,7 @@ interface NavItem {
 
 const TOP_NAV: NavItem[] = [
   { label: "Overview", href: "/", icon: <LayoutDashboard size={16} /> },
-  { label: "Network Map", href: "/network", icon: <MapPin size={16} /> },
+  { label: "Network", href: "/network", icon: <MapPin size={16} /> },
   { label: "Tools", href: "/tools", icon: <BarChart3 size={16} /> },
   { label: "GBP Images", href: "/gbp-images", icon: <ImageIcon size={16} /> },
   { label: "Analytics", href: "/analytics", icon: <LineChart size={16} /> },
@@ -38,7 +38,7 @@ const TOP_NAV: NavItem[] = [
   { label: "Proposals", href: "/proposals", icon: <FileText size={16} />, adminOnly: true },
   { label: "Strategy Reports", href: "/strategy-report", icon: <FileBarChart size={16} />, adminOnly: true },
   { label: "Suburb Pages", href: "/suburb-pages", icon: <FileText size={16} />, adminOnly: true },
-  { label: "Salesforce", href: "/salesforce", icon: <Cloud size={16} />, adminOnly: true },
+  { label: "Salesforce Setup", href: "/salesforce", icon: <Cloud size={16} />, adminOnly: true },
 ];
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {

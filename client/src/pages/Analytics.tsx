@@ -7,7 +7,7 @@
 
 import PortalLayout from "@/components/PortalLayout";
 import { trpc } from "@/lib/trpc";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line, Legend, Area, AreaChart,
@@ -240,11 +240,20 @@ function InsightsPanel({ insights, isLoading, territoryName }: { insights: any[]
 // ─── Main Component ──────────────────────────────────────────────────────────
 export default function Analytics() {
   const [selectedTerritory, setSelectedTerritory] = useState("hamilton");
-  const [selectedYear, setSelectedYear] = useState(2025);
-  const [comparisonMonth, setComparisonMonth] = useState(6); // June
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [comparisonMonth, setComparisonMonth] = useState(new Date().getMonth() + 1);
 
   // Fetch territories (19 parent territories)
   const { data: territories } = trpc.analytics.getTerritories.useQuery();
+  const { data: latestPeriod } = trpc.analytics.getLatestPeriod.useQuery();
+  const { data: dateRange } = trpc.analytics.getDateRange.useQuery();
+
+  useEffect(() => {
+    if (latestPeriod?.latest) {
+      setSelectedYear(latestPeriod.latest.year);
+      setComparisonMonth(latestPeriod.latest.month);
+    }
+  }, [latestPeriod]);
 
   // Fetch insights — territory-specific when a territory is selected
   const { data: insights, isLoading: insightsLoading } = trpc.analytics.getInsights.useQuery({
@@ -295,7 +304,7 @@ export default function Analytics() {
 
     // Group by year-month, pivot page types into columns
     // Focus on Species + Suburb pages only (exclude Total, Blog, Service to avoid inflation)
-    const INCLUDED_PAGE_TYPES = new Set(["species_pages", "suburb_pages"]);
+    const INCLUDED_PAGE_TYPES = new Set(["species_pages", "location_page"]);
     const grouped: Record<string, any> = {};
     for (const row of ga4Trend as any[]) {
       if (!INCLUDED_PAGE_TYPES.has(row.pageType)) continue;
@@ -304,7 +313,7 @@ export default function Analytics() {
         grouped[key] = { name: `${MONTHS[row.month - 1]} '${String(row.year).slice(2)}`, year: row.year, month: row.month };
       }
       const pt = row.pageType === "species_pages" ? "Species Pages" :
-        row.pageType === "suburb_pages" ? "Suburb Pages" : row.pageType;
+        row.pageType === "location_page" ? "Location Pages" : row.pageType;
       grouped[key][pt] = (grouped[key][pt] || 0) + Number(row.sessions);
     }
 
@@ -364,8 +373,8 @@ export default function Analytics() {
         const found = arr.find((r: any) => r.pageType === k);
         return sum + (found ? Number(found.sessions || 0) : 0);
       }, 0);
-    const currentSessions = getSum(yoyData.ga4.current, ["species_pages", "suburb_pages"]);
-    const prevSessions = getSum(yoyData.ga4.previous, ["species_pages", "suburb_pages"]);
+    const currentSessions = getSum(yoyData.ga4.current, ["species_pages", "location_page"]);
+    const prevSessions = getSum(yoyData.ga4.previous, ["species_pages", "location_page"]);
 
     return {
       calls: { current: currentCalls, previous: prevCalls, delta: formatDelta(currentCalls, prevCalls) },
@@ -390,13 +399,11 @@ export default function Analytics() {
 
   const handleExportGA4 = useCallback(() => {
     if (!ga4ChartData.length) return;
-    const headers = ["Month", "Total Sessions", "Species Pages", "Blog Pages", "Location Pages"];
+    const headers = ["Month", "Species Pages", "Location Pages"];
     const rows = ga4ChartData.map((d: any) => [
       d.name,
-      String(d.Total || 0),
-      String(d.Species || 0),
-      String(d.Blog || 0),
-      String(d.Location || 0),
+      String(d["Species Pages"] || 0),
+      String(d["Location Pages"] || 0),
     ]);
     downloadCSV(`ga4_sessions_${selectedTerritoryName}_${selectedYear - 1}-${selectedYear}.csv`, headers, rows);
   }, [ga4ChartData, selectedTerritoryName, selectedYear]);
@@ -414,7 +421,9 @@ export default function Analytics() {
   }, [gbpChartData, selectedTerritoryName, selectedYear]);
 
   // ─── Available years ────────────────────────────────────────────────────────
-  const years = [2022, 2023, 2024, 2025, 2026];
+  const minYear = Math.min(dateRange?.ga4.minYear || selectedYear, dateRange?.gbp.minYear || selectedYear);
+  const maxYear = Math.max(dateRange?.ga4.maxYear || selectedYear, dateRange?.gbp.maxYear || selectedYear);
+  const years = Array.from({ length: maxYear - minYear + 1 }, (_, index) => minYear + index);
 
   // Territory list from the 19 parent territories
   const territoryList = territories?.territories || [];
@@ -491,7 +500,7 @@ export default function Analytics() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
             <KpiCard
               icon={Activity}
-              label="Species + Suburb Sessions"
+              label="Species + Location Sessions"
               value={yoyKPIs?.sessions.current.toLocaleString() || "—"}
               delta={yoyKPIs?.sessions.delta}
               color={SAGE}
@@ -525,10 +534,10 @@ export default function Analytics() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
             <div>
               <h2 style={{ fontSize: 15, fontWeight: 700, color: FOREST, marginBottom: 4, fontFamily: "'Playfair Display', serif" }}>
-                Species & Suburb Page Sessions
+                Species & Location Page Sessions
               </h2>
               <p style={{ fontSize: 12, color: "#888", marginBottom: 20 }}>
-                GA4 sessions for species and suburb pages — {selectedTerritoryName} ({selectedYear - 1}–{selectedYear})
+                GA4 sessions for species and location pages — {selectedTerritoryName} ({selectedYear - 1}–{selectedYear})
               </p>
             </div>
             <button
@@ -559,7 +568,7 @@ export default function Analytics() {
                 <Tooltip content={<EnhancedTooltip chartType="ga4" />} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Area type="monotone" dataKey="Species Pages" stroke={SAGE} fill={SAGE + "30"} strokeWidth={2} name="Species Pages" />
-                <Area type="monotone" dataKey="Suburb Pages" stroke={GOLD} fill={GOLD + "20"} strokeWidth={1.5} name="Suburb Pages" />
+                <Area type="monotone" dataKey="Location Pages" stroke={GOLD} fill={GOLD + "20"} strokeWidth={1.5} name="Location Pages" />
               </AreaChart>
             </ResponsiveContainer>
           )}

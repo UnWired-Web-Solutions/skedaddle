@@ -950,7 +950,7 @@ export default function GbpImageGenerator() {
           <div className="flex items-start gap-2">
             <ImageIcon size={14} className="mt-0.5 shrink-0" style={{ color: "oklch(0.32 0.09 145)" }} />
             <div>
-              <strong style={{ color: "oklch(0.32 0.09 145)" }}>How it works:</strong> AI reads your post title and body, extracts the species, location, and scenario, then builds a tailored Flux Pro image prompt. Each image is generated at 1024×768 with a Skedaddle brand overlay. ~10–15 seconds per image via fal.ai. Click any image to open the lightbox — use arrows to navigate, view the AI prompt, or regenerate a new variation.
+              <strong style={{ color: "oklch(0.32 0.09 145)" }}>How it works:</strong> AI reads the post, extracts the species and setting, then creates an illustrative 1024×768 image with a Skedaddle brand overlay. Review species accuracy, uniforms, property details, and local fit before publishing; generated images are not documentary job photos. Click any image to inspect the prompt or regenerate a variation.
             </div>
           </div>
         </div>
