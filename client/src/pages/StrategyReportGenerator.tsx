@@ -199,7 +199,7 @@ export default function StrategyReportGenerator() {
         <div className="mb-8">
           <div
             className="text-xs font-semibold tracking-widest uppercase mb-1"
-            style={{ color: "oklch(0.42 0.09 145)", fontFamily: "Inter, sans-serif" }}
+            style={{ color: "oklch(0.75 0.18 140)", fontFamily: "Inter, sans-serif" }}
           >
             Document Generator
           </div>
@@ -215,7 +215,7 @@ export default function StrategyReportGenerator() {
           >
             Generate a reviewable territory strategy from verified demand/performance data and explicitly confirmed campaign inputs.
           </p>
-          <div className="mt-3" style={{ borderTop: "2px solid oklch(0.32 0.09 145)", width: "48px" }} />
+          <div className="mt-3" style={{ borderTop: "2px solid oklch(0.68 0.20 140)", width: "48px" }} />
         </div>
 
         {/* Territory Selection Card */}
@@ -313,7 +313,7 @@ export default function StrategyReportGenerator() {
                     onClick={handlePreview}
                     className="flex items-center gap-2 px-4 py-2 rounded-sm text-sm font-semibold transition-all"
                     style={{
-                      background: "oklch(0.32 0.09 145)",
+                      background: "oklch(0.68 0.20 140)",
                       color: "white",
                       fontFamily: "Inter, sans-serif",
                     }}
@@ -358,10 +358,10 @@ export default function StrategyReportGenerator() {
             style={{ background: "oklch(0.97 0.012 80)", borderColor: "oklch(0.88 0.012 80)" }}
           >
             <div className="flex items-center gap-3 mb-3">
-              <Loader2 size={16} className="animate-spin" style={{ color: "oklch(0.32 0.09 145)" }} />
+              <Loader2 size={16} className="animate-spin" style={{ color: "oklch(0.68 0.20 140)" }} />
               <span
                 className="text-sm font-semibold"
-                style={{ color: "oklch(0.32 0.09 145)", fontFamily: "Inter, sans-serif" }}
+                style={{ color: "oklch(0.68 0.20 140)", fontFamily: "Inter, sans-serif" }}
               >
                 Generating Strategy Report...
               </span>
@@ -369,7 +369,7 @@ export default function StrategyReportGenerator() {
             <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: "oklch(0.90 0.012 80)" }}>
               <div
                 className="h-full rounded-full transition-all duration-1000"
-                style={{ width: `${progress}%`, background: "oklch(0.32 0.09 145)" }}
+                style={{ width: `${progress}%`, background: "oklch(0.68 0.20 140)" }}
               />
             </div>
             <p className="text-xs mt-2" style={{ color: "oklch(0.52 0.016 80)", fontFamily: "Inter, sans-serif" }}>
@@ -408,7 +408,7 @@ export default function StrategyReportGenerator() {
               <p className="text-sm font-semibold" style={{ color: "oklch(0.28 0.09 145)" }}>
                 Strategy Report Generated Successfully
               </p>
-              <p className="text-xs mt-1" style={{ color: "oklch(0.42 0.09 145)" }}>
+              <p className="text-xs mt-1" style={{ color: "oklch(0.75 0.18 140)" }}>
                 {selectedTerritoryData?.name} — Full strategy document ready for download.
               </p>
               <a
@@ -417,7 +417,7 @@ export default function StrategyReportGenerator() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 mt-3 px-4 py-2 rounded-sm text-sm font-semibold transition-all"
                 style={{
-                  background: "oklch(0.32 0.09 145)",
+                  background: "oklch(0.68 0.20 140)",
                   color: "white",
                   fontFamily: "Inter, sans-serif",
                   textDecoration: "none",
@@ -485,7 +485,7 @@ export default function StrategyReportGenerator() {
               <div>
                 <div
                   className="text-xs font-bold uppercase tracking-wider mb-1"
-                  style={{ color: "oklch(0.42 0.09 145)" }}
+                  style={{ color: "oklch(0.75 0.18 140)" }}
                 >
                   Step 1: Data Assembly
                 </div>
@@ -496,7 +496,7 @@ export default function StrategyReportGenerator() {
               <div>
                 <div
                   className="text-xs font-bold uppercase tracking-wider mb-1"
-                  style={{ color: "oklch(0.42 0.09 145)" }}
+                  style={{ color: "oklch(0.75 0.18 140)" }}
                 >
                   Step 2: Section Generation
                 </div>
@@ -507,7 +507,7 @@ export default function StrategyReportGenerator() {
               <div>
                 <div
                   className="text-xs font-bold uppercase tracking-wider mb-1"
-                  style={{ color: "oklch(0.42 0.09 145)" }}
+                  style={{ color: "oklch(0.75 0.18 140)" }}
                 >
                   Step 3: Document Assembly
                 </div>
@@ -519,7 +519,7 @@ export default function StrategyReportGenerator() {
 
             <div className="mt-4 pt-4" style={{ borderTop: "1px solid oklch(0.90 0.008 80)" }}>
               <p className="text-xs" style={{ color: "oklch(0.65 0.010 80)", fontFamily: "Inter, sans-serif" }}>
-                <strong style={{ color: "oklch(0.42 0.09 145)" }}>Section order (Dave's gold standard):</strong>{" "}
+                <strong style={{ color: "oklch(0.75 0.18 140)" }}>Section order (Dave's gold standard):</strong>{" "}
                 Executive Summary → Current Campaign → Species Analysis → Suburb Revenue → GBP Performance →
                 Gap Analysis → Proposed Program → Scale Comparison → Content Architecture → GBP Strategy →
                 90-Day Action Plan → Delivery Dependencies → Recommendations

@@ -33,7 +33,7 @@ export default function Login() {
   return (
     <div
       className="min-h-screen flex items-center justify-center"
-      style={{ background: "oklch(0.22 0.09 145)" }}
+      style={{ background: "oklch(0.20 0.08 140)" }}
     >
       <div className="w-full max-w-md px-6">
         {/* Logo / Brand mark */}
@@ -62,9 +62,9 @@ export default function Login() {
           <div
             className="text-xs font-semibold tracking-widest uppercase mb-6 pb-3"
             style={{
-              color: "oklch(0.32 0.09 145)",
+              color: "oklch(0.68 0.20 140)",
               fontFamily: "Inter, sans-serif",
-              borderBottom: "2px solid oklch(0.32 0.09 145)",
+              borderBottom: "2px solid oklch(0.68 0.20 140)",
             }}
           >
             Sign In
@@ -93,7 +93,7 @@ export default function Login() {
                   color: "oklch(0.18 0.015 65)",
                   fontFamily: "Inter, sans-serif",
                 }}
-                onFocus={(e) => (e.target.style.borderColor = "oklch(0.32 0.09 145)")}
+                onFocus={(e) => (e.target.style.borderColor = "oklch(0.68 0.20 140)")}
                 onBlur={(e) => (e.target.style.borderColor = "oklch(0.88 0.012 80)")}
                 placeholder="e.g. milwaukee"
               />
@@ -121,7 +121,7 @@ export default function Login() {
                   color: "oklch(0.18 0.015 65)",
                   fontFamily: "Inter, sans-serif",
                 }}
-                onFocus={(e) => (e.target.style.borderColor = "oklch(0.32 0.09 145)")}
+                onFocus={(e) => (e.target.style.borderColor = "oklch(0.68 0.20 140)")}
                 onBlur={(e) => (e.target.style.borderColor = "oklch(0.88 0.012 80)")}
                 placeholder="••••••••"
               />
@@ -146,7 +146,7 @@ export default function Login() {
               disabled={loading}
               className="w-full py-3 text-sm font-semibold rounded-sm transition-all active:scale-[0.98]"
               style={{
-                background: loading ? "oklch(0.45 0.07 145)" : "oklch(0.32 0.09 145)",
+                background: loading ? "oklch(0.45 0.07 145)" : "oklch(0.68 0.20 140)",
                 color: "oklch(0.98 0 0)",
                 fontFamily: "Inter, sans-serif",
                 letterSpacing: "0.05em",

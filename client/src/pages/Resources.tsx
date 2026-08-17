@@ -28,7 +28,7 @@ export default function Resources() {
         <div className="mb-8">
           <div
             className="text-xs font-semibold tracking-widest uppercase mb-1"
-            style={{ color: "oklch(0.42 0.09 145)", fontFamily: "Inter, sans-serif" }}
+            style={{ color: "oklch(0.75 0.18 140)", fontFamily: "Inter, sans-serif" }}
           >
             Admin Only
           </div>
@@ -38,14 +38,14 @@ export default function Resources() {
           >
             Resources
           </h1>
-          <div className="mt-3" style={{ borderTop: "2px solid oklch(0.32 0.09 145)", width: "48px" }} />
+          <div className="mt-3" style={{ borderTop: "2px solid oklch(0.68 0.20 140)", width: "48px" }} />
         </div>
 
         {RESOURCES.map((section) => (
           <div key={section.category} className="mb-8">
             <h2
               className="text-xs font-semibold tracking-widest uppercase mb-3"
-              style={{ color: "oklch(0.42 0.09 145)", fontFamily: "Inter, sans-serif" }}
+              style={{ color: "oklch(0.75 0.18 140)", fontFamily: "Inter, sans-serif" }}
             >
               {section.category}
             </h2>
@@ -75,7 +75,7 @@ export default function Resources() {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-1 text-xs font-semibold transition-opacity hover:opacity-70"
-                      style={{ color: "oklch(0.32 0.09 145)", fontFamily: "Inter, sans-serif" }}
+                      style={{ color: "oklch(0.68 0.20 140)", fontFamily: "Inter, sans-serif" }}
                     >
                       Open <ExternalLink size={11} />
                     </a>

@@ -57,25 +57,25 @@
 }
 
 :root {
-  /* Deep forest green — brand signature color */
-  --forest:        oklch(0.32 0.09 145);
-  --forest-light:  oklch(0.42 0.09 145);
-  --forest-dark:   oklch(0.22 0.09 145);
+  /* Skedaddle brand green #69BE28 — rgb(105, 190, 40) */
+  --forest:        oklch(0.68 0.20 140);
+  --forest-light:  oklch(0.75 0.18 140);
+  --forest-dark:   oklch(0.55 0.18 140);
   --parchment:     oklch(0.97 0.012 80);
   --ink:           oklch(0.18 0.015 65);
 
-  /* Primary = forest green */
-  --primary:             oklch(0.32 0.09 145);
+  /* Primary = Skedaddle brand green */
+  --primary:             oklch(0.68 0.20 140);
   --primary-foreground:  oklch(0.98 0 0);
 
-  /* Sidebar = deep forest */
-  --sidebar-primary:             oklch(0.32 0.09 145);
+  /* Sidebar = Skedaddle brand green */
+  --sidebar-primary:             oklch(0.68 0.20 140);
   --sidebar-primary-foreground:  oklch(0.98 0 0);
 
   /* Charts — green gradient family */
-  --chart-1: oklch(0.55 0.12 145);
-  --chart-2: oklch(0.42 0.10 145);
-  --chart-3: oklch(0.32 0.09 145);
+  --chart-1: oklch(0.75 0.18 140);
+  --chart-2: oklch(0.68 0.20 140);
+  --chart-3: oklch(0.55 0.18 140);
   --chart-4: oklch(0.65 0.10 80);
   --chart-5: oklch(0.75 0.08 80);
 
@@ -98,15 +98,15 @@
   --destructive-foreground: oklch(0.985 0 0);
   --border:            oklch(0.88 0.012 80);
   --input:             oklch(0.88 0.012 80);
-  --ring:              oklch(0.32 0.09 145);
+  --ring:              oklch(0.68 0.20 140);
 
   /* Sidebar */
-  --sidebar:                     oklch(0.22 0.09 145);
+  --sidebar:                     oklch(0.20 0.08 140);
   --sidebar-foreground:          oklch(0.95 0.005 80);
-  --sidebar-accent:              oklch(0.28 0.09 145);
+  --sidebar-accent:              oklch(0.28 0.10 140);
   --sidebar-accent-foreground:   oklch(0.98 0 0);
-  --sidebar-border:              oklch(0.28 0.09 145);
-  --sidebar-ring:                oklch(0.55 0.12 145);
+  --sidebar-border:              oklch(0.28 0.10 140);
+  --sidebar-ring:                oklch(0.68 0.20 140);
 }
 
 .dark {
@@ -210,7 +210,7 @@
 
   /* Field Operations Manual — editorial rule lines */
   .rule-line {
-    border-top: 2px solid oklch(0.32 0.09 145);
+    border-top: 2px solid oklch(0.68 0.20 140);
     margin: 0.5rem 0 1rem;
   }
 

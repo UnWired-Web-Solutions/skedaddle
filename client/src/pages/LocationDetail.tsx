@@ -89,7 +89,7 @@ export default function LocationDetail() {
         <div className="mb-8">
           <div
             className="text-xs font-semibold tracking-widest uppercase mb-1"
-            style={{ color: "oklch(0.42 0.09 145)", fontFamily: "Inter, sans-serif" }}
+            style={{ color: "oklch(0.75 0.18 140)", fontFamily: "Inter, sans-serif" }}
           >
             {loc.region} · {loc.country}
           </div>
@@ -106,7 +106,7 @@ export default function LocationDetail() {
             {loc.city}, {loc.state}
             {loc.lastUpdated && ` · Dashboard updated ${new Date(loc.lastUpdated).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`}
           </div>
-          <div className="mt-3" style={{ borderTop: "2px solid oklch(0.32 0.09 145)", width: "48px" }} />
+          <div className="mt-3" style={{ borderTop: "2px solid oklch(0.68 0.20 140)", width: "48px" }} />
         </div>
 
         {/* Strategy Dashboard section */}
@@ -133,7 +133,7 @@ export default function LocationDetail() {
                 <div className="flex items-center gap-3">
                   <div
                     className="w-8 h-8 rounded-sm flex items-center justify-center flex-shrink-0"
-                    style={{ background: "oklch(0.32 0.09 145)" }}
+                    style={{ background: "oklch(0.68 0.20 140)" }}
                   >
                     <BarChart2 size={16} color="white" />
                   </div>
@@ -167,7 +167,7 @@ export default function LocationDetail() {
                       { icon: <FileText size={13} />, label: "GBP performance — searches, calls, website clicks" },
                     ].map((item, i) => (
                       <div key={i} className="flex items-start gap-2">
-                        <span className="mt-0.5 flex-shrink-0" style={{ color: "oklch(0.42 0.09 145)" }}>{item.icon}</span>
+                        <span className="mt-0.5 flex-shrink-0" style={{ color: "oklch(0.75 0.18 140)" }}>{item.icon}</span>
                         <span className="text-xs" style={{ color: "oklch(0.35 0.015 65)", fontFamily: "Inter, sans-serif", lineHeight: 1.5 }}>{item.label}</span>
                       </div>
                     ))}
@@ -182,7 +182,7 @@ export default function LocationDetail() {
                     </div>
                     <div>
                       <div className="text-xs" style={{ color: "oklch(0.65 0.010 80)", fontFamily: "Inter, sans-serif" }}>Sessions Trend</div>
-                      <div className="text-sm font-semibold" style={{ color: loc.kpis.sessionsTrend === "up" ? "oklch(0.42 0.09 145)" : loc.kpis.sessionsTrend === "down" ? "oklch(0.45 0.18 27)" : "oklch(0.52 0.016 80)", fontFamily: "Inter, sans-serif" }}>
+                      <div className="text-sm font-semibold" style={{ color: loc.kpis.sessionsTrend === "up" ? "oklch(0.75 0.18 140)" : loc.kpis.sessionsTrend === "down" ? "oklch(0.45 0.18 27)" : "oklch(0.52 0.016 80)", fontFamily: "Inter, sans-serif" }}>
                         {loc.kpis.sessionsTrend === "up" ? "↑ Growing" : loc.kpis.sessionsTrend === "down" ? "↓ Declining" : "→ Stable"}
                       </div>
                     </div>
@@ -216,7 +216,7 @@ export default function LocationDetail() {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs flex items-center gap-1 font-semibold transition-opacity hover:opacity-70"
-                      style={{ color: "oklch(0.32 0.09 145)", fontFamily: "Inter, sans-serif", textDecoration: "none" }}
+                      style={{ color: "oklch(0.68 0.20 140)", fontFamily: "Inter, sans-serif", textDecoration: "none" }}
                     >
                       <FileText size={12} /> Combined WI Report
                     </a>
@@ -235,7 +235,7 @@ export default function LocationDetail() {
                   <Link
                     href={`/dashboard/${loc.id}`}
                     className="text-xs flex items-center gap-1 font-semibold transition-opacity hover:opacity-70"
-                    style={{ color: "oklch(0.32 0.09 145)", fontFamily: "Inter, sans-serif", textDecoration: "none" }}
+                    style={{ color: "oklch(0.68 0.20 140)", fontFamily: "Inter, sans-serif", textDecoration: "none" }}
                   >
                     View Full Dashboard →
                   </Link>
@@ -258,7 +258,7 @@ export default function LocationDetail() {
                 style={{ color: "oklch(0.65 0.010 80)", fontFamily: "Inter, sans-serif" }}
               >
                 A full strategy dashboard will be generated once Salesforce data is received.
-                Contact <a href="mailto:dave@skedaddlewildlife.com" style={{ color: "oklch(0.32 0.09 145)" }}>dave@skedaddlewildlife.com</a> to request data collection.
+                Contact <a href="mailto:dave@skedaddlewildlife.com" style={{ color: "oklch(0.68 0.20 140)" }}>dave@skedaddlewildlife.com</a> to request data collection.
               </div>
             </div>
           )}
@@ -276,7 +276,7 @@ export default function LocationDetail() {
               </h2>
               <div
                 className="text-xs font-semibold"
-                style={{ color: "oklch(0.42 0.09 145)", fontFamily: "Inter, sans-serif" }}
+                style={{ color: "oklch(0.75 0.18 140)", fontFamily: "Inter, sans-serif" }}
               >
                 {completedCount}/{totalCount} complete
               </div>
@@ -289,7 +289,7 @@ export default function LocationDetail() {
             >
               <div
                 className="h-full rounded-full transition-all duration-500"
-                style={{ width: `${progressPct}%`, background: "oklch(0.42 0.09 145)" }}
+                style={{ width: `${progressPct}%`, background: "oklch(0.75 0.18 140)" }}
               />
             </div>
 
@@ -302,7 +302,7 @@ export default function LocationDetail() {
                   <div
                     className="text-xs font-semibold tracking-widest uppercase mb-3 pb-2"
                     style={{
-                      color: "oklch(0.42 0.09 145)",
+                      color: "oklch(0.75 0.18 140)",
                       fontFamily: "Inter, sans-serif",
                       borderBottom: "1px solid oklch(0.88 0.012 80)",
                     }}
@@ -325,7 +325,7 @@ export default function LocationDetail() {
                         >
                           <div className="mt-0.5 flex-shrink-0">
                             {done ? (
-                              <CheckSquare size={16} style={{ color: "oklch(0.42 0.09 145)" }} />
+                              <CheckSquare size={16} style={{ color: "oklch(0.75 0.18 140)" }} />
                             ) : (
                               <Square size={16} style={{ color: "oklch(0.65 0.010 80)" }} />
                             )}
@@ -335,7 +335,7 @@ export default function LocationDetail() {
                               className="text-sm"
                               style={{
                                 fontFamily: "Inter, sans-serif",
-                                color: done ? "oklch(0.42 0.09 145)" : "oklch(0.18 0.015 65)",
+                                color: done ? "oklch(0.75 0.18 140)" : "oklch(0.18 0.015 65)",
                                 textDecoration: done ? "line-through" : "none",
                                 opacity: done ? 0.75 : 1,
                               }}

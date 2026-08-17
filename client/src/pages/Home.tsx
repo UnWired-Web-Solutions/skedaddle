@@ -39,7 +39,7 @@ function LocationCard({ loc }: { loc: FranchiseLocation }) {
       style={{
         background: "oklch(1 0 0)",
         borderColor: "oklch(0.88 0.012 80)",
-        borderLeft: isReady ? "3px solid oklch(0.32 0.09 145)" : "3px solid oklch(0.88 0.012 80)",
+        borderLeft: isReady ? "3px solid oklch(0.68 0.20 140)" : "3px solid oklch(0.88 0.012 80)",
       }}
     >
       {/* Card header */}
@@ -75,7 +75,7 @@ function LocationCard({ loc }: { loc: FranchiseLocation }) {
               </div>
               <div
                 className="text-sm font-bold"
-                style={{ color: "oklch(0.32 0.09 145)", fontFamily: "Inter, sans-serif" }}
+                style={{ color: "oklch(0.68 0.20 140)", fontFamily: "Inter, sans-serif" }}
               >
                 {loc.kpis.totalRevenue > 0
                   ? `$${(loc.kpis.totalRevenue / 1000).toFixed(0)}K`
@@ -150,7 +150,7 @@ function LocationCard({ loc }: { loc: FranchiseLocation }) {
         <Link
           href={`/location/${loc.id}`}
           className="text-xs font-semibold flex items-center gap-1 transition-colors"
-          style={{ color: "oklch(0.32 0.09 145)", fontFamily: "Inter, sans-serif" }}
+          style={{ color: "oklch(0.68 0.20 140)", fontFamily: "Inter, sans-serif" }}
         >
           View Details <ArrowUpRight size={12} />
         </Link>
@@ -190,7 +190,7 @@ export default function Home() {
         <div className="mb-8">
           <div
             className="text-xs font-semibold tracking-widest uppercase mb-1"
-            style={{ color: "oklch(0.42 0.09 145)", fontFamily: "Inter, sans-serif" }}
+            style={{ color: "oklch(0.75 0.18 140)", fontFamily: "Inter, sans-serif" }}
           >
             {user?.role === "admin" ? "Network Overview" : "Your Dashboard"}
           </div>
@@ -207,7 +207,7 @@ export default function Home() {
             {activeCount} location{activeCount !== 1 ? "s" : ""} with complete dashboards
             {user?.role === "admin" && " · Skedaddle Humane Wildlife Control network"}
           </div>
-          <div className="mt-3" style={{ borderTop: "2px solid oklch(0.32 0.09 145)", width: "48px" }} />
+          <div className="mt-3" style={{ borderTop: "2px solid oklch(0.68 0.20 140)", width: "48px" }} />
         </div>
 
         {/* Location grid */}
@@ -228,7 +228,7 @@ export default function Home() {
               fontFamily: "Inter, sans-serif",
             }}
           >
-            <strong style={{ color: "oklch(0.32 0.09 145)" }}>Admin note:</strong> {completeLocations.length} of {FRANCHISE_LOCATIONS.length} territories have a current dashboard snapshot. Analytics coverage varies by source and territory; locations still awaiting data remain listed on the Network page.
+            <strong style={{ color: "oklch(0.68 0.20 140)" }}>Admin note:</strong> {completeLocations.length} of {FRANCHISE_LOCATIONS.length} territories have a current dashboard snapshot. Analytics coverage varies by source and territory; locations still awaiting data remain listed on the Network page.
           </div>
         )}
       </div>

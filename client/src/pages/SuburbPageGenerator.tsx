@@ -79,12 +79,12 @@ function ResearchProgressCard({ suburbName }: { suburbName: string }) {
       <div className="flex items-start gap-3">
         <div
           className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
-          style={{ background: "oklch(0.32 0.09 145)", color: "white" }}
+          style={{ background: "oklch(0.68 0.20 140)", color: "white" }}
         >
           <Loader2 size={16} className="animate-spin" />
         </div>
         <div>
-          <h2 className="text-base font-semibold" style={{ color: "oklch(0.22 0.07 145)", fontFamily: "Inter, sans-serif" }}>
+          <h2 className="text-base font-semibold" style={{ color: "oklch(0.55 0.18 140)", fontFamily: "Inter, sans-serif" }}>
             Researching with Sonar…
           </h2>
           <p className="mt-1 text-sm leading-relaxed" style={{ color: "oklch(0.35 0.04 145)", fontFamily: "Inter, sans-serif" }}>
@@ -171,7 +171,7 @@ function ContentPreview({ content }: { content: GeneratedContent }) {
       {expandedSections.has("trust") && (
         <div className="pl-8 pb-3 flex flex-wrap gap-2">
           {content.trustChips.map((chip, i) => (
-            <span key={i} className="text-xs px-2 py-1 rounded-sm border" style={{ borderColor: "oklch(0.88 0.012 80)", color: "oklch(0.32 0.09 145)", fontFamily: "Inter, sans-serif" }}>
+            <span key={i} className="text-xs px-2 py-1 rounded-sm border" style={{ borderColor: "oklch(0.88 0.012 80)", color: "oklch(0.68 0.20 140)", fontFamily: "Inter, sans-serif" }}>
               {chip}
             </span>
           ))}
@@ -199,7 +199,7 @@ function ContentPreview({ content }: { content: GeneratedContent }) {
       {expandedSections.has("species") && (
         <div className="pl-8 pb-3 space-y-4">
           {content.speciesSections.map((sp, i) => (
-            <div key={i} className="border-l-2 pl-3" style={{ borderColor: sp.tier === 1 ? "oklch(0.32 0.09 145)" : sp.tier === 2 ? "oklch(0.65 0.10 80)" : "oklch(0.85 0.008 80)" }}>
+            <div key={i} className="border-l-2 pl-3" style={{ borderColor: sp.tier === 1 ? "oklch(0.68 0.20 140)" : sp.tier === 2 ? "oklch(0.65 0.10 80)" : "oklch(0.85 0.008 80)" }}>
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-sm font-semibold" style={{ color: "oklch(0.18 0.015 65)", fontFamily: "Inter, sans-serif" }}>{sp.heading}</span>
                 <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: sp.tier === 1 ? "oklch(0.92 0.06 145)" : "oklch(0.94 0.008 80)", color: sp.tier === 1 ? "oklch(0.28 0.09 145)" : "oklch(0.52 0.016 80)" }}>
@@ -382,7 +382,7 @@ export default function SuburbPageGenerator() {
         <div className="mb-6">
           <div
             className="text-xs font-semibold tracking-widest uppercase mb-1"
-            style={{ color: "oklch(0.42 0.09 145)", fontFamily: "Inter, sans-serif" }}
+            style={{ color: "oklch(0.75 0.18 140)", fontFamily: "Inter, sans-serif" }}
           >
             Content Generation
           </div>
@@ -403,8 +403,8 @@ export default function SuburbPageGenerator() {
             onClick={() => setActiveTab("generate")}
             className="pb-2 text-sm font-medium border-b-2 transition-colors"
             style={{
-              borderColor: activeTab === "generate" ? "oklch(0.32 0.09 145)" : "transparent",
-              color: activeTab === "generate" ? "oklch(0.32 0.09 145)" : "oklch(0.52 0.016 80)",
+              borderColor: activeTab === "generate" ? "oklch(0.68 0.20 140)" : "transparent",
+              color: activeTab === "generate" ? "oklch(0.68 0.20 140)" : "oklch(0.52 0.016 80)",
               fontFamily: "Inter, sans-serif",
             }}
           >
@@ -414,8 +414,8 @@ export default function SuburbPageGenerator() {
             onClick={() => setActiveTab("history")}
             className="pb-2 text-sm font-medium border-b-2 transition-colors"
             style={{
-              borderColor: activeTab === "history" ? "oklch(0.32 0.09 145)" : "transparent",
-              color: activeTab === "history" ? "oklch(0.32 0.09 145)" : "oklch(0.52 0.016 80)",
+              borderColor: activeTab === "history" ? "oklch(0.68 0.20 140)" : "transparent",
+              color: activeTab === "history" ? "oklch(0.68 0.20 140)" : "oklch(0.52 0.016 80)",
               fontFamily: "Inter, sans-serif",
             }}
           >
@@ -559,7 +559,7 @@ export default function SuburbPageGenerator() {
                   onClick={handleGenerate}
                   disabled={!selectedTerritory || !selectedSuburb || !phone || !gbpUrl || !yearsServing || !franchiseFoundedYear || !neighbourhoods || !county || !latitude || !longitude || generateMutation.isPending}
                   className="mt-4 w-full py-2.5 rounded-sm text-sm font-semibold text-white transition-opacity disabled:opacity-50"
-                  style={{ background: "oklch(0.32 0.09 145)", fontFamily: "Inter, sans-serif" }}
+                  style={{ background: "oklch(0.68 0.20 140)", fontFamily: "Inter, sans-serif" }}
                 >
                   {generateMutation.isPending ? (
                     <span className="flex items-center justify-center gap-2">
@@ -591,7 +591,7 @@ export default function SuburbPageGenerator() {
                   {/* Preview header */}
                   <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: "oklch(0.93 0.008 80)" }}>
                     <div className="flex items-center gap-2">
-                      <Eye size={14} style={{ color: "oklch(0.32 0.09 145)" }} />
+                      <Eye size={14} style={{ color: "oklch(0.68 0.20 140)" }} />
                       <span className="text-sm font-semibold" style={{ color: "oklch(0.18 0.015 65)", fontFamily: "Inter, sans-serif" }}>
                         Preview: {generatedContent.h1}
                       </span>
@@ -667,7 +667,7 @@ export default function SuburbPageGenerator() {
                     <button
                       onClick={() => handleOpenHistory(page.id, page.status)}
                       className="text-xs px-2 py-1 rounded-sm border"
-                      style={{ borderColor: "oklch(0.88 0.012 80)", color: "oklch(0.32 0.09 145)" }}
+                      style={{ borderColor: "oklch(0.88 0.012 80)", color: "oklch(0.68 0.20 140)" }}
                     >
                       View
                     </button>
@@ -689,7 +689,7 @@ export default function SuburbPageGenerator() {
                         disabled={generatedPageId !== page.id}
                         title={generatedPageId === page.id ? "Approve reviewed page" : "Open the page before approval"}
                         className="text-xs px-2 py-1 rounded-sm text-white"
-                        style={{ background: "oklch(0.32 0.09 145)", opacity: generatedPageId === page.id ? 1 : 0.5 }}
+                        style={{ background: "oklch(0.68 0.20 140)", opacity: generatedPageId === page.id ? 1 : 0.5 }}
                       >
                         Approve
                       </button>

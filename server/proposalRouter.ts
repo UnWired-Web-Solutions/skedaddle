@@ -161,7 +161,7 @@ function buildProposalHtml(data: ProposalData, narrative: string, config: Propos
     .page:last-child { page-break-after: avoid; }
     
     .header-bar {
-      background: #1B5E3B;
+      background: #69BE28;
       height: 6px;
       width: 100%;
       position: absolute;
@@ -181,31 +181,31 @@ function buildProposalHtml(data: ProposalData, narrative: string, config: Propos
     .logo-text {
       font-family: 'Playfair Display', Georgia, serif;
       font-size: 22pt;
-      color: #1B5E3B;
+      color: #69BE28;
       font-weight: 700;
     }
     
     .territory-badge {
       background: #f0f7f3;
-      border: 1px solid #1B5E3B;
+      border: 1px solid #69BE28;
       border-radius: 4px;
       padding: 4px 12px;
       font-size: 9pt;
       font-weight: 600;
-      color: #1B5E3B;
+      color: #69BE28;
     }
     
     h1 {
       font-family: 'Playfair Display', Georgia, serif;
       font-size: 18pt;
-      color: #1B5E3B;
+      color: #69BE28;
       margin-bottom: 6px;
     }
     
     h2 {
       font-size: 12pt;
       font-weight: 700;
-      color: #1B5E3B;
+      color: #69BE28;
       margin-top: 20px;
       margin-bottom: 8px;
       text-transform: uppercase;
@@ -249,7 +249,7 @@ function buildProposalHtml(data: ProposalData, narrative: string, config: Propos
     }
     
     li::marker {
-      color: #1B5E3B;
+      color: #69BE28;
       content: "■ ";
     }
     
@@ -261,7 +261,7 @@ function buildProposalHtml(data: ProposalData, narrative: string, config: Propos
     }
     
     .pricing-table th {
-      background: #1B5E3B;
+      background: #69BE28;
       color: white;
       padding: 10px 14px;
       text-align: left;
@@ -282,7 +282,7 @@ function buildProposalHtml(data: ProposalData, narrative: string, config: Propos
     
     .pricing-table .tier-name {
       font-weight: 700;
-      color: #1B5E3B;
+      color: #69BE28;
     }
     
     .pricing-table .price {
@@ -301,7 +301,7 @@ function buildProposalHtml(data: ProposalData, narrative: string, config: Propos
     }
     
     .includes-box strong {
-      color: #1B5E3B;
+      color: #69BE28;
     }
     
     .comparison-table {
@@ -312,7 +312,7 @@ function buildProposalHtml(data: ProposalData, narrative: string, config: Propos
     }
     
     .comparison-table th {
-      background: #1B5E3B;
+      background: #69BE28;
       color: white;
       padding: 8px 10px;
       text-align: center;
@@ -342,7 +342,7 @@ function buildProposalHtml(data: ProposalData, narrative: string, config: Propos
       background: #f9fafb;
     }
     
-    .check { color: #1B5E3B; font-weight: 700; }
+    .check { color: #69BE28; font-weight: 700; }
     .dash { color: #ccc; }
     
     .footer {
@@ -358,7 +358,7 @@ function buildProposalHtml(data: ProposalData, narrative: string, config: Propos
     
     .next-steps {
       background: #fafafa;
-      border-left: 3px solid #1B5E3B;
+      border-left: 3px solid #69BE28;
       padding: 14px 18px;
       margin: 16px 0;
     }

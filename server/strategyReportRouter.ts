@@ -958,13 +958,13 @@ function buildFullReportHtml(data: TerritoryDataObject, sections: SectionResult[
       left: 0;
       right: 0;
       height: 8px;
-      background: #1B5E3B;
+      background: #69BE28;
     }
 
     .cover-logo {
       font-family: 'Playfair Display', Georgia, serif;
       font-size: 28pt;
-      color: #1B5E3B;
+      color: #69BE28;
       font-weight: 700;
       margin-bottom: 48px;
     }
@@ -1010,7 +1010,7 @@ function buildFullReportHtml(data: TerritoryDataObject, sections: SectionResult[
       left: 0;
       right: 0;
       height: 4px;
-      background: #1B5E3B;
+      background: #69BE28;
     }
 
     .page-header {
@@ -1025,7 +1025,7 @@ function buildFullReportHtml(data: TerritoryDataObject, sections: SectionResult[
     .page-header-logo {
       font-family: 'Playfair Display', Georgia, serif;
       font-size: 11pt;
-      color: #1B5E3B;
+      color: #69BE28;
       font-weight: 700;
     }
 
@@ -1041,17 +1041,17 @@ function buildFullReportHtml(data: TerritoryDataObject, sections: SectionResult[
     h2 {
       font-family: 'Playfair Display', Georgia, serif;
       font-size: 14pt;
-      color: #1B5E3B;
+      color: #69BE28;
       margin-bottom: 14px;
       padding-bottom: 6px;
-      border-bottom: 2px solid #1B5E3B;
+      border-bottom: 2px solid #69BE28;
     }
 
     .section-num {
       font-family: 'Inter', sans-serif;
       font-size: 10pt;
       font-weight: 700;
-      color: #1B5E3B;
+      color: #69BE28;
       margin-right: 8px;
       opacity: 0.7;
     }
@@ -1079,7 +1079,7 @@ function buildFullReportHtml(data: TerritoryDataObject, sections: SectionResult[
     }
 
     .data-table th {
-      background: #1B5E3B;
+      background: #69BE28;
       color: white;
       padding: 8px 10px;
       text-align: left;
@@ -1105,11 +1105,11 @@ function buildFullReportHtml(data: TerritoryDataObject, sections: SectionResult[
 
     .data-table .total-row td {
       background: #f0f7f3;
-      border-top: 2px solid #1B5E3B;
+      border-top: 2px solid #69BE28;
     }
 
     .data-table .highlight {
-      color: #1B5E3B;
+      color: #69BE28;
       font-weight: 700;
     }
 
@@ -1122,7 +1122,7 @@ function buildFullReportHtml(data: TerritoryDataObject, sections: SectionResult[
     .callout-box {
       background: #f0f7f3;
       border: 1px solid #c8e0d4;
-      border-left: 4px solid #1B5E3B;
+      border-left: 4px solid #69BE28;
       border-radius: 4px;
       padding: 14px 18px;
       margin: 16px 0;
@@ -1131,7 +1131,7 @@ function buildFullReportHtml(data: TerritoryDataObject, sections: SectionResult[
     }
 
     .callout-box strong {
-      color: #1B5E3B;
+      color: #69BE28;
     }
 
     .action-plan-month {
@@ -1139,7 +1139,7 @@ function buildFullReportHtml(data: TerritoryDataObject, sections: SectionResult[
     }
 
     .action-plan-month h3 {
-      color: #1B5E3B;
+      color: #69BE28;
       font-size: 11pt;
       margin-bottom: 10px;
     }
@@ -1169,7 +1169,7 @@ function buildFullReportHtml(data: TerritoryDataObject, sections: SectionResult[
     }
 
     .action-category li::marker {
-      color: #1B5E3B;
+      color: #69BE28;
       content: "▪ ";
     }
 
@@ -1181,7 +1181,7 @@ function buildFullReportHtml(data: TerritoryDataObject, sections: SectionResult[
     }
 
     .risk-table th {
-      background: #1B5E3B;
+      background: #69BE28;
       color: white;
       padding: 8px 10px;
       text-align: left;
@@ -1221,7 +1221,7 @@ function buildFullReportHtml(data: TerritoryDataObject, sections: SectionResult[
       top: 10px;
       width: 24px;
       height: 24px;
-      background: #1B5E3B;
+      background: #69BE28;
       color: white;
       border-radius: 50%;
       display: flex;

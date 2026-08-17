@@ -7,7 +7,7 @@ import { ArrowUpRight, TrendingUp } from "lucide-react";
 import { Link } from "wouter";
 
 const FOREST = "oklch(0.18 0.015 65)";
-const SAGE_GREEN = "oklch(0.32 0.09 145)";
+const SAGE_GREEN = "oklch(0.68 0.20 140)";
 const GOLD = "oklch(0.68 0.14 80)";
 const MIST = "oklch(0.88 0.012 80)";
 
@@ -35,7 +35,7 @@ export default function Network() {
         <div className="mb-8">
           <div
             className="text-xs font-semibold tracking-widest uppercase mb-1"
-            style={{ color: "oklch(0.42 0.09 145)", fontFamily: "Inter, sans-serif" }}
+            style={{ color: "oklch(0.75 0.18 140)", fontFamily: "Inter, sans-serif" }}
           >
             Franchise Network
           </div>
@@ -51,7 +51,7 @@ export default function Network() {
           >
             {FRANCHISE_LOCATIONS.length} locations tracked · {FRANCHISE_LOCATIONS.filter(f => f.status === "active").length} with active dashboards
           </div>
-          <div className="mt-3" style={{ borderTop: "2px solid oklch(0.32 0.09 145)", width: "48px" }} />
+          <div className="mt-3" style={{ borderTop: "2px solid oklch(0.68 0.20 140)", width: "48px" }} />
         </div>
 
         {/* ── Market rankings ── */}
@@ -148,7 +148,7 @@ export default function Network() {
             <div key={region} className="mb-8">
               <h2
                 className="text-xs font-semibold tracking-widest uppercase mb-3"
-                style={{ color: "oklch(0.42 0.09 145)", fontFamily: "Inter, sans-serif" }}
+                style={{ color: "oklch(0.75 0.18 140)", fontFamily: "Inter, sans-serif" }}
               >
                 {region}
               </h2>
@@ -205,7 +205,7 @@ export default function Network() {
                           <Link
                             href={`/location/${loc.id}`}
                             className="text-xs font-semibold flex items-center gap-1 justify-end transition-opacity hover:opacity-70"
-                            style={{ color: "oklch(0.32 0.09 145)" }}
+                            style={{ color: "oklch(0.68 0.20 140)" }}
                           >
                             View <ArrowUpRight size={11} />
                           </Link>

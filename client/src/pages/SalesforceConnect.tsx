@@ -79,7 +79,7 @@ export default function SalesforceConnect() {
         <div className="mb-8">
           <div
             className="text-xs font-semibold tracking-widest uppercase mb-1"
-            style={{ color: "oklch(0.42 0.09 145)", fontFamily: "Inter, sans-serif" }}
+            style={{ color: "oklch(0.75 0.18 140)", fontFamily: "Inter, sans-serif" }}
           >
             Integration Settings
           </div>
@@ -95,7 +95,7 @@ export default function SalesforceConnect() {
           >
             Authorize and inspect the Salesforce schema or run administrative SOQL queries. This console does not yet sync results into portal dashboards or reports.
           </p>
-          <div className="mt-3" style={{ borderTop: "2px solid oklch(0.32 0.09 145)", width: "48px" }} />
+          <div className="mt-3" style={{ borderTop: "2px solid oklch(0.68 0.20 140)", width: "48px" }} />
         </div>
 
         {/* Status Banner */}
@@ -158,7 +158,7 @@ export default function SalesforceConnect() {
                     className="px-3 py-1.5 text-xs font-semibold rounded-sm flex items-center gap-1.5 transition-colors"
                     style={{
                       background: "oklch(0.95 0.02 145)",
-                      color: "oklch(0.32 0.09 145)",
+                      color: "oklch(0.68 0.20 140)",
                       border: "1px solid oklch(0.85 0.04 145)",
                     }}
                   >
@@ -185,7 +185,7 @@ export default function SalesforceConnect() {
                   href={authUrlQuery.data?.url ?? "#"}
                   className="px-4 py-2 text-sm font-semibold rounded-sm flex items-center gap-2 transition-transform active:scale-[0.97]"
                   style={{
-                    background: "oklch(0.32 0.09 145)",
+                    background: "oklch(0.68 0.20 140)",
                     color: "oklch(1 0 0)",
                     fontFamily: "Inter, sans-serif",
                   }}
@@ -202,7 +202,7 @@ export default function SalesforceConnect() {
               className="mt-3 p-3 rounded-sm text-xs"
               style={{
                 background: testQuery.data.success ? "oklch(0.97 0.02 145)" : "oklch(0.97 0.02 27)",
-                color: testQuery.data.success ? "oklch(0.32 0.09 145)" : "oklch(0.45 0.15 27)",
+                color: testQuery.data.success ? "oklch(0.68 0.20 140)" : "oklch(0.45 0.15 27)",
                 fontFamily: "Inter, sans-serif",
               }}
             >
@@ -218,7 +218,7 @@ export default function SalesforceConnect() {
             style={{ background: "oklch(1 0 0)", borderColor: "oklch(0.88 0.012 80)" }}
           >
             <div className="flex items-center gap-2 mb-4">
-              <Database size={18} style={{ color: "oklch(0.42 0.09 145)" }} />
+              <Database size={18} style={{ color: "oklch(0.75 0.18 140)" }} />
               <h2
                 className="text-base font-bold"
                 style={{ fontFamily: "Inter, sans-serif", color: "oklch(0.18 0.015 65)" }}
@@ -233,7 +233,7 @@ export default function SalesforceConnect() {
                 className="px-3 py-1.5 text-xs font-semibold rounded-sm flex items-center gap-1.5"
                 style={{
                   background: "oklch(0.95 0.02 145)",
-                  color: "oklch(0.32 0.09 145)",
+                  color: "oklch(0.68 0.20 140)",
                   border: "1px solid oklch(0.85 0.04 145)",
                 }}
               >
@@ -270,7 +270,7 @@ export default function SalesforceConnect() {
             {/* Object Fields */}
             {describeQuery.data && (
               <div className="mb-4">
-                <h3 className="text-xs font-bold mb-2" style={{ color: "oklch(0.32 0.09 145)" }}>
+                <h3 className="text-xs font-bold mb-2" style={{ color: "oklch(0.68 0.20 140)" }}>
                   {describeQuery.data.label} — Fields ({describeQuery.data.fields.length})
                 </h3>
                 <div className="max-h-60 overflow-y-auto border rounded-sm" style={{ borderColor: "oklch(0.92 0.008 80)" }}>
@@ -305,7 +305,7 @@ export default function SalesforceConnect() {
             style={{ background: "oklch(1 0 0)", borderColor: "oklch(0.88 0.012 80)" }}
           >
             <div className="flex items-center gap-2 mb-4">
-              <Search size={18} style={{ color: "oklch(0.42 0.09 145)" }} />
+              <Search size={18} style={{ color: "oklch(0.75 0.18 140)" }} />
               <h2
                 className="text-base font-bold"
                 style={{ fontFamily: "Inter, sans-serif", color: "oklch(0.18 0.015 65)" }}
@@ -332,7 +332,7 @@ export default function SalesforceConnect() {
                 disabled={queryMutation.isPending || !soqlQuery.trim()}
                 className="px-4 py-2 text-xs font-semibold rounded-sm flex items-center gap-1.5 transition-transform active:scale-[0.97] disabled:opacity-50"
                 style={{
-                  background: "oklch(0.32 0.09 145)",
+                  background: "oklch(0.68 0.20 140)",
                   color: "oklch(1 0 0)",
                 }}
               >

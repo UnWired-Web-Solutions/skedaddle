@@ -108,7 +108,7 @@ function Lightbox({ images, currentIndex, onClose, onNavigate, onRegenerate, reg
 
           {/* Service label badge */}
           <div className="absolute top-3 left-3">
-            <Badge className="text-xs" style={{ background: "oklch(0.32 0.09 145)", color: "white" }}>
+            <Badge className="text-xs" style={{ background: "oklch(0.68 0.20 140)", color: "white" }}>
               {img.serviceLabel}
             </Badge>
           </div>
@@ -171,7 +171,7 @@ function Lightbox({ images, currentIndex, onClose, onNavigate, onRegenerate, reg
               href={img.url}
               download={img.filename}
               className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded transition-opacity hover:opacity-80"
-              style={{ background: "oklch(0.32 0.09 145)", color: "white" }}
+              style={{ background: "oklch(0.68 0.20 140)", color: "white" }}
             >
               <Download size={11} /> Download
             </a>
@@ -200,7 +200,7 @@ function Lightbox({ images, currentIndex, onClose, onNavigate, onRegenerate, reg
                 style={{
                   width: 56,
                   height: 42,
-                  outline: i === currentIndex ? "2px solid oklch(0.32 0.09 145)" : "2px solid transparent",
+                  outline: i === currentIndex ? "2px solid oklch(0.68 0.20 140)" : "2px solid transparent",
                   opacity: i === currentIndex ? 1 : 0.55,
                 }}
                 aria-label={`Go to image ${i + 1}`}
@@ -268,7 +268,7 @@ function ImageCard({
           >
             <img src={img.url} alt={img.serviceLabel} className="w-full h-full object-cover" />
             <div className="absolute top-2 left-2">
-              <Badge className="text-xs" style={{ background: "oklch(0.32 0.09 145)", color: "white" }}>
+              <Badge className="text-xs" style={{ background: "oklch(0.68 0.20 140)", color: "white" }}>
                 {img.serviceLabel}
               </Badge>
             </div>
@@ -287,7 +287,7 @@ function ImageCard({
               href={img.url}
               download={img.filename}
               className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded transition-opacity hover:opacity-80"
-              style={{ background: "oklch(0.32 0.09 145)", color: "white", fontFamily: "Inter, sans-serif" }}
+              style={{ background: "oklch(0.68 0.20 140)", color: "white", fontFamily: "Inter, sans-serif" }}
             >
               <Download size={11} /> Save
             </a>
@@ -602,7 +602,7 @@ export default function GbpImageGenerator() {
         <div className="mb-8">
           <div
             className="text-xs font-semibold tracking-widest uppercase mb-1"
-            style={{ color: "oklch(0.42 0.09 145)", fontFamily: "Inter, sans-serif" }}
+            style={{ color: "oklch(0.75 0.18 140)", fontFamily: "Inter, sans-serif" }}
           >
             GBP Tools
           </div>
@@ -615,14 +615,14 @@ export default function GbpImageGenerator() {
           <p className="text-sm" style={{ color: "oklch(0.52 0.016 80)", fontFamily: "Inter, sans-serif" }}>
             Generate branded Skedaddle images for Google Business Profile posts using AI.
           </p>
-          <div className="mt-3" style={{ borderTop: "2px solid oklch(0.32 0.09 145)", width: "48px" }} />
+          <div className="mt-3" style={{ borderTop: "2px solid oklch(0.68 0.20 140)", width: "48px" }} />
         </div>
 
         {/* Progress bar */}
         {isGenerating && (
           <div className="mb-6 p-4 rounded-lg border" style={{ background: "oklch(0.97 0.012 80)", borderColor: "oklch(0.88 0.012 80)" }}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium" style={{ color: "oklch(0.32 0.09 145)" }}>
+              <span className="text-sm font-medium" style={{ color: "oklch(0.68 0.20 140)" }}>
                 Generating images…
               </span>
               <span className="text-xs" style={{ color: "oklch(0.52 0.016 80)" }}>
@@ -634,7 +634,7 @@ export default function GbpImageGenerator() {
                 className="h-2 rounded-full transition-all duration-500"
                 style={{
                   width: progress.total > 0 ? `${(progress.current / progress.total) * 100}%` : "0%",
-                  background: "oklch(0.32 0.09 145)",
+                  background: "oklch(0.68 0.20 140)",
                 }}
               />
             </div>
@@ -701,7 +701,7 @@ export default function GbpImageGenerator() {
                 onClick={handleSingleGenerate}
                 disabled={isGenerating}
                 className="flex items-center gap-2"
-                style={{ background: "oklch(0.32 0.09 145)", color: "white" }}
+                style={{ background: "oklch(0.68 0.20 140)", color: "white" }}
               >
                 {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                 Generate Image
@@ -798,7 +798,7 @@ export default function GbpImageGenerator() {
                 onClick={handleBulkGenerate}
                 disabled={isGenerating}
                 className="flex items-center gap-2"
-                style={{ background: "oklch(0.32 0.09 145)", color: "white" }}
+                style={{ background: "oklch(0.68 0.20 140)", color: "white" }}
               >
                 {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                 Generate {bulkPosts.filter((p) => p.title && p.territory).length} Image{bulkPosts.filter((p) => p.title && p.territory).length !== 1 ? "s" : ""}
@@ -839,7 +839,7 @@ export default function GbpImageGenerator() {
                   href={`data:text/csv;charset=utf-8,post_title,post_body,territory,suburb\n"Squirrel found in attic","A homeowner called us after hearing scratching sounds...",milwaukee,Waukesha\n"Raccoon removal in Hamilton","Spring is peak season for raccoon activity...",hamilton,Ancaster`}
                   download="gbp_posts_template.csv"
                   className="text-xs font-semibold flex items-center gap-1"
-                  style={{ color: "oklch(0.32 0.09 145)" }}
+                  style={{ color: "oklch(0.68 0.20 140)" }}
                 >
                   <Download size={11} /> Download Template CSV
                 </a>
@@ -853,7 +853,7 @@ export default function GbpImageGenerator() {
                 <Upload size={24} className="mx-auto mb-2" style={{ color: "oklch(0.52 0.016 80)" }} />
                 {csvFileName ? (
                   <div>
-                    <p className="text-sm font-semibold" style={{ color: "oklch(0.32 0.09 145)" }}>{csvFileName}</p>
+                    <p className="text-sm font-semibold" style={{ color: "oklch(0.68 0.20 140)" }}>{csvFileName}</p>
                     <p className="text-xs mt-1" style={{ color: "oklch(0.52 0.016 80)" }}>{csvPosts.length} posts loaded</p>
                   </div>
                 ) : (
@@ -914,7 +914,7 @@ export default function GbpImageGenerator() {
                       onClick={handleCsvGenerate}
                       disabled={isGenerating}
                       className="flex items-center gap-2"
-                      style={{ background: "oklch(0.32 0.09 145)", color: "white" }}
+                      style={{ background: "oklch(0.68 0.20 140)", color: "white" }}
                     >
                       {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                       Generate {csvPosts.filter((p) => p.title && p.territory).length} Images
@@ -948,9 +948,9 @@ export default function GbpImageGenerator() {
         {/* Info box */}
         <div className="mt-6 p-4 rounded-lg border text-sm" style={{ background: "oklch(0.97 0.012 80)", borderColor: "oklch(0.88 0.012 80)", color: "oklch(0.52 0.016 80)", fontFamily: "Inter, sans-serif" }}>
           <div className="flex items-start gap-2">
-            <ImageIcon size={14} className="mt-0.5 shrink-0" style={{ color: "oklch(0.32 0.09 145)" }} />
+            <ImageIcon size={14} className="mt-0.5 shrink-0" style={{ color: "oklch(0.68 0.20 140)" }} />
             <div>
-              <strong style={{ color: "oklch(0.32 0.09 145)" }}>How it works:</strong> AI reads the post, extracts the species and setting, then creates an illustrative 1024×768 image with a Skedaddle brand overlay. Review species accuracy, uniforms, property details, and local fit before publishing; generated images are not documentary job photos. Click any image to inspect the prompt or regenerate a variation.
+              <strong style={{ color: "oklch(0.68 0.20 140)" }}>How it works:</strong> AI reads the post, extracts the species and setting, then creates an illustrative 1024×768 image with a Skedaddle brand overlay. Review species accuracy, uniforms, property details, and local fit before publishing; generated images are not documentary job photos. Click any image to inspect the prompt or regenerate a variation.
             </div>
           </div>
         </div>

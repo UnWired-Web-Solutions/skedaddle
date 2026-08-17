@@ -127,7 +127,7 @@ export default function ProposalGenerator() {
         <div className="mb-8">
           <div
             className="text-xs font-semibold tracking-widest uppercase mb-1"
-            style={{ color: "oklch(0.42 0.09 145)", fontFamily: "Inter, sans-serif" }}
+            style={{ color: "oklch(0.75 0.18 140)", fontFamily: "Inter, sans-serif" }}
           >
             Sales Tools
           </div>
@@ -149,7 +149,7 @@ export default function ProposalGenerator() {
           </div>
           <div
             className="mt-3"
-            style={{ borderTop: "2px solid oklch(0.32 0.09 145)", width: "48px" }}
+            style={{ borderTop: "2px solid oklch(0.68 0.20 140)", width: "48px" }}
           />
         </div>
 
@@ -211,14 +211,14 @@ export default function ProposalGenerator() {
                     fontFamily: "Inter, sans-serif",
                   }}
                 >
-                  <div style={{ color: "oklch(0.32 0.09 145)" }}>
+                  <div style={{ color: "oklch(0.68 0.20 140)" }}>
                     <strong>{selectedTerritoryData.name}</strong>
                   </div>
                   <div style={{ color: "oklch(0.52 0.016 80)" }}>
                     {selectedTerritoryData.city}, {selectedTerritoryData.state} ·{" "}
                     {selectedTerritoryData.country === "CA" ? "Canada" : "United States"}
                   </div>
-                  <div style={{ color: "oklch(0.42 0.09 145)", fontWeight: 600 }}>
+                  <div style={{ color: "oklch(0.75 0.18 140)", fontWeight: 600 }}>
                     {formatRevenue(selectedTerritoryData.revenue, selectedTerritoryData.id)}{" "}
                     trailing 12-month revenue
                   </div>
@@ -305,7 +305,7 @@ export default function ProposalGenerator() {
               style={{
                 background: selectedTerritory && termsConfirmed && !generating ? "oklch(0.97 0.012 80)" : "oklch(0.94 0.008 80)",
                 border: "1px solid oklch(0.88 0.012 80)",
-                color: selectedTerritory && termsConfirmed && !generating ? "oklch(0.32 0.09 145)" : "oklch(0.65 0.010 80)",
+                color: selectedTerritory && termsConfirmed && !generating ? "oklch(0.68 0.20 140)" : "oklch(0.65 0.010 80)",
                 cursor: selectedTerritory && termsConfirmed && !generating ? "pointer" : "not-allowed",
                 fontFamily: "Inter, sans-serif",
               }}
@@ -323,7 +323,7 @@ export default function ProposalGenerator() {
               disabled={!selectedTerritory || !termsConfirmed || generating}
               className="flex items-center gap-2 px-4 py-2 rounded-sm text-sm font-semibold transition-all"
               style={{
-                background: selectedTerritory && termsConfirmed && !generating ? "oklch(0.32 0.09 145)" : "oklch(0.65 0.010 80)",
+                background: selectedTerritory && termsConfirmed && !generating ? "oklch(0.68 0.20 140)" : "oklch(0.65 0.010 80)",
                 color: "white",
                 cursor: selectedTerritory && termsConfirmed && !generating ? "pointer" : "not-allowed",
                 fontFamily: "Inter, sans-serif",
@@ -342,7 +342,7 @@ export default function ProposalGenerator() {
           {generating && (
             <div
               className="mt-4 text-sm flex items-center gap-2"
-              style={{ color: "oklch(0.42 0.09 145)", fontFamily: "Inter, sans-serif" }}
+              style={{ color: "oklch(0.75 0.18 140)", fontFamily: "Inter, sans-serif" }}
             >
               <Loader2 size={14} className="animate-spin" />
               {exportMutation.isPending ? "Exporting the reviewed preview..." : "Generating proposal narrative and layout... This takes 15-30 seconds."}
@@ -375,7 +375,7 @@ export default function ProposalGenerator() {
                 <div>
                   <div
                     className="text-sm font-bold"
-                    style={{ color: "oklch(0.32 0.09 145)", fontFamily: "Inter, sans-serif" }}
+                    style={{ color: "oklch(0.68 0.20 140)", fontFamily: "Inter, sans-serif" }}
                   >
                     Proposal Generated Successfully
                   </div>
@@ -392,7 +392,7 @@ export default function ProposalGenerator() {
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 px-4 py-2 rounded-sm text-sm font-semibold transition-opacity hover:opacity-80"
                   style={{
-                    background: "oklch(0.32 0.09 145)",
+                    background: "oklch(0.68 0.20 140)",
                     color: "white",
                     fontFamily: "Inter, sans-serif",
                     textDecoration: "none",
@@ -430,7 +430,7 @@ export default function ProposalGenerator() {
                 disabled={generating}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-xs font-semibold"
                 style={{
-                  background: "oklch(0.32 0.09 145)",
+                  background: "oklch(0.68 0.20 140)",
                   color: "white",
                   fontFamily: "Inter, sans-serif",
                   cursor: generating ? "not-allowed" : "pointer",
@@ -466,7 +466,7 @@ export default function ProposalGenerator() {
           >
             <h3
               className="text-sm font-bold mb-3"
-              style={{ color: "oklch(0.32 0.09 145)", fontFamily: "Inter, sans-serif" }}
+              style={{ color: "oklch(0.68 0.20 140)", fontFamily: "Inter, sans-serif" }}
             >
               How It Works
             </h3>

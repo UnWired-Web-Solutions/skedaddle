@@ -20,7 +20,7 @@ export default function Tools() {
     <PortalLayout>
       <div className="px-6 py-8 max-w-4xl">
         <div className="mb-8">
-          <div className="text-xs font-semibold tracking-widest uppercase mb-1" style={{ color: "oklch(0.42 0.09 145)", fontFamily: "Inter, sans-serif" }}>
+          <div className="text-xs font-semibold tracking-widest uppercase mb-1" style={{ color: "oklch(0.75 0.18 140)", fontFamily: "Inter, sans-serif" }}>
             Operational Workspace
           </div>
           <h1 className="text-3xl font-bold mb-2" style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "oklch(0.18 0.015 65)" }}>
@@ -29,7 +29,7 @@ export default function Tools() {
           <p className="text-sm" style={{ color: "oklch(0.52 0.016 80)", fontFamily: "Inter, sans-serif" }}>
             Working portal features only. Availability follows your account role.
           </p>
-          <div className="mt-3" style={{ borderTop: "2px solid oklch(0.32 0.09 145)", width: "48px" }} />
+          <div className="mt-3" style={{ borderTop: "2px solid oklch(0.68 0.20 140)", width: "48px" }} />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -38,7 +38,7 @@ export default function Tools() {
               key={tool.href}
               href={tool.href}
               className="rounded-sm border p-5 transition-opacity hover:opacity-80"
-              style={{ background: "white", borderColor: "oklch(0.88 0.012 80)", borderLeft: "3px solid oklch(0.32 0.09 145)" }}
+              style={{ background: "white", borderColor: "oklch(0.88 0.012 80)", borderLeft: "3px solid oklch(0.68 0.20 140)" }}
             >
               <div className="flex items-start gap-3">
                 <div className="w-9 h-9 rounded-sm flex items-center justify-center shrink-0" style={{ background: "oklch(0.92 0.06 145)", color: "oklch(0.28 0.09 145)" }}>
