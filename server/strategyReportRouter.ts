@@ -395,7 +395,7 @@ STYLE: Professional, data-backed, direct. Written like a senior digital strategi
 
 Return ONLY the paragraph text (no headings, no HTML tags, no markdown). Use plain text with line breaks between paragraphs.`;
 
-  const text = await callClaude(prompt, "claude-sonnet-4-20250514", 1500);
+  const text = await callClaude(prompt, "claude-opus-5", 1500);
 
   // Convert plain text paragraphs to HTML
   const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
@@ -457,7 +457,7 @@ STYLE: Analytical, revenue-backed, persuasive. Each suburb mentioned must includ
 
 Return ONLY paragraph text (no headings, no HTML, no markdown).`;
 
-  const text = await callClaude(prompt, "claude-sonnet-4-20250514", 1500);
+  const text = await callClaude(prompt, "claude-opus-5", 1500);
   const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
   return paragraphs.map(p => `<p class="narrative">${p.trim()}</p>`).join("\n");
 }
@@ -492,7 +492,7 @@ STYLE: Strategic and specific. Reference actual suburb names and species. Writte
 
 Return ONLY paragraph text (no headings, no HTML, no markdown). Separate the 4 areas with double line breaks.`;
 
-  const text = await callClaude(prompt, "claude-sonnet-4-20250514", 2500);
+  const text = await callClaude(prompt, "claude-opus-5", 2500);
   const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
   return paragraphs.map(p => `<p class="narrative">${p.trim()}</p>`).join("\n");
 }
@@ -519,7 +519,7 @@ STYLE: Detailed and prescriptive. This section should read like a content strate
 
 Return ONLY paragraph text (no headings, no HTML, no markdown). Use double line breaks between subsections.`;
 
-  const text = await callClaude(prompt, "claude-sonnet-4-20250514", 3000);
+  const text = await callClaude(prompt, "claude-opus-5", 3000);
   const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
   return paragraphs.map(p => `<p class="narrative">${p.trim()}</p>`).join("\n");
 }
@@ -556,7 +556,7 @@ STYLE: Tactical and specific. This should read like a monthly playbook a marketi
 
 Return ONLY paragraph text (no headings, no HTML, no markdown). Use double line breaks between subsections.`;
 
-  const text = await callClaude(prompt, "claude-sonnet-4-20250514", 3000);
+  const text = await callClaude(prompt, "claude-opus-5", 3000);
   const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
   return paragraphs.map(p => `<p class="narrative">${p.trim()}</p>`).join("\n");
 }
@@ -595,7 +595,7 @@ Month 2 — Expansion
 Month 3 — Optimization
 [same format]`;
 
-  const text = await callClaude(prompt, "claude-sonnet-4-20250514", 4000);
+  const text = await callClaude(prompt, "claude-opus-5", 4000);
   return text; // Will be formatted in the HTML builder
 }
 
@@ -620,7 +620,7 @@ STYLE: Neutral, direct, and practical. Do not manufacture negative performance c
 Return as plain text in this format (one per line):
 RISK: [risk statement] | IMPACT: [impact] | MITIGATION: [mitigation action]`;
 
-  const text = await callClaude(prompt, "claude-sonnet-4-20250514", 2000);
+  const text = await callClaude(prompt, "claude-opus-5", 2000);
   return text; // Will be formatted into a table in HTML builder
 }
 
@@ -649,7 +649,7 @@ STYLE: Concise, direct, data-backed. Each recommendation should feel like a clea
 
 Return as numbered list (1. ... 2. ... etc.) with no other formatting.`;
 
-  const text = await callClaude(prompt, "claude-sonnet-4-20250514", 1500);
+  const text = await callClaude(prompt, "claude-opus-5", 1500);
   return text; // Will be formatted in HTML builder
 }
 
