@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { adminProcedure, router } from "./_core/trpc";
+import { publicProcedure, router } from "./_core/trpc";
 import { ENV } from "./_core/env";
 import { storagePut } from "./storage";
 import puppeteer from "puppeteer";
@@ -600,7 +600,7 @@ async function generatePdf(html: string): Promise<Buffer> {
 
 export const proposalRouter = router({
   // Get available territories for proposal generation
-  getTerritories: adminProcedure.query(async () => {
+  getTerritories: publicProcedure.query(async () => {
     // Import franchise data dynamically to avoid circular deps
     const { DASHBOARD_DATA } = await import("../client/src/data/dashboardData");
     const { FRANCHISE_LOCATIONS } = await import("../client/src/data/franchises");
@@ -618,7 +618,7 @@ export const proposalRouter = router({
   }),
 
   // Generate a proposal for a specific territory
-  generate: adminProcedure
+  generate: publicProcedure
     .input(proposalInputSchema)
     .mutation(async ({ input }) => {
       const { DASHBOARD_DATA } = await import("../client/src/data/dashboardData");
@@ -666,7 +666,7 @@ export const proposalRouter = router({
     }),
 
   // Preview HTML (for in-browser preview without PDF generation)
-  preview: adminProcedure
+  preview: publicProcedure
     .input(proposalInputSchema)
     .mutation(async ({ input }) => {
       const { DASHBOARD_DATA } = await import("../client/src/data/dashboardData");
@@ -698,7 +698,7 @@ export const proposalRouter = router({
     }),
 
   // Export the exact reviewed preview; no second AI call can change the copy.
-  exportPdf: adminProcedure
+  exportPdf: publicProcedure
     .input(z.object({ territoryId: z.string(), html: z.string().min(1).max(1_500_000) }))
     .mutation(async ({ input }) => {
       const pdfBuffer = await generatePdf(input.html);

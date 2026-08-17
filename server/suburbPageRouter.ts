@@ -5,7 +5,7 @@
  */
 
 import { z } from "zod";
-import { router, adminProcedure, publicProcedure } from "./_core/trpc";
+import { router, publicProcedure } from "./_core/trpc";
 import { getDb } from "./db";
 import { suburbPages } from "../drizzle/schema";
 import { eq, desc } from "drizzle-orm";
@@ -759,7 +759,7 @@ export const suburbPageRouter = router({
   }),
 
   // Generate suburb page content
-  generate: adminProcedure
+  generate: publicProcedure
     .input(z.object({
       territoryId: z.string(),
       suburbName: z.string(),
@@ -809,7 +809,7 @@ export const suburbPageRouter = router({
     }),
 
   // List generated pages
-  list: adminProcedure
+  list: publicProcedure
     .input(z.object({ territoryId: z.string().optional() }).optional())
     .query(async ({ input }) => {
       const db = await getDb();
@@ -821,7 +821,7 @@ export const suburbPageRouter = router({
     }),
 
   // Get single page content
-  getPage: adminProcedure
+  getPage: publicProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
       const db = await getDb();
@@ -836,7 +836,7 @@ export const suburbPageRouter = router({
     }),
 
   // Update page status (approval workflow)
-  updateStatus: adminProcedure
+  updateStatus: publicProcedure
     .input(z.object({
       id: z.number(),
       status: z.enum(["draft", "in_review", "approved", "exported"]),
@@ -849,7 +849,7 @@ export const suburbPageRouter = router({
         .set({
           status: input.status,
           reviewerNotes: input.reviewerNotes || null,
-          ...(input.status === "approved" ? { approvedAt: new Date(), reviewedBy: ctx.user.name || ctx.user.openId } : {}),
+          ...(input.status === "approved" ? { approvedAt: new Date(), reviewedBy: "portal-admin" } : {}),
         })
         .where(eq(suburbPages.id, input.id));
       return { success: true };

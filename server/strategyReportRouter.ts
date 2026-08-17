@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { adminProcedure, publicProcedure, router } from "./_core/trpc";
+import { publicProcedure, router } from "./_core/trpc";
 import { ENV } from "./_core/env";
 import { storagePut } from "./storage";
 import puppeteer from "puppeteer";
@@ -1539,7 +1539,7 @@ export const strategyReportRouter = router({
   }),
 
   // Generate strategy report (returns HTML for preview)
-  preview: adminProcedure
+  preview: publicProcedure
     .input(z.object({ territoryId: z.string(), config: strategyConfigSchema }))
     .mutation(async ({ input }) => {
       const result = await generateStrategyReport(input.territoryId, input.config);
@@ -1547,7 +1547,7 @@ export const strategyReportRouter = router({
     }),
 
   // Generate strategy report + PDF
-  generate: adminProcedure
+  generate: publicProcedure
     .input(z.object({ territoryId: z.string(), config: strategyConfigSchema }))
     .mutation(async ({ input }) => {
       const { DASHBOARD_DATA } = await import("../client/src/data/dashboardData");
@@ -1574,7 +1574,7 @@ export const strategyReportRouter = router({
     }),
 
   // Render the exact reviewed HTML instead of re-running every AI section.
-  exportPdf: adminProcedure
+  exportPdf: publicProcedure
     .input(z.object({ territoryId: z.string(), html: z.string().min(1).max(3_000_000) }))
     .mutation(async ({ input }) => {
       const pdfBuffer = await generatePdf(input.html);
