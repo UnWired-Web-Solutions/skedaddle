@@ -6,7 +6,7 @@ describe("Anthropic API Key Validation", () => {
     expect(process.env.ANTHROPIC_API_KEY!.length).toBeGreaterThan(10);
   });
 
-  it("should successfully call Anthropic API with a minimal request", async () => {
+  it.runIf(process.env.RUN_LIVE_API_TESTS === "1")("should successfully call Anthropic API with a minimal request", async () => {
     const resp = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
