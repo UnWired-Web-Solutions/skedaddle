@@ -511,7 +511,7 @@ TERRITORY DATA:
 Write a detailed content architecture section covering:
 1. The Hub-and-Spoke Model explanation (hub page = main territory page, spokes = suburb pages + species pages)
 2. Content types and word count guidance: Hub pages 1500-2200 words, Species pages 1000-1500 words, Suburb pages 900-1400 words, Species×Location pages 700-1000 words
-3. Page build priority order (based on revenue ranking) — name the specific suburbs in order
+3. Mandatory phase order: Phase 1 builds Tier 1 suburb hub pages in revenue order; Phase 2 builds species×suburb pages beneath those approved hubs. Never reverse these phases
 4. Species page priority weighting (Tier 1, Tier 2, Tier 3 based on revenue/job volume)
 5. Blog reorientation strategy: from generic educational → conversion-oriented, suburb-specific, species×suburb×season combinations
 
@@ -575,9 +575,9 @@ TERRITORY DATA:
 
 Write a focused month-by-month 90-day plan. Each month must contain 3-5 total priorities, not a long backlog. Every priority must include an owner role, a concrete deliverable, and a measurable outcome.
 
-MONTH 1 should focus on: measurement baseline, confirmed technical gaps, and the approved campaign volumes
+MONTH 1 should focus on: measurement baseline, confirmed technical gaps, and Phase 1 Tier 1 suburb hub pages in revenue order
 
-MONTH 2 should focus on: expansion (next batch of suburb pages, species×location pages, review velocity, seasonal content aligned to the territory's wildlife calendar)
+MONTH 2 should focus on: Phase 2 species×suburb pages beneath the approved Month 1 hubs, review velocity, and seasonal content aligned to the territory's wildlife calendar
 
 MONTH 3 should focus on: optimization (review Month 1-2 data, build remaining suburb pages, species×location variants, identify best-performing content, prepare next quarter's strategy)
 
@@ -1255,7 +1255,7 @@ function buildFullReportHtml(data: TerritoryDataObject, sections: SectionResult[
 <!-- COVER PAGE -->
 <div class="cover-page">
   <div class="cover-logo">Skedaddle</div>
-  <div class="cover-title">Franchise Digital Marketing<br>& Sales Strategy</div>
+  <div class="cover-title">Initial Franchise Sales<br>& Digital Marketing Strategy</div>
   <div class="cover-subtitle">${data.name} Territory — ${data.city}, ${data.state}</div>
   <div class="cover-meta">
     <strong>Prepared by:</strong> Unwired Web Solutions<br>

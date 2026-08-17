@@ -36,8 +36,7 @@ const TOP_NAV: NavItem[] = [
   { label: "Analytics", href: "/analytics", icon: <LineChart size={16} /> },
   { label: "Resources", href: "/resources", icon: <BookOpen size={16} />, adminOnly: true },
   { label: "Proposals", href: "/proposals", icon: <FileText size={16} />, adminOnly: true },
-  { label: "Strategy Reports", href: "/strategy-report", icon: <FileBarChart size={16} />, adminOnly: true },
-  { label: "Suburb Pages", href: "/suburb-pages", icon: <FileText size={16} />, adminOnly: true },
+  { label: "Sales Strategy Report", href: "/strategy-report", icon: <FileBarChart size={16} />, adminOnly: true },
   { label: "Salesforce Setup", href: "/salesforce", icon: <Cloud size={16} />, adminOnly: true },
 ];
 

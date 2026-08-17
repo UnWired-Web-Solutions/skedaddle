@@ -78,7 +78,9 @@ function LocationCard({ loc }: { loc: FranchiseLocation }) {
                 style={{ color: "oklch(0.68 0.20 140)", fontFamily: "Inter, sans-serif" }}
               >
                 {loc.kpis.totalRevenue > 0
-                  ? `$${(loc.kpis.totalRevenue / 1000).toFixed(0)}K`
+                  ? loc.kpis.totalRevenue >= 1_000_000
+                    ? `$${(loc.kpis.totalRevenue / 1_000_000).toFixed(2)}M`
+                    : `$${(loc.kpis.totalRevenue / 1_000).toFixed(0)}K`
                   : "—"}
               </div>
             </div>

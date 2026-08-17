@@ -15,7 +15,7 @@ import {
 import {
   TrendingUp, TrendingDown, Phone, MousePointer, MapPin, Activity,
   Calendar, ChevronDown, ArrowUpRight, ArrowDownRight, Minus,
-  AlertTriangle, CheckCircle, Info, Download, Lightbulb,
+  AlertTriangle, CheckCircle, Info, Download, Lightbulb, Search,
 } from "lucide-react";
 
 // ─── Colour Palette (Skedaddle brand) ────────────────────────────────────────
@@ -292,6 +292,12 @@ export default function Analytics() {
     month: comparisonMonth,
   });
 
+  const { data: searchConsole, isLoading: searchConsoleLoading } = trpc.analytics.getSearchConsoleOverview.useQuery({
+    territoryId: selectedTerritory,
+    year: selectedYear,
+    month: comparisonMonth,
+  });
+
   // Get display name for selected territory
   const selectedTerritoryName = useMemo(() => {
     const t = territories?.territories.find((t: any) => t.id === selectedTerritory);
@@ -420,9 +426,30 @@ export default function Analytics() {
     downloadCSV(`gbp_metrics_${selectedTerritoryName}_${selectedYear - 1}-${selectedYear}.csv`, headers, rows);
   }, [gbpChartData, selectedTerritoryName, selectedYear]);
 
+  const handleExportSearchConsole = useCallback(() => {
+    if (!searchConsole?.dataAvailable) return;
+    const rows = [
+      ...searchConsole.topPages.map((row: any) => ["Page", row.pageUrl, String(row.clicks), String(row.impressions), `${row.ctr.toFixed(2)}%`, row.position.toFixed(2)]),
+      ...searchConsole.topQueries.map((row: any) => ["Query", row.query, String(row.clicks), String(row.impressions), `${row.ctr.toFixed(2)}%`, row.position.toFixed(2)]),
+    ];
+    downloadCSV(
+      `gsc_${selectedTerritoryName}_${selectedYear}-${String(comparisonMonth).padStart(2, "0")}.csv`,
+      ["Type", "Page or query", "Clicks", "Impressions", "CTR", "Position"],
+      rows,
+    );
+  }, [searchConsole, selectedTerritoryName, selectedYear, comparisonMonth]);
+
   // ─── Available years ────────────────────────────────────────────────────────
-  const minYear = Math.min(dateRange?.ga4.minYear || selectedYear, dateRange?.gbp.minYear || selectedYear);
-  const maxYear = Math.max(dateRange?.ga4.maxYear || selectedYear, dateRange?.gbp.maxYear || selectedYear);
+  const minYear = Math.min(
+    dateRange?.ga4.minYear || selectedYear,
+    dateRange?.gbp.minYear || selectedYear,
+    dateRange?.gsc.minYear || selectedYear,
+  );
+  const maxYear = Math.max(
+    dateRange?.ga4.maxYear || selectedYear,
+    dateRange?.gbp.maxYear || selectedYear,
+    dateRange?.gsc.maxYear || selectedYear,
+  );
   const years = Array.from({ length: maxYear - minYear + 1 }, (_, index) => minYear + index);
 
   // Territory list from the 19 parent territories
@@ -440,54 +467,110 @@ export default function Analytics() {
             Analytics Dashboard
           </h1>
           <p style={{ fontSize: 13, color: "#666", marginTop: 6 }}>
-            GA4 sessions and Google Business Profile metrics across all territories.
+            GA4, Google Business Profile, and territory-filtered Search Console performance.
           </p>
           <div style={{ marginTop: 10, borderTop: `2px solid ${SKEDADDLE_GREEN}`, width: 48 }} />
         </div>
 
         {/* ─── Filters Bar ─────────────────────────────────────────────────────── */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 24, padding: "16px 20px", background: "#fff", borderRadius: 10, border: `1px solid ${MIST}` }}>
-          {/* Territory (single dropdown for all 19 franchises) */}
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <label style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#888" }}>Territory</label>
-            <select
-              value={selectedTerritory}
-              onChange={(e) => setSelectedTerritory(e.target.value)}
-              style={{ padding: "6px 12px", borderRadius: 6, border: `1px solid ${MIST}`, fontSize: 13, fontWeight: 500, color: FOREST, background: CREAM, cursor: "pointer", minWidth: 200 }}
-            >
-              {territoryList.map((t: any) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
+            <select value={selectedTerritory} onChange={(event) => setSelectedTerritory(event.target.value)} style={{ padding: "6px 12px", borderRadius: 6, border: `1px solid ${MIST}`, fontSize: 13, fontWeight: 500, color: FOREST, background: CREAM, cursor: "pointer", minWidth: 200 }}>
+              {territoryList.map((territory: any) => <option key={territory.id} value={territory.id}>{territory.name}</option>)}
             </select>
           </div>
-
-          {/* Year */}
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <label style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#888" }}>Year</label>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
-              style={{ padding: "6px 12px", borderRadius: 6, border: `1px solid ${MIST}`, fontSize: 13, fontWeight: 500, color: FOREST, background: CREAM, cursor: "pointer" }}
-            >
-              {years.map(y => (
-                <option key={y} value={y}>{y}</option>
-              ))}
+            <select value={selectedYear} onChange={(event) => setSelectedYear(Number(event.target.value))} style={{ padding: "6px 12px", borderRadius: 6, border: `1px solid ${MIST}`, fontSize: 13, fontWeight: 500, color: FOREST, background: CREAM, cursor: "pointer" }}>
+              {years.map(year => <option key={year} value={year}>{year}</option>)}
             </select>
           </div>
-
-          {/* Comparison Month */}
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <label style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#888" }}>Compare Month</label>
-            <select
-              value={comparisonMonth}
-              onChange={(e) => setComparisonMonth(Number(e.target.value))}
-              style={{ padding: "6px 12px", borderRadius: 6, border: `1px solid ${MIST}`, fontSize: 13, fontWeight: 500, color: FOREST, background: CREAM, cursor: "pointer" }}
-            >
-              {FULL_MONTHS.map((m, i) => (
-                <option key={i + 1} value={i + 1}>{m}</option>
-              ))}
+            <select value={comparisonMonth} onChange={(event) => setComparisonMonth(Number(event.target.value))} style={{ padding: "6px 12px", borderRadius: 6, border: `1px solid ${MIST}`, fontSize: 13, fontWeight: 500, color: FOREST, background: CREAM, cursor: "pointer" }}>
+              {FULL_MONTHS.map((monthName, index) => <option key={index + 1} value={index + 1}>{monthName}</option>)}
             </select>
           </div>
+        </div>
+
+        {/* ─── Search Console: top pages and queries ─────────────────────────── */}
+        <div style={{ background: "#fff", borderRadius: 10, border: `1px solid ${MIST}`, padding: "24px 20px", marginBottom: 28 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 16 }}>
+            <div>
+              <h2 style={{ fontSize: 15, fontWeight: 700, color: FOREST, marginBottom: 4, fontFamily: "'Playfair Display', serif", display: "flex", alignItems: "center", gap: 7 }}>
+                <Search size={15} color={SAGE} /> Organic Search Performance
+              </h2>
+              <p style={{ fontSize: 12, color: "#888" }}>
+                Main domain property filtered to {searchConsole?.pathPrefix || `${selectedTerritoryName}'s approved URL path`} · {FULL_MONTHS[comparisonMonth - 1]} {selectedYear}
+              </p>
+            </div>
+            <button
+              onClick={handleExportSearchConsole}
+              disabled={!searchConsole?.dataAvailable}
+              style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 6, border: `1px solid ${MIST}`, background: CREAM, fontSize: 11, fontWeight: 600, color: SAGE, cursor: "pointer", opacity: searchConsole?.dataAvailable ? 1 : 0.5 }}
+            >
+              <Download size={12} /> Export CSV
+            </button>
+          </div>
+          {searchConsoleLoading ? (
+            <div style={{ padding: 32, color: "#aaa", textAlign: "center" }}>Loading Search Console data...</div>
+          ) : !searchConsole?.dataAvailable ? (
+            <div style={{ padding: "22px 18px", background: CREAM, borderRadius: 7, color: "#666", fontSize: 12 }}>
+              No territory-filtered Search Console import is available for this month. Import the main domain property export using an approved <code>/location/.../</code> path; the dashboard will not combine separate location properties or guess a path.
+            </div>
+          ) : (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 20 }}>
+                {[
+                  { label: "Organic Clicks", value: searchConsole.summary.clicks.toLocaleString() },
+                  { label: "Impressions", value: searchConsole.summary.impressions.toLocaleString() },
+                  { label: "CTR", value: `${searchConsole.summary.ctr.toFixed(2)}%` },
+                  { label: "Average Position", value: searchConsole.summary.averagePosition.toFixed(2) },
+                ].map(item => (
+                  <div key={item.label} style={{ background: CREAM, borderRadius: 7, padding: "12px 14px" }}>
+                    <div style={{ color: "#888", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>{item.label}</div>
+                    <div style={{ color: FOREST, fontWeight: 700, fontSize: 20, marginTop: 4 }}>{item.value}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.4fr) minmax(0, 1fr)", gap: 22 }}>
+                {[
+                  { title: "Top 25 Performing Pages", rows: searchConsole.topPages, keyName: "pageUrl" },
+                  { title: "Top 25 Search Queries", rows: searchConsole.topQueries, keyName: "query" },
+                ].map(group => (
+                  <div key={group.title} style={{ minWidth: 0, overflowX: "auto" }}>
+                    <h3 style={{ fontSize: 12, color: FOREST, marginBottom: 8 }}>{group.title}</h3>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                      <thead>
+                        <tr style={{ borderBottom: `2px solid ${MIST}`, color: "#777" }}>
+                          <th style={{ textAlign: "left", padding: "7px 8px" }}>{group.keyName === "pageUrl" ? "Page" : "Query"}</th>
+                          <th style={{ textAlign: "right", padding: "7px 8px" }}>Clicks</th>
+                          <th style={{ textAlign: "right", padding: "7px 8px" }}>Impr.</th>
+                          <th style={{ textAlign: "right", padding: "7px 8px" }}>CTR</th>
+                          <th style={{ textAlign: "right", padding: "7px 8px" }}>Pos.</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {group.rows.map((row: any, index: number) => (
+                          <tr key={`${row[group.keyName]}-${index}`} style={{ borderBottom: `1px solid ${MIST}` }}>
+                            <td title={row[group.keyName]} style={{ padding: "7px 8px", color: FOREST, maxWidth: 310, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row[group.keyName]}</td>
+                            <td style={{ padding: "7px 8px", textAlign: "right", fontWeight: 600 }}>{row.clicks.toLocaleString()}</td>
+                            <td style={{ padding: "7px 8px", textAlign: "right", color: "#666" }}>{row.impressions.toLocaleString()}</td>
+                            <td style={{ padding: "7px 8px", textAlign: "right", color: "#666" }}>{row.ctr.toFixed(1)}%</td>
+                            <td style={{ padding: "7px 8px", textAlign: "right", color: "#666" }}>{row.position.toFixed(1)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop: 12, fontSize: 10, color: "#888" }}>
+                Source: {searchConsole.sourceProperty}. Rankings are from the configured domain-property path filter, not personalized browser searches.
+              </div>
+            </>
+          )}
         </div>
 
         {/* ─── YoY KPI Cards ───────────────────────────────────────────────────── */}
@@ -682,8 +765,7 @@ export default function Analytics() {
 
         {/* ─── Data Source Note ─────────────────────────────────────────────────── */}
         <div style={{ padding: "14px 18px", background: CREAM, borderRadius: 8, border: `1px solid ${MIST}`, fontSize: 12, color: "#666" }}>
-          <strong style={{ color: SAGE }}>Data Sources:</strong> GA4 sessions from Google Analytics (2022–2026). GBP metrics from Google Business Profile (Oct 2024–Jun 2026).
-          GSC data (search queries, clicks, impressions) will be added when API access is available.
+          <strong style={{ color: SAGE }}>Data Sources:</strong> GA4 sessions, Google Business Profile metrics stored by month for long-term YoY reporting, and Search Console pages/queries from the main domain property when a territory-scoped import is available.
         </div>
       </div>
     </PortalLayout>

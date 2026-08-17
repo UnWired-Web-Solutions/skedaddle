@@ -32,6 +32,9 @@ const proposalConfigSchema = z.object({
   acceleratorPrice: z.number().nonnegative(),
   acceleratorBlogPosts: z.number().int().nonnegative(),
   acceleratorGbpPosts: z.number().int().nonnegative(),
+  implementationFee: z.number().nonnegative(),
+  estimatedTokenCost: z.number().nonnegative(),
+  tokenBufferPercent: z.number().min(0).max(100),
   scopeNotes: z.string().min(1).max(2000),
 });
 type ProposalConfig = z.infer<typeof proposalConfigSchema>;
@@ -133,6 +136,8 @@ function buildProposalHtml(data: ProposalData, narrative: string, config: Propos
   const suburbList = data.topSuburbs.slice(0, 6).join(", ");
   const seasonalTiming = data.seasonalTiming;
   const money = (amount: number) => (data.currency === "CAD" ? "CA$" : "$") + amount.toLocaleString("en-US");
+  const tokenBuffer = config.estimatedTokenCost * (config.tokenBufferPercent / 100);
+  const estimatedImplementationTotal = config.implementationFee + config.estimatedTokenCost + tokenBuffer;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -507,56 +512,22 @@ function buildProposalHtml(data: ProposalData, narrative: string, config: Propos
         <td>${config.acceleratorGbpPosts}</td>
       </tr>
       <tr>
-        <td>Species Page Rewrites</td>
-        <td class="dash">—</td>
-        <td class="check">✓</td>
-        <td class="check">✓</td>
-        <td class="check">✓</td>
-      </tr>
-      <tr>
-        <td>Location & Suburb Pages</td>
-        <td class="dash">—</td>
-        <td class="check">✓</td>
-        <td class="check">✓</td>
-        <td class="check">✓</td>
-      </tr>
-      <tr>
-        <td>Neighborhood Pages</td>
-        <td class="dash">—</td>
-        <td class="check">✓</td>
-        <td class="check">✓</td>
-        <td class="check">✓</td>
-      </tr>
-      <tr>
-        <td>AEO / GEO Optimization</td>
-        <td class="dash">—</td>
-        <td class="check">✓</td>
-        <td class="check">✓</td>
-        <td class="check">✓</td>
-      </tr>
-      <tr>
-        <td>Quarterly Content Strategy</td>
-        <td class="dash">—</td>
-        <td class="check">✓</td>
-        <td class="check">✓</td>
-        <td class="check">✓</td>
-      </tr>
-      <tr>
-        <td>Quarterly Strategy Calls</td>
-        <td class="dash">—</td>
-        <td class="check">✓</td>
-        <td class="check">✓</td>
-        <td class="check">✓</td>
-      </tr>
-      <tr>
-        <td>Monthly Analytics Folder</td>
-        <td class="dash">—</td>
-        <td class="check">✓</td>
-        <td class="check">✓</td>
-        <td class="check">✓</td>
+        <td>Other Inclusions</td>
+        <td colspan="4">Only the deliverables explicitly listed in the approved scope notes below are included.</td>
       </tr>
     </tbody>
   </table>
+
+  <h2>Implementation & AI Usage Allowance</h2>
+  <table class="comparison-table">
+    <tbody>
+      <tr><td>Development / implementation fee</td><td>${money(config.implementationFee)}</td></tr>
+      <tr><td>Estimated token usage</td><td>${money(config.estimatedTokenCost)}</td></tr>
+      <tr><td>Exploration buffer (${config.tokenBufferPercent.toFixed(1)}%)</td><td>${money(tokenBuffer)}</td></tr>
+      <tr><td><strong>Estimated one-time implementation total</strong></td><td><strong>${money(estimatedImplementationTotal)}</strong></td></tr>
+    </tbody>
+  </table>
+  <p class="scope-note">The buffer is explicit so exploration and investigation are priced transparently. Final billing follows the approved commercial terms and actual scope.</p>
   
   <h2>Next Steps</h2>
   <div class="next-steps">

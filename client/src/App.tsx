@@ -18,7 +18,6 @@ import Analytics from "./pages/Analytics";
 import SalesforceConnect from "./pages/SalesforceConnect";
 import ProposalGenerator from "./pages/ProposalGenerator";
 import StrategyReportGenerator from "./pages/StrategyReportGenerator";
-import SuburbPageGenerator from "./pages/SuburbPageGenerator";
 import { Redirect, Route, Switch } from "wouter";
 
 // Protected route — redirects to /login if not authenticated
@@ -82,7 +81,7 @@ function Router() {
         <ProtectedRoute component={StrategyReportGenerator} adminOnly />
       </Route>
       <Route path="/suburb-pages">
-        <ProtectedRoute component={SuburbPageGenerator} adminOnly />
+        <Redirect to="/tools" />
       </Route>
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

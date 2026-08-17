@@ -60,6 +60,64 @@ export const gbpMetrics = mysqlTable("gbp_metrics", {
 export type GBPMetric = typeof gbpMetrics.$inferSelect;
 export type InsertGBPMetric = typeof gbpMetrics.$inferInsert;
 
+/**
+ * Search Console page performance imported from the single domain property.
+ * Each import is already restricted to an approved territory URL prefix.
+ */
+export const gscPageMetrics = mysqlTable("gsc_page_metrics", {
+  id: int("id").autoincrement().primaryKey(),
+  territoryId: varchar("territoryId", { length: 64 }).notNull(),
+  year: int("year").notNull(),
+  month: int("month").notNull(),
+  pageUrl: text("pageUrl").notNull(),
+  clicks: int("clicks").notNull().default(0),
+  impressions: int("impressions").notNull().default(0),
+  ctrBps: int("ctrBps").notNull().default(0),
+  positionHundredths: int("positionHundredths").notNull().default(0),
+  sourceProperty: varchar("sourceProperty", { length: 255 }).notNull(),
+  pathPrefix: varchar("pathPrefix", { length: 255 }).notNull(),
+});
+
+export type GSCPageMetric = typeof gscPageMetrics.$inferSelect;
+export type InsertGSCPageMetric = typeof gscPageMetrics.$inferInsert;
+
+/** Search Console queries for the same territory-scoped monthly imports. */
+export const gscQueryMetrics = mysqlTable("gsc_query_metrics", {
+  id: int("id").autoincrement().primaryKey(),
+  territoryId: varchar("territoryId", { length: 64 }).notNull(),
+  year: int("year").notNull(),
+  month: int("month").notNull(),
+  query: text("query").notNull(),
+  clicks: int("clicks").notNull().default(0),
+  impressions: int("impressions").notNull().default(0),
+  ctrBps: int("ctrBps").notNull().default(0),
+  positionHundredths: int("positionHundredths").notNull().default(0),
+  sourceProperty: varchar("sourceProperty", { length: 255 }).notNull(),
+  pathPrefix: varchar("pathPrefix", { length: 255 }).notNull(),
+});
+
+export type GSCQueryMetric = typeof gscQueryMetrics.$inferSelect;
+export type InsertGSCQueryMetric = typeof gscQueryMetrics.$inferInsert;
+
+/**
+ * Salesforce inspection-to-sale snapshots. Species is `__ALL__` for the
+ * territory total; detailed rows use the Salesforce species label.
+ */
+export const salesforcePerformanceSnapshots = mysqlTable("salesforce_performance_snapshots", {
+  id: int("id").autoincrement().primaryKey(),
+  territoryId: varchar("territoryId", { length: 64 }).notNull(),
+  species: varchar("species", { length: 128 }).notNull().default("__ALL__"),
+  periodStart: varchar("periodStart", { length: 10 }).notNull(),
+  periodEnd: varchar("periodEnd", { length: 10 }).notNull(),
+  inspections: int("inspections").notNull().default(0),
+  closedJobs: int("closedJobs").notNull().default(0),
+  sourceLabel: varchar("sourceLabel", { length: 255 }).notNull().default("Salesforce"),
+  importedAt: timestamp("importedAt").defaultNow().notNull(),
+});
+
+export type SalesforcePerformanceSnapshot = typeof salesforcePerformanceSnapshots.$inferSelect;
+export type InsertSalesforcePerformanceSnapshot = typeof salesforcePerformanceSnapshots.$inferInsert;
+
 // ─── Salesforce Integration ──────────────────────────────────────────────────
 
 /**

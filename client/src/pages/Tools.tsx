@@ -1,6 +1,6 @@
 import PortalLayout from "@/components/PortalLayout";
 import { useAuth } from "@/contexts/AuthContext";
-import { BarChart3, FileBarChart, FileText, ImageIcon, LineChart, MapPin, ArrowUpRight } from "lucide-react";
+import { FileBarChart, FileText, ImageIcon, LineChart, MapPin, ArrowUpRight } from "lucide-react";
 import { Link } from "wouter";
 
 const TOOLS = [
@@ -8,8 +8,7 @@ const TOOLS = [
   { name: "Analytics", description: "Compare species and location-page sessions plus GBP interactions using the latest imported period.", href: "/analytics", icon: LineChart, adminOnly: false },
   { name: "GBP Images", description: "Generate branded illustrative images for individual or bulk GBP posts.", href: "/gbp-images", icon: ImageIcon, adminOnly: false },
   { name: "Proposal Generator", description: "Confirm commercial terms, review one proposal draft, and export that exact draft.", href: "/proposals", icon: FileText, adminOnly: true },
-  { name: "Strategy Reports", description: "Build a territory strategy from sourced data and explicitly confirmed campaign scope.", href: "/strategy-report", icon: FileBarChart, adminOnly: true },
-  { name: "Suburb Pages", description: "Generate review-ready local pages after required business facts are supplied.", href: "/suburb-pages", icon: BarChart3, adminOnly: true },
+  { name: "Initial Sales Strategy Report", description: "Build the pre-sale territory report from sourced data and explicitly confirmed campaign scope.", href: "/strategy-report", icon: FileBarChart, adminOnly: true },
 ];
 
 export default function Tools() {
