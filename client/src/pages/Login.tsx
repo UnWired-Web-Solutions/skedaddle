@@ -33,7 +33,7 @@ export default function Login() {
   return (
     <div
       className="min-h-screen flex items-center justify-center"
-      style={{ background: "oklch(0.20 0.08 140)" }}
+      style={{ background: "oklch(0.68 0.20 140)" }}
     >
       <div className="w-full max-w-md px-6">
         {/* Logo / Brand mark */}

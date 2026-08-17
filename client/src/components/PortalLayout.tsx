@@ -62,7 +62,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       {/* Brand header */}
       <div
         className="px-4 py-4 border-b flex flex-col items-center"
-        style={{ borderColor: "oklch(0.28 0.10 140)", background: "oklch(0.18 0.07 140)" }}
+        style={{ borderColor: "oklch(0.55 0.18 140)", background: "oklch(0.58 0.18 140)" }}
       >
         <img
           src="/manus-storage/skedaddle_logo_white_rgba_ef9c6122.png"
@@ -88,7 +88,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             style={{
               fontFamily: "Inter, sans-serif",
               fontWeight: isActive(item.href) ? 600 : 400,
-              background: isActive(item.href) ? "oklch(0.28 0.10 140)" : "transparent",
+              background: isActive(item.href) ? "oklch(0.55 0.18 140)" : "transparent",
               color: isActive(item.href) ? "oklch(0.97 0.012 80)" : "oklch(0.75 0.06 80)",
             }}
           >
@@ -103,7 +103,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       {/* Divider */}
       <div
         className="mx-3 my-2"
-        style={{ borderTop: "1px solid oklch(0.28 0.10 140)" }}
+        style={{ borderTop: "1px solid oklch(0.55 0.18 140)" }}
       />
 
       {/* Locations list */}
@@ -125,7 +125,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
               className="flex items-center justify-between px-3 py-2 rounded-sm text-sm mb-0.5 transition-colors group"
               style={{
                 fontFamily: "Inter, sans-serif",
-                background: active ? "oklch(0.28 0.10 140)" : "transparent",
+                background: active ? "oklch(0.55 0.18 140)" : "transparent",
                 color: active ? "oklch(0.97 0.012 80)" : "oklch(0.72 0.06 80)",
               }}
             >
@@ -154,7 +154,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       {/* User footer */}
       <div
         className="px-5 py-4 border-t"
-        style={{ borderColor: "oklch(0.28 0.10 140)" }}
+        style={{ borderColor: "oklch(0.55 0.18 140)" }}
       >
         <div className="flex items-center justify-between">
           <div>
@@ -188,7 +188,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       {/* Desktop sidebar */}
       <aside
         className="hidden lg:flex flex-col w-56 flex-shrink-0 h-full"
-        style={{ background: "oklch(0.20 0.08 140)" }}
+        style={{ background: "oklch(0.68 0.20 140)" }}
       >
         <SidebarContent />
       </aside>
@@ -203,7 +203,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           />
           <aside
             className="relative w-64 h-full flex flex-col"
-            style={{ background: "oklch(0.20 0.08 140)" }}
+            style={{ background: "oklch(0.68 0.20 140)" }}
           >
             <button
               className="absolute top-4 right-4"
@@ -222,7 +222,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         {/* Mobile topbar */}
         <div
           className="lg:hidden flex items-center gap-3 px-4 py-3 border-b"
-          style={{ background: "oklch(0.20 0.08 140)", borderColor: "oklch(0.28 0.10 140)" }}
+          style={{ background: "oklch(0.68 0.20 140)", borderColor: "oklch(0.55 0.18 140)" }}
         >
           <button onClick={() => setMobileOpen(true)}>
             <Menu size={20} style={{ color: "oklch(0.85 0.005 80)" }} />
