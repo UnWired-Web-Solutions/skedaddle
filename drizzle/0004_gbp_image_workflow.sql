@@ -1,0 +1,43 @@
+CREATE TABLE `gbp_image_jobs` (
+	`id` varchar(64) NOT NULL,
+	`status` enum('pending','running','completed','partial','failed','interrupted') NOT NULL DEFAULT 'pending',
+	`total` int NOT NULL DEFAULT 0,
+	`completed` int NOT NULL DEFAULT 0,
+	`failed` int NOT NULL DEFAULT 0,
+	`resultsJson` text,
+	`errorMessage` text,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `gbp_image_jobs_id` PRIMARY KEY(`id`),
+	KEY `gbp_jobs_status_updated_idx` (`status`,`updatedAt`)
+);
+--> statement-breakpoint
+CREATE TABLE `gbp_image_assets` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`generationJobId` varchar(64),
+	`sourceHash` varchar(64) NOT NULL,
+	`title` varchar(255) NOT NULL,
+	`body` text,
+	`territoryId` varchar(64) NOT NULL,
+	`suburb` varchar(128),
+	`serviceLabel` varchar(128) NOT NULL,
+	`species` varchar(128) NOT NULL,
+	`prompt` text NOT NULL,
+	`imageUrl` text NOT NULL,
+	`filename` varchar(255) NOT NULL,
+	`brandAsset` enum('official_logo','text_fallback') NOT NULL DEFAULT 'text_fallback',
+	`status` enum('draft','in_review','approved','rejected','posted') NOT NULL DEFAULT 'draft',
+	`qaStatus` enum('passed','failed','unavailable') NOT NULL DEFAULT 'unavailable',
+	`qaJson` text,
+	`generationAttempts` int NOT NULL DEFAULT 1,
+	`scheduledFor` varchar(10),
+	`reviewedBy` varchar(128),
+	`reviewerNotes` text,
+	`reviewedAt` timestamp,
+	`postedAt` timestamp,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `gbp_image_assets_id` PRIMARY KEY(`id`),
+	KEY `gbp_assets_territory_status_idx` (`territoryId`,`status`,`createdAt`),
+	KEY `gbp_assets_job_idx` (`generationJobId`)
+);

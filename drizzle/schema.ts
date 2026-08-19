@@ -1,4 +1,4 @@
-import { int, json, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { index, int, json, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -117,6 +117,66 @@ export const salesforcePerformanceSnapshots = mysqlTable("salesforce_performance
 
 export type SalesforcePerformanceSnapshot = typeof salesforcePerformanceSnapshots.$inferSelect;
 export type InsertSalesforcePerformanceSnapshot = typeof salesforcePerformanceSnapshots.$inferInsert;
+
+// ─── GBP Content Production ─────────────────────────────────────────────────
+
+/**
+ * Durable record for every AI-generated GBP post image.
+ *
+ * AI images are permitted for GBP posts only. They must remain in a reviewable
+ * state and must never be treated as documentary job photos or uploaded to the
+ * consumer-facing GBP photo gallery.
+ */
+export const gbpImageAssets = mysqlTable("gbp_image_assets", {
+  id: int("id").autoincrement().primaryKey(),
+  generationJobId: varchar("generationJobId", { length: 64 }),
+  sourceHash: varchar("sourceHash", { length: 64 }).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  body: text("body"),
+  territoryId: varchar("territoryId", { length: 64 }).notNull(),
+  suburb: varchar("suburb", { length: 128 }),
+  serviceLabel: varchar("serviceLabel", { length: 128 }).notNull(),
+  species: varchar("species", { length: 128 }).notNull(),
+  prompt: text("prompt").notNull(),
+  imageUrl: text("imageUrl").notNull(),
+  filename: varchar("filename", { length: 255 }).notNull(),
+  brandAsset: mysqlEnum("brandAsset", ["official_logo", "text_fallback"]).default("text_fallback").notNull(),
+  status: mysqlEnum("status", ["draft", "in_review", "approved", "rejected", "posted"]).default("draft").notNull(),
+  qaStatus: mysqlEnum("qaStatus", ["passed", "failed", "unavailable"]).default("unavailable").notNull(),
+  qaJson: text("qaJson"),
+  generationAttempts: int("generationAttempts").notNull().default(1),
+  scheduledFor: varchar("scheduledFor", { length: 10 }),
+  reviewedBy: varchar("reviewedBy", { length: 128 }),
+  reviewerNotes: text("reviewerNotes"),
+  reviewedAt: timestamp("reviewedAt"),
+  postedAt: timestamp("postedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  territoryStatusIdx: index("gbp_assets_territory_status_idx").on(table.territoryId, table.status, table.createdAt),
+  jobIdx: index("gbp_assets_job_idx").on(table.generationJobId),
+}));
+
+export type GBPImageAsset = typeof gbpImageAssets.$inferSelect;
+export type InsertGBPImageAsset = typeof gbpImageAssets.$inferInsert;
+
+/** Persistent progress/results for long-running bulk image jobs. */
+export const gbpImageJobs = mysqlTable("gbp_image_jobs", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  status: mysqlEnum("status", ["pending", "running", "completed", "partial", "failed", "interrupted"]).default("pending").notNull(),
+  total: int("total").notNull().default(0),
+  completed: int("completed").notNull().default(0),
+  failed: int("failed").notNull().default(0),
+  resultsJson: text("resultsJson"),
+  errorMessage: text("errorMessage"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  statusUpdatedIdx: index("gbp_jobs_status_updated_idx").on(table.status, table.updatedAt),
+}));
+
+export type GBPImageJob = typeof gbpImageJobs.$inferSelect;
+export type InsertGBPImageJob = typeof gbpImageJobs.$inferInsert;
 
 // ─── Salesforce Integration ──────────────────────────────────────────────────
 
