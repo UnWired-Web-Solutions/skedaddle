@@ -56,6 +56,8 @@ describe("analyticsRouter", () => {
   it("should expose territory-filtered Search Console reporting", async () => {
     const mod = await import("./analyticsRouter");
     expect(mod.analyticsRouter._def.procedures.getSearchConsoleOverview).toBeDefined();
+    expect(mod.analyticsRouter._def.procedures.getSearchConsoleScope).toBeDefined();
+    expect(mod.analyticsRouter._def.procedures.syncSearchConsoleTerritory).toBeDefined();
   });
 
   it("should expose verified territory close-rate snapshots", async () => {

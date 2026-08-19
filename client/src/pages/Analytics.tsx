@@ -15,7 +15,7 @@ import {
 import {
   TrendingUp, TrendingDown, Phone, MousePointer, MapPin, Activity,
   Calendar, ChevronDown, ArrowUpRight, ArrowDownRight, Minus,
-  AlertTriangle, CheckCircle, Info, Download, Lightbulb, Search,
+  AlertTriangle, CheckCircle, Info, Download, Lightbulb, Search, RefreshCw,
 } from "lucide-react";
 
 // ─── Colour Palette (Skedaddle brand) ────────────────────────────────────────
@@ -297,6 +297,28 @@ export default function Analytics() {
     year: selectedYear,
     month: comparisonMonth,
   });
+  const { data: searchConsoleScope } = trpc.analytics.getSearchConsoleScope.useQuery({
+    territoryId: selectedTerritory,
+  });
+  const trpcUtils = trpc.useUtils();
+  const [searchConsoleSyncMessage, setSearchConsoleSyncMessage] = useState<string | null>(null);
+  const searchConsoleSync = trpc.analytics.syncSearchConsoleTerritory.useMutation({
+    onSuccess: async (result) => {
+      setSearchConsoleSyncMessage(
+        `Live import complete: ${result.pageCount.toLocaleString()} pages and ${result.queryCount.toLocaleString()} queries.`,
+      );
+      await trpcUtils.analytics.getSearchConsoleOverview.invalidate({
+        territoryId: selectedTerritory,
+        year: selectedYear,
+        month: comparisonMonth,
+      });
+      await trpcUtils.analytics.getDateRange.invalidate();
+    },
+    onError: (error) => setSearchConsoleSyncMessage(error.message),
+  });
+  const currentUtcPeriod = new Date().getUTCFullYear() * 100 + new Date().getUTCMonth() + 1;
+  const selectedSearchConsolePeriod = selectedYear * 100 + comparisonMonth;
+  const isCompletedSearchConsolePeriod = selectedSearchConsolePeriod < currentUtcPeriod;
 
   // Get display name for selected territory
   const selectedTerritoryName = useMemo(() => {
@@ -505,19 +527,45 @@ export default function Analytics() {
                 Main domain property filtered to {searchConsole?.pathPrefix || `${selectedTerritoryName}'s approved URL path`} · {FULL_MONTHS[comparisonMonth - 1]} {selectedYear}
               </p>
             </div>
-            <button
-              onClick={handleExportSearchConsole}
-              disabled={!searchConsole?.dataAvailable}
-              style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 6, border: `1px solid ${MIST}`, background: CREAM, fontSize: 11, fontWeight: 600, color: SAGE, cursor: "pointer", opacity: searchConsole?.dataAvailable ? 1 : 0.5 }}
-            >
-              <Download size={12} /> Export CSV
-            </button>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "flex-end" }}>
+              {searchConsoleScope?.status === "ready" && (
+                <button
+                  onClick={() => {
+                    setSearchConsoleSyncMessage(null);
+                    searchConsoleSync.mutate({ territoryId: selectedTerritory, year: selectedYear, month: comparisonMonth });
+                  }}
+                  disabled={!isCompletedSearchConsolePeriod || searchConsoleSync.isPending}
+                  title={isCompletedSearchConsolePeriod ? "Refresh the selected completed month from Google Search Console" : "Only completed calendar months can be imported"}
+                  style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 6, border: "1px solid #69BE28", background: "#69BE28", fontSize: 11, fontWeight: 700, color: "#fff", cursor: "pointer", opacity: !isCompletedSearchConsolePeriod || searchConsoleSync.isPending ? 0.55 : 1 }}
+                >
+                  <RefreshCw size={12} className={searchConsoleSync.isPending ? "animate-spin" : ""} />
+                  {searchConsoleSync.isPending ? "Refreshing…" : "Refresh live data"}
+                </button>
+              )}
+              <button
+                onClick={handleExportSearchConsole}
+                disabled={!searchConsole?.dataAvailable}
+                style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 6, border: `1px solid ${MIST}`, background: CREAM, fontSize: 11, fontWeight: 600, color: SAGE, cursor: "pointer", opacity: searchConsole?.dataAvailable ? 1 : 0.5 }}
+              >
+                <Download size={12} /> Export CSV
+              </button>
+            </div>
           </div>
+          {searchConsoleScope?.status !== "ready" && (
+            <div style={{ marginBottom: 12, padding: "10px 12px", borderRadius: 7, background: "#fff5e8", border: "1px solid #f0d3a6", color: "#765526", fontSize: 12 }}>
+              Live import is blocked for this territory until its URL scope is confirmed. {searchConsoleScope?.notes}
+            </div>
+          )}
+          {searchConsoleSyncMessage && (
+            <div style={{ marginBottom: 12, padding: "10px 12px", borderRadius: 7, background: searchConsoleSync.isError ? "#fff0ee" : "#eef8e8", border: `1px solid ${searchConsoleSync.isError ? "#efb7b0" : "#b8df9e"}`, color: searchConsoleSync.isError ? "#9d3024" : "#316e18", fontSize: 12 }}>
+              {searchConsoleSyncMessage}
+            </div>
+          )}
           {searchConsoleLoading ? (
             <div style={{ padding: 32, color: "#aaa", textAlign: "center" }}>Loading Search Console data...</div>
           ) : !searchConsole?.dataAvailable ? (
             <div style={{ padding: "22px 18px", background: CREAM, borderRadius: 7, color: "#666", fontSize: 12 }}>
-              No territory-filtered Search Console import is available for this month. Import the main domain property export using an approved <code>/location/.../</code> path; the dashboard will not combine separate location properties or guess a path.
+              No territory-filtered Search Console import is available for this month. {searchConsoleScope?.status === "ready" ? "Use Refresh live data for this completed month." : "This territory remains blocked until its approved URL scope is confirmed."}
             </div>
           ) : (
             <>

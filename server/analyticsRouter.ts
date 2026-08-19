@@ -17,6 +17,8 @@ import {
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { TERRITORY_GROUPS, UNMAPPED_GA4, UNMAPPED_GBP, getSubLocations } from "../shared/territoryMapping";
 import { verifySearchConsoleAccess } from "./googleSearchConsoleClient";
+import { importSearchConsoleTerritoryMonth } from "./googleSearchConsoleImporter";
+import { getGscTerritoryScope } from "../shared/gscTerritoryPaths";
 
 // ─── Procedures ──────────────────────────────────────────────────────────────
 
@@ -34,6 +36,28 @@ export const analyticsRouter = router({
       };
     }
   }),
+
+  /**
+   * Pull a completed calendar month from the live parent-domain property.
+   * The importer rejects partial, overlapping, or otherwise unverified
+   * territory scopes before it requests or persists Google data.
+   */
+  syncSearchConsoleTerritory: publicProcedure
+    .input(z.object({
+      territoryId: z.string(),
+      year: z.number().int(),
+      month: z.number().int().min(1).max(12),
+    }))
+    .mutation(async ({ input }) => importSearchConsoleTerritoryMonth(
+      input.territoryId,
+      input.year,
+      input.month,
+    )),
+
+  /** Surface the import decision without exposing credentials or mutable scope configuration. */
+  getSearchConsoleScope: publicProcedure
+    .input(z.object({ territoryId: z.string() }))
+    .query(({ input }) => getGscTerritoryScope(input.territoryId) ?? null),
 
   /**
    * Get the 19 parent territories for the dropdowns.
