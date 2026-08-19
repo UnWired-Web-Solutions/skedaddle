@@ -14,6 +14,8 @@
 - [ ] Resolve and document canonical Search Console path(s) for territories currently marked `partial` or `review_required`
 - [ ] Confirm import boundaries for overlapping and multi-city territories, including Durham, Ottawa, Hamilton, Milwaukee, Baltimore, and Windsor/London
 - [x] Enable guarded live Search Console imports for verified ready territories only — July 2026 data imported for Minneapolis, Montreal, Madison, Maryland Central, Columbus, and Pittsburgh; dashboard refresh control blocks ambiguous territories and incomplete months
+- [x] Backfill all available Search Console metrics for ready territories through July 2026 — each ready territory has April 2025–July 2026 coverage (16 months)
+- [ ] Determine whether verified Search Console data exists before April 2025; otherwise label Jan–Mar YoY reporting as unavailable rather than estimating it
 
 ## Core Portal
 - [x] Portal home page with franchise location cards
