@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TERRITORIES, gbpImageRouter } from "./gbpImageRouter";
+import { TERRITORIES, buildPromptFromFields, sanitizeAction } from "./gbpImageRouter";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 import { createHash } from "crypto";
@@ -64,8 +64,7 @@ describe("gbpImage.getSuburbs", () => {
 
   it("returns empty array for unknown territory", async () => {
     const caller = appRouter.createCaller(createPublicContext());
-    const suburbs = await caller.gbpImage.getSuburbs({ territoryId: "unknown-territory" });
-    expect(suburbs).toEqual([]);
+    await expect(caller.gbpImage.getSuburbs({ territoryId: "unknown-territory" })).rejects.toThrow();
   });
 });
 
@@ -231,6 +230,54 @@ describe("Prompt construction rules", () => {
       expect(hasStructureWork, `Framing "${framing}" should reference structure work`).toBe(true);
     }
   });
+
+  it("uses the extracted post action and setting instead of an unrelated random species scene", () => {
+    const prompt = buildPromptFromFields({
+      species: "squirrel",
+      sizeClass: "large",
+      action: "installing steel mesh over a chewed fascia opening",
+      scene: "two-storey brick home with an attached garage",
+      season: "fall",
+      serviceLabel: "Squirrel Exclusion",
+    }, "Hamilton ON", "Ancaster", "test-variation");
+    expect(prompt).toContain("installing steel mesh over a chewed fascia opening");
+    expect(prompt).toContain("two-storey brick home with an attached garage");
+    expect(prompt).toContain("Ancaster, Hamilton ON");
+  });
+
+  it("does not turn an unsupported species into a raccoon scene", () => {
+    const prompt = buildPromptFromFields({
+      species: "fox",
+      sizeClass: "large",
+      action: "inspecting a den opening beneath a shed",
+      scene: "residential backyard with a detached shed",
+      season: "spring",
+      serviceLabel: "Fox Assessment",
+    }, "Ottawa ON", "Kanata", "fox-test");
+    expect(prompt).toContain("fox");
+    expect(prompt).not.toContain("black mask markings");
+    expect(prompt).not.toContain("ringed tail");
+  });
+
+  it("keeps generated branding out of the photograph", () => {
+    const prompt = buildPromptFromFields({
+      species: "raccoon",
+      sizeClass: "large",
+      action: "performing wildlife exclusion",
+      scene: "suburban home roofline",
+      season: "summer",
+      serviceLabel: "Raccoon Exclusion",
+    }, "Milwaukee WI", "Waukesha", "legacy-brand-test");
+    expect(prompt).not.toContain("raccoon-in-circle logo");
+    expect(prompt).not.toContain("same green raccoon logo");
+    expect(prompt).toContain("verified Skedaddle branding will be applied after generation");
+    expect(prompt).toContain("Do not imply that this is a real customer or job photograph");
+  });
+
+  it("replaces direct animal-handling actions with humane exclusion work", () => {
+    expect(sanitizeAction("catching and holding the raccoon")).toContain("humane one-way exclusion");
+    expect(sanitizeAction("sealing a soffit entry point")).toBe("sealing a soffit entry point");
+  });
 });
 
 // ── Image dimension configuration ───────────────────────────────────────────
@@ -241,5 +288,20 @@ describe("Image dimension configuration", () => {
     const source = fs.readFileSync("server/gbpImageRouter.ts", "utf-8");
     expect(source).not.toContain('"landscape_4_3"');
     expect(source).not.toContain("'landscape_4_3'");
+  });
+
+  it("uses high-quality GPT Image 2 generation and exact post dimensions", async () => {
+    const fs = await import("fs");
+    const source = fs.readFileSync("server/gbpImageRouter.ts", "utf-8");
+    expect(source).toContain('model: "gpt-image-2"');
+    expect(source).toContain('quality: "high"');
+    expect(source).toContain("resize(1200, 900");
+  });
+
+  it("does not fail open when automated vision QA is unavailable", async () => {
+    const fs = await import("fs");
+    const source = fs.readFileSync("server/gbpImageRouter.ts", "utf-8");
+    expect(source).toContain('status: "unavailable"');
+    expect(source).toContain("asset.qaStatus !== \"passed\"");
   });
 });

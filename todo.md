@@ -25,24 +25,28 @@
 - [x] franchises.ts with all 19 territory definitions
 
 ## GBP Image Generator
-- [x] Backend router (gbpImageRouter.ts) with fal.ai Flux Pro integration
-- [x] LLM prompt builder from post title/body
-- [x] Sharp brand overlay (Skedaddle green bar, service label, city, Skedaddle name)
+- [x] Backend router (gbpImageRouter.ts) with GPT Image 2 integration
+- [x] GPT-5.6 structured prompt builder grounded in post title/body, species, action, scene, season, territory, and suburb
+- [x] Sharp brand overlay (semi-transparent Skedaddle bar, service label, city, and verified official logo on a neutral plate)
 - [x] storagePut integration for image hosting
 - [x] getTerritories procedure
 - [x] getSuburbs procedure
 - [x] generateSingle procedure
-- [x] generateBulk procedure (up to 50 images)
+- [x] generateBulk procedure (up to 50 images, concurrency-limited, duplicate-safe, persistent progress/results)
 - [x] GbpImageGenerator.tsx frontend page
 - [x] Single Post input method
 - [x] Bulk Manual input method (add/remove rows)
-- [x] CSV Upload input method with template download
+- [x] RFC 4180-aware CSV Upload input method with validation, row errors, scheduling, and template download
 - [x] Progress bar during generation
 - [x] Image gallery with individual download
 - [x] Download All as ZIP
 - [x] GBP Images nav item in PortalLayout sidebar
 - [x] Route /gbp-images wired in App.tsx
-- [x] Vitest tests for router and FAL_KEY
+- [x] Automated tests for router prompt rules, GPT Image 2 configuration, exact output sizing, QA fail-closed behavior, and CSV parsing
+- [x] Vision QA for species, humane handling, anatomy, realism, setting, and professional quality with up to two retries
+- [x] Persistent draft/in-review/approved/rejected asset workflow with a human review queue
+- [x] Approval guard: QA must pass and the official logo must be present
+- [x] GBP-post-only compliance warning; AI images must never be used as documentary job photos or in the consumer-facing GBP gallery
 
 ## Lightbox Enhancements
 - [x] Lightbox: add prev/next arrow navigation through all generated images
@@ -51,7 +55,9 @@
 
 ## Pending
 - [x] Remaining 15 territory strategy reports (Minneapolis, Coquitlam, Baltimore, etc.)
-- [ ] Logo overlay once Skedaddle logo PNG is provided
+- [x] Official logo overlay uses a local asset or verified Skedaddle URL; production can pin it with `SKEDADDLE_LOGO_URL`
+- [ ] Run a representative live batch and have Rachel, Sarah, or Tristan confirm image quality and approval flow
+- [ ] Apply database migration `0004_gbp_image_workflow.sql` in each deployed environment
 
 ## Branding Update: Official Skedaddle Uniform (July 20)
 - [x] Replace all 'teal polo shirt' technician descriptions with official Skedaddle uniform (bright lime-green polo, raccoon-in-circle logo on chest, black cap with logo, black work pants, black gloves)
@@ -59,13 +65,13 @@
 - [x] Remove all fal.ai references (already done in model switch)
 
 ## Production Readiness (Review Brief — July 2026)
-- [x] #1 Bulk generation job/poll pattern (fal queue API + p-limit concurrency + idempotency)
+- [x] #1 Bulk generation job/poll pattern (persistent job records + p-limit concurrency + duplicate suppression)
 - [x] #2 Filename collision fix (content hash suffix)
-- [x] #3 Vision-QA retry loop (vision model checks small-animal presence, retries once if missing)
+- [x] #3 Vision-QA retry loop (structured six-factor review, fail-closed status, up to two retries)
 - [x] #4 Structured-intermediate prompt builder (LLM extracts fields → deterministic template assembles prompt)
-- [x] #5 Model upgrade (Claude 3.5 Haiku → best available Haiku on built-in API)
+- [x] #5 Model upgrade (GPT-5.6 structured extraction + GPT Image 2 generation)
 - [x] #6 Interim prompt rewrite (no negatives, balanced composition, depth-of-field, small-animal foreground)
-- [x] #7 Logo overlay prep + minor code fixes (stray space, GBP sizing, flux-pro version check)
+- [x] #7 Verified logo overlay + exact 1200×900 GBP output sizing
 
 ## Image Quality Fixes (July 2026)
 - [x] Fix brand overlay text rendering — switched from SVG text to sharp Pango text() method (font-independent, works on any server)
@@ -119,9 +125,9 @@
 - [ ] Content calendar per franchise location
 - [ ] Auto-generate GBP post topics from content plan
 - [ ] Auto-write GBP post text from topic + blog content
-- [ ] Auto-generate image prompt from post text (already built)
-- [ ] Auto-generate image from prompt (already built)
-- [ ] Approval queue — Rachel/Sarah/Tristan review + check off
+- [x] Auto-generate image prompt from post text
+- [x] Auto-generate image from prompt
+- [x] Approval queue — Rachel/Sarah/Tristan review + approve/reject
 - [ ] Auto-post to GBP via API after approval
 - [ ] One post at a time (not batches) to avoid context issues
 - [ ] Notification system for approval queue
