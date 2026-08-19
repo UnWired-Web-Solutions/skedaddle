@@ -27,15 +27,15 @@ export const GSC_TERRITORY_SCOPES: GscTerritoryScope[] = [
   },
   {
     territoryId: "durham",
-    registeredPaths: [],
-    status: "review_required",
-    notes: "No Durham Region URL-prefix property appeared in the owner property inventory. Confirm the canonical path before importing.",
+    registeredPaths: ["/location/ajax/", "/location/bowmanville/", "/location/durham-region/", "/location/etobicoke/", "/location/north-york/", "/location/oshawa/", "/location/pickering/", "/location/rexdale/", "/location/scarborough/", "/location/whitby/"],
+    status: "ready",
+    notes: "All mapped Durham Region cities have matching live Search Console location roots.",
   },
   {
     territoryId: "ottawa",
-    registeredPaths: ["/location/ottawa/"],
-    status: "partial",
-    notes: "Ottawa is registered; Belleville and Peterborough need scope review before a combined territory import.",
+    registeredPaths: ["/location/belleville/", "/location/ottawa/", "/location/peterborough/"],
+    status: "ready",
+    notes: "Ottawa, Belleville, and Peterborough all have matching live Search Console location roots.",
   },
   {
     territoryId: "minneapolis",
@@ -53,9 +53,9 @@ export const GSC_TERRITORY_SCOPES: GscTerritoryScope[] = [
   { territoryId: "madison", registeredPaths: ["/location/madison/"], status: "ready", notes: "Registered territory prefix." },
   {
     territoryId: "milwaukee",
-    registeredPaths: ["/location/milwaukee/"],
-    status: "partial",
-    notes: "Milwaukee is registered; the Lake Country/Waukesha scope requires review.",
+    registeredPaths: ["/location/lake-country-waukesha/", "/location/milwaukee/"],
+    status: "ready",
+    notes: "Milwaukee and Lake Country/Waukesha both have matching live Search Console location roots.",
   },
   {
     territoryId: "maryland-central",
@@ -69,9 +69,9 @@ export const GSC_TERRITORY_SCOPES: GscTerritoryScope[] = [
   },
   {
     territoryId: "barrie-north",
-    registeredPaths: ["/location/barrie/", "/location/collingwood/"],
-    status: "partial",
-    notes: "Barrie and Collingwood are registered; York Region and the remaining service cities require scope review.",
+    registeredPaths: ["/location/barrie/", "/location/collingwood/", "/location/markham/", "/location/newmarket/", "/location/richmond-hill/", "/location/thornhill/", "/location/vaughan/", "/location/whitchurch-stouffville/", "/location/woodbridge/", "/location/york-region/"],
+    status: "ready",
+    notes: "All mapped Barrie/York Region cities have matching live Search Console location roots.",
   },
   {
     territoryId: "co-denver",
@@ -93,9 +93,9 @@ export const GSC_TERRITORY_SCOPES: GscTerritoryScope[] = [
   },
   {
     territoryId: "orangeville",
-    registeredPaths: ["/location/orangeville/"],
-    status: "partial",
-    notes: "Orangeville is registered; Brampton and Mississauga require scope review.",
+    registeredPaths: ["/location/brampton/", "/location/mississauga/", "/location/orangeville/"],
+    status: "ready",
+    notes: "Orangeville, Brampton, and Mississauga all have matching live Search Console location roots.",
   },
   {
     territoryId: "oh-columbus",
@@ -116,9 +116,9 @@ export const GSC_TERRITORY_SCOPES: GscTerritoryScope[] = [
   },
   {
     territoryId: "okanagan",
-    registeredPaths: ["/location/Okanagan/"],
-    status: "partial",
-    notes: "Okanagan is registered; Victoria requires scope review.",
+    registeredPaths: ["/location/okanagan/", "/location/victoria/"],
+    status: "ready",
+    notes: "Okanagan and Victoria both have matching live Search Console location roots.",
   },
   {
     territoryId: "l-windsor",

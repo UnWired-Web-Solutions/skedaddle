@@ -22,4 +22,21 @@ describe("Search Console territory scope registry", () => {
       }
     }
   });
+
+  it("enables only the additional territories whose mapped cities have live matching paths", () => {
+    const expectedPaths: Record<string, string[]> = {
+      durham: ["/location/durham-region/", "/location/ajax/", "/location/whitby/"],
+      ottawa: ["/location/ottawa/", "/location/belleville/", "/location/peterborough/"],
+      milwaukee: ["/location/milwaukee/", "/location/lake-country-waukesha/"],
+      "barrie-north": ["/location/barrie/", "/location/york-region/", "/location/collingwood/"],
+      orangeville: ["/location/orangeville/", "/location/brampton/", "/location/mississauga/"],
+      okanagan: ["/location/okanagan/", "/location/victoria/"],
+    };
+
+    for (const [territoryId, paths] of Object.entries(expectedPaths)) {
+      const scope = getGscTerritoryScope(territoryId);
+      expect(scope?.status).toBe("ready");
+      for (const path of paths) expect(scope?.registeredPaths).toContain(path);
+    }
+  });
 });

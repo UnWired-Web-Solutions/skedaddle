@@ -11,8 +11,10 @@
 - [x] Confirm the property model — location entries are URL-prefix properties beneath the parent domain; approved domain-property plus verified path-filter model documented
 - [x] Create and save the complete owner-account inventory of authorised Skedaddle domain and URL-prefix properties — 72 owner-visible Skedaddle properties saved in `GSC_OWNER_PROPERTY_INVENTORY_2026-08-19.json`
 - [x] Create an explicit Search Console scope-decision registry for all 19 territories — `ready`, `partial`, and `review_required` states prevent unverified imports
-- [ ] Resolve and document canonical Search Console path(s) for territories currently marked `partial` or `review_required`
-- [ ] Confirm import boundaries for overlapping and multi-city territories, including Durham, Ottawa, Hamilton, Milwaukee, Baltimore, and Windsor/London
+- [x] Reuse the existing territory/sub-market mapping with live Search Console page evidence to resolve eligible remaining path scopes — Durham, Ottawa, Milwaukee, Barrie/York Region, Orangeville, and Okanagan are now ready
+- [ ] Resolve and document canonical Search Console path(s) for territories that remain `partial` or `review_required`
+- [ ] Confirm import boundaries for remaining overlapping or incomplete territories, including Hamilton, London/Windsor, Denver, Coquitlam, Atlanta North, and Baltimore
+- [x] Import and backfill Search Console data for the newly verified ready territories — Durham, Ottawa, Milwaukee, Barrie/York Region, Orangeville, and Okanagan each have April 2025–July 2026 coverage
 - [x] Enable guarded live Search Console imports for verified ready territories only — July 2026 data imported for Minneapolis, Montreal, Madison, Maryland Central, Columbus, and Pittsburgh; dashboard refresh control blocks ambiguous territories and incomplete months
 - [x] Backfill all available Search Console metrics for ready territories through July 2026 — each ready territory has April 2025–July 2026 coverage (16 months)
 - [x] Determine whether verified Search Console data exists before April 2025; label Jan–Mar reporting as unavailable rather than estimating it — all ready territory paths returned zero rows before April 2025
