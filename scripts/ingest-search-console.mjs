@@ -10,7 +10,8 @@
  *   --pages ./Pages.csv --queries ./Queries.csv \
  *   --territory durham --year 2026 --month 7 \
  *   --property sc-domain:skedaddlewildlife.com \
- *   --path-prefix /location/durham-region/ --replace
+ *   --path-prefix /location/durham-region/ \
+ *   --query-path-prefix /location/durham-region/ --replace
  */
 
 import { readFileSync } from "fs";
@@ -32,10 +33,11 @@ const year = Number(readArg("--year"));
 const month = Number(readArg("--month"));
 const sourceProperty = readArg("--property");
 const rawPathPrefix = readArg("--path-prefix");
+const rawQueryPathPrefix = readArg("--query-path-prefix");
 const replaceExisting = process.argv.includes("--replace");
 
-if (!pagesPath || !queriesPath || !territoryId || !sourceProperty || !rawPathPrefix || !year || !month) {
-  throw new Error("Provide --pages, --queries, --territory, --year, --month, --property, and --path-prefix.");
+if (!pagesPath || !queriesPath || !territoryId || !sourceProperty || !rawPathPrefix || !rawQueryPathPrefix || !year || !month) {
+  throw new Error("Provide --pages, --queries, --territory, --year, --month, --property, --path-prefix, and --query-path-prefix.");
 }
 if (!/^sc-domain:/.test(sourceProperty)) {
   throw new Error("--property must be the main Search Console domain property (for example sc-domain:skedaddlewildlife.com).");
@@ -48,7 +50,15 @@ if (!replaceExisting) {
 }
 
 const pathPrefix = `/${rawPathPrefix.replace(/^\/+|\/+$/g, "")}/`;
+const queryPathPrefix = `/${rawQueryPathPrefix.replace(/^\/+|\/+$/g, "")}/`;
 const sourceDomain = sourceProperty.slice("sc-domain:".length).toLowerCase();
+
+if (queryPathPrefix !== pathPrefix) {
+  throw new Error(
+    "The Queries CSV must be exported with the same Page filter as the Pages CSV. " +
+      "Pass that exact filter using --query-path-prefix.",
+  );
+}
 
 function normalizeHeader(value) {
   return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
@@ -148,7 +158,11 @@ async function main() {
     await insertBatches(conn, "gsc_page_metrics", "pageUrl", pages);
     await insertBatches(conn, "gsc_query_metrics", "query", queries);
     await conn.commit();
-    console.log(`Imported ${pages.length} pages and ${queries.length} queries for ${territoryId}, ${year}-${String(month).padStart(2, "0")} (${pathPrefix}).`);
+    console.log(
+      `Imported ${pages.length} pages and ${queries.length} queries for ${territoryId}, ` +
+        `${year}-${String(month).padStart(2, "0")} (${pathPrefix}). ` +
+        "The Queries CSV was explicitly declared as exported with the same Page filter.",
+    );
   } catch (error) {
     await conn.rollback();
     throw error;
