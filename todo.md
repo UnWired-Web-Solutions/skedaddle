@@ -7,6 +7,7 @@
 - [ ] Verify the dashboard-header overlap after the portal-layout merge — anonymous preview cannot access the authenticated dashboard route
 - [x] Refine portal brand treatment: official Skedaddle logo with selective brand-green accents — neutral login surface, charcoal navigation, official colour logo, green reserved for actions and active states
 - [x] Verify authorised Google Search Console access and document the portal connection path — `uws@unwiredwebsolutions.com` is a verified owner of `sc-domain:skedaddlewildlife.com`; production API credential setup remains next
+- [x] Create, authorise, and verify the least-privilege Google Search Console service-account connection — Search Console API enabled, dedicated service account granted Full property access, JSON key stored securely, and live API property test passed
 
 ## Core Portal
 - [x] Portal home page with franchise location cards

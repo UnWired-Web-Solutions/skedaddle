@@ -16,10 +16,25 @@ import {
 } from "../drizzle/schema";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { TERRITORY_GROUPS, UNMAPPED_GA4, UNMAPPED_GBP, getSubLocations } from "../shared/territoryMapping";
+import { verifySearchConsoleAccess } from "./googleSearchConsoleClient";
 
 // ─── Procedures ──────────────────────────────────────────────────────────────
 
 export const analyticsRouter = router({
+  /** Confirm the server-side read-only GSC connection without returning credential material. */
+  getSearchConsoleConnectionStatus: publicProcedure.query(async () => {
+    try {
+      return await verifySearchConsoleAccess();
+    } catch (error) {
+      return {
+        connected: false as const,
+        property: null,
+        permissionLevel: null,
+        error: error instanceof Error ? error.message : "Unable to verify Search Console access.",
+      };
+    }
+  }),
+
   /**
    * Get the 19 parent territories for the dropdowns.
    * Also includes an "All Network" option and any unmapped territories as "Other".

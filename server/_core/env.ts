@@ -16,4 +16,6 @@ export const ENV = {
   anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? "",
   // Perplexity Sonar API for real-time web research
   sonarApiKey: process.env.SONAR_API_KEY ?? "",
+  // Google Search Console read-only service-account credential
+  gscServiceAccountJson: process.env.GSC_SERVICE_ACCOUNT_JSON ?? "",
 };
