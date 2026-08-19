@@ -13,10 +13,26 @@ This is a UWS client property, NOT the Skedaddle Wildlife property.
 
 ### Skedaddle Wildlife GA4 Property
 - **Account ID:** 39401450
-- **Property ID:** p394014501
-- **Status:** VISIBLE in the property picker but ACCESS DENIED — "You do not have access to the account or property"
-- **Blocker:** UWS account can see the Skedaddle Wildlife account in the picker (account 39401450) but does NOT have viewer permission on the GA4 property (p394014501). Need an admin of the Skedaddle Wildlife GA4 property to grant Viewer access to uws@unwiredwebsolutions.com AND the service account email.
-- **Action required:** Ask Dave/Nina/Ares to add uws@unwiredwebsolutions.com as a Viewer on the Skedaddle Wildlife GA4 property (p394014501), and also add skedaddle-search-console-reader@uws-gbp-analytics.iam.gserviceaccount.com as a Viewer for API access.
+- **Status:** ACCESS CONFIRMED — UWS account has full access to the Skedaddle Wildlife GA4 account
+- **Key finding:** Skedaddle uses SEPARATE GA4 properties per territory (not one unified property)
+- **Previous blocker resolved:** Property p394014501 was the wrong ID. The actual properties are listed below.
+
+### Discovered GA4 Properties (all accessible):
+
+| Property Name | Property ID | Territory |
+|---|---|---|
+| Skedaddle Wildlife Pickering - GA4 | 386412751 | Durham (Pickering sub-market) |
+| Skedaddle Wildl... | 475791585 | TBD — needs investigation |
+| Skedaddle Wildl... | 487034337 | TBD — needs investigation |
+| Skedaddle Wildl... | 426814229 | TBD — needs investigation |
+| Skedaddle Wildl... | 386492593 | TBD — needs investigation |
+| (additional properties) | ... | TBD — scroll to see all |
+
+### Pickering Property (386412751) — Verified Data:
+- Active users last 7 days: 132
+- Top pages: bat content, rodent content, raccoon content, skunk content (all Pickering-specific)
+- Traffic: 91 organic search, 48 direct, 0 organic social
+- Top countries: US (63), Singapore (33), Canada (13)
 
 ### GA4 Data API
 - **Status:** ENABLED in the UWS Google Cloud project (uws-gbp-analytics)
@@ -24,7 +40,8 @@ This is a UWS client property, NOT the Skedaddle Wildlife property.
 - **Enabled:** Aug 19, 2026
 
 ### Next Steps
-1. Open the GA4 property picker to check if Skedaddle Wildlife is accessible
-2. If not accessible, need to request viewer access from Ares/Nina/Dave
-3. If accessible, add the service account email as a viewer on the GA4 property
-4. Build the GA4 client similar to the Search Console client
+1. ~~Open the GA4 property picker to check if Skedaddle Wildlife is accessible~~ ✅ DONE — accessible
+2. Navigate to each property to identify which territory it covers (map property IDs to territories)
+3. Add the service account email as a viewer on each property for API access
+4. Update the GA4 client to query the correct property per territory (not one unified property)
+5. Build territory-filtered GA4 importer using the per-territory property mapping

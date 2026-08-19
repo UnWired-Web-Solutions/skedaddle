@@ -19,8 +19,10 @@
 ## Google Analytics 4 Connection (Aug 19, 2026)
 - [x] Enable the GA4 Data API in the UWS Google Cloud project
 - [x] Verify GA4 property access — check if UWS account has viewer access to the Skedaddle Wildlife GA4 property (p394014501) — CONFIRMED BLOCKED: "Missing permissions"
-- [ ] Grant the service account viewer permission on the GA4 property (or request access from Ares/Nina)
-- [ ] Build the GA4 client and territory-filtered reporting endpoint
+- [x] Discover all GA4 properties — found 129 properties under account 39401450, mapped to 19 territories
+- [x] Build the GA4 client (googleAnalyticsClient.ts) and territory-filtered reporting endpoint
+- [x] Create GA4 territory property mapping (shared/ga4TerritoryProperties.ts)
+- [ ] Add the service account as Viewer on the Skedaddle Wildlife GA4 account (account-level access grants access to all properties)
 - [ ] Import and persist GA4 metrics for verified territories
 
 ## DashThis Replacement — GSC Enhancements (Aug 19, 2026)
