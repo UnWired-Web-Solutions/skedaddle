@@ -15,6 +15,22 @@
 - [ ] Resolve and document canonical Search Console path(s) for territories that remain `partial` or `review_required`
 - [ ] Confirm import boundaries for remaining overlapping or incomplete territories, including Hamilton, London/Windsor, Denver, Coquitlam, Atlanta North, and Baltimore
 - [x] Import and backfill Search Console data for the newly verified ready territories — Durham, Ottawa, Milwaukee, Barrie/York Region, Orangeville, and Okanagan each have April 2025–July 2026 coverage
+
+## Google Analytics 4 Connection (Aug 19, 2026)
+- [x] Enable the GA4 Data API in the UWS Google Cloud project
+- [x] Verify GA4 property access — check if UWS account has viewer access to the Skedaddle Wildlife GA4 property (p394014501) — CONFIRMED BLOCKED: "Missing permissions"
+- [ ] Grant the service account viewer permission on the GA4 property (or request access from Ares/Nina)
+- [ ] Build the GA4 client and territory-filtered reporting endpoint
+- [ ] Import and persist GA4 metrics for verified territories
+
+## DashThis Replacement — GSC Enhancements (Aug 19, 2026)
+- [x] Add getSearchConsoleYTD procedure — YTD clicks/impressions with same-period-last-year comparison
+- [x] Add getSearchConsoleMonthlyTrend procedure — monthly clicks/impressions line chart data
+- [x] Add getSearchConsoleReadyTerritories procedure — lists which territories have live GSC data
+- [x] Add GSC YTD KPI cards to Analytics page (organic clicks, impressions, avg CTR with YoY delta)
+- [x] Add GSC monthly trend line chart to Analytics page (clicks + impressions over time)
+- [ ] Add GSC YoY comparison to the existing YoY detail table
+- [ ] Build GA4 client code (ready for when access is granted)
 - [x] Enable guarded live Search Console imports for verified ready territories only — July 2026 data imported for Minneapolis, Montreal, Madison, Maryland Central, Columbus, and Pittsburgh; dashboard refresh control blocks ambiguous territories and incomplete months
 - [x] Backfill all available Search Console metrics for ready territories through July 2026 — each ready territory has April 2025–July 2026 coverage (16 months)
 - [x] Determine whether verified Search Console data exists before April 2025; label Jan–Mar reporting as unavailable rather than estimating it — all ready territory paths returned zero rows before April 2025

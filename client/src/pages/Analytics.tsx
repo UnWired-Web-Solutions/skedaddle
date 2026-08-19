@@ -300,6 +300,20 @@ export default function Analytics() {
   const { data: searchConsoleScope } = trpc.analytics.getSearchConsoleScope.useQuery({
     territoryId: selectedTerritory,
   });
+
+  // GSC YTD comparison (DashThis replacement)
+  const { data: gscYTD } = trpc.analytics.getSearchConsoleYTD.useQuery({
+    territoryId: selectedTerritory,
+    year: selectedYear,
+  });
+
+  // GSC monthly trend (DashThis replacement)
+  const { data: gscMonthlyTrend } = trpc.analytics.getSearchConsoleMonthlyTrend.useQuery({
+    territoryId: selectedTerritory,
+    startYear: selectedYear - 1,
+    endYear: selectedYear,
+  });
+
   const trpcUtils = trpc.useUtils();
   const [searchConsoleSyncMessage, setSearchConsoleSyncMessage] = useState<string | null>(null);
   const searchConsoleSync = trpc.analytics.syncSearchConsoleTerritory.useMutation({
@@ -319,6 +333,29 @@ export default function Analytics() {
   const currentUtcPeriod = new Date().getUTCFullYear() * 100 + new Date().getUTCMonth() + 1;
   const selectedSearchConsolePeriod = selectedYear * 100 + comparisonMonth;
   const isCompletedSearchConsolePeriod = selectedSearchConsolePeriod < currentUtcPeriod;
+
+  // ─── Transform GSC monthly trend for chart ─────────────────────────────────
+  const gscChartData = useMemo(() => {
+    if (!gscMonthlyTrend || !Array.isArray(gscMonthlyTrend) || gscMonthlyTrend.length === 0) return [];
+    return gscMonthlyTrend.map((row: any) => ({
+      name: `${MONTHS[row.month - 1]} '${String(row.year).slice(2)}`,
+      year: row.year,
+      month: row.month,
+      Clicks: row.clicks,
+      Impressions: row.impressions,
+      CTR: row.ctr,
+    }));
+  }, [gscMonthlyTrend]);
+
+  // ─── GSC YTD KPI deltas ────────────────────────────────────────────────────
+  const gscYTDDeltas = useMemo(() => {
+    if (!gscYTD) return null;
+    return {
+      clicks: formatDelta(gscYTD.clicks.current, gscYTD.clicks.previous),
+      impressions: formatDelta(gscYTD.impressions.current, gscYTD.impressions.previous),
+      ctr: formatDelta(gscYTD.ctr.current, gscYTD.ctr.previous),
+    };
+  }, [gscYTD]);
 
   // Get display name for selected territory
   const selectedTerritoryName = useMemo(() => {
@@ -622,6 +659,70 @@ export default function Analytics() {
             </>
           )}
         </div>
+
+        {/* ─── GSC YTD KPI Cards (DashThis replacement) ──────────────────────── */}
+        {gscYTD && gscYTD.monthsCovered > 0 && (
+          <div style={{ marginBottom: 28 }}>
+            <h2 style={{ fontSize: 14, fontWeight: 700, color: FOREST, marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
+              <Search size={15} color={SAGE} />
+              {selectedYear} Year-to-Date Organic Search
+              <span style={{ fontSize: 11, fontWeight: 400, color: "#888", marginLeft: 4 }}>
+                ({gscYTD.monthsCovered} month{gscYTD.monthsCovered !== 1 ? "s" : ""} imported{gscYTD.prevMonthsCovered > 0 ? ` · vs ${gscYTD.prevYear} same period` : ""})
+              </span>
+            </h2>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
+              <KpiCard
+                icon={MousePointer}
+                label="YTD Organic Clicks"
+                value={gscYTD.clicks.current.toLocaleString()}
+                delta={gscYTDDeltas?.clicks}
+                color={SAGE}
+              />
+              <KpiCard
+                icon={Activity}
+                label="YTD Impressions"
+                value={gscYTD.impressions.current.toLocaleString()}
+                delta={gscYTDDeltas?.impressions}
+                color={GOLD}
+              />
+              <KpiCard
+                icon={TrendingUp}
+                label="Avg CTR"
+                value={`${gscYTD.ctr.current.toFixed(2)}%`}
+                delta={gscYTDDeltas?.ctr}
+                color="#6b8f71"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ─── GSC Monthly Trend Chart (DashThis replacement) ─────────────────── */}
+        {gscChartData.length > 0 && (
+          <div style={{ background: "#fff", borderRadius: 10, border: `1px solid ${MIST}`, padding: "24px 20px", marginBottom: 28 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+              <div>
+                <h2 style={{ fontSize: 15, fontWeight: 700, color: FOREST, marginBottom: 4, fontFamily: "'Playfair Display', serif" }}>
+                  Organic Search Trend
+                </h2>
+                <p style={{ fontSize: 12, color: "#888", marginBottom: 20 }}>
+                  Monthly clicks and impressions from Google Search Console — {selectedTerritoryName} ({selectedYear - 1}–{selectedYear})
+                </p>
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={280}>
+              <LineChart data={gscChartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#888" }} />
+                <YAxis yAxisId="left" tick={{ fontSize: 10, fill: "#888" }} />
+                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: "#888" }} />
+                <Tooltip content={<EnhancedTooltip chartType="gsc" />} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Line yAxisId="left" type="monotone" dataKey="Clicks" stroke={SAGE} strokeWidth={2.5} dot={{ r: 3 }} name="Clicks" />
+                <Line yAxisId="right" type="monotone" dataKey="Impressions" stroke={GOLD} strokeWidth={1.5} strokeDasharray="5 5" dot={false} name="Impressions" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
 
         {/* ─── YoY KPI Cards ───────────────────────────────────────────────────── */}
         <div style={{ marginBottom: 32 }}>

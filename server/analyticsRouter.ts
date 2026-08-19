@@ -19,6 +19,7 @@ import { TERRITORY_GROUPS, UNMAPPED_GA4, UNMAPPED_GBP, getSubLocations } from ".
 import { verifySearchConsoleAccess } from "./googleSearchConsoleClient";
 import { importSearchConsoleTerritoryMonth } from "./googleSearchConsoleImporter";
 import { getGscTerritoryScope } from "../shared/gscTerritoryPaths";
+import { GSC_TERRITORY_SCOPES } from "../shared/gscTerritoryPaths";
 
 // ─── Procedures ──────────────────────────────────────────────────────────────
 
@@ -58,6 +59,129 @@ export const analyticsRouter = router({
   getSearchConsoleScope: publicProcedure
     .input(z.object({ territoryId: z.string() }))
     .query(({ input }) => getGscTerritoryScope(input.territoryId) ?? null),
+
+  /**
+   * GSC YTD summary with YoY comparison — sums all imported months in the
+   * selected year and compares to the same months in the previous year.
+   * This powers the "YTD Organic Clicks" KPI card in the DashThis replacement.
+   */
+  getSearchConsoleYTD: publicProcedure
+    .input(z.object({
+      territoryId: z.string(),
+      year: z.number().int(),
+    }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return null;
+
+      const { territoryId, year } = input;
+      const prevYear = year - 1;
+
+      // Current year totals
+      const [currentPages] = await db
+        .select({
+          clicks: sql<number>`COALESCE(SUM(${gscPageMetrics.clicks}), 0)`,
+          impressions: sql<number>`COALESCE(SUM(${gscPageMetrics.impressions}), 0)`,
+          months: sql<number>`COUNT(DISTINCT ${gscPageMetrics.month})`,
+        })
+        .from(gscPageMetrics)
+        .where(and(
+          eq(gscPageMetrics.territoryId, territoryId),
+          eq(gscPageMetrics.year, year),
+        ));
+
+      // Previous year totals (same months only for fair comparison)
+      const currentMonths = await db
+        .selectDistinct({ month: gscPageMetrics.month })
+        .from(gscPageMetrics)
+        .where(and(
+          eq(gscPageMetrics.territoryId, territoryId),
+          eq(gscPageMetrics.year, year),
+        ));
+      const monthList = currentMonths.map(r => r.month);
+
+      const [prevPages] = monthList.length > 0
+        ? await db
+          .select({
+            clicks: sql<number>`COALESCE(SUM(${gscPageMetrics.clicks}), 0)`,
+            impressions: sql<number>`COALESCE(SUM(${gscPageMetrics.impressions}), 0)`,
+            months: sql<number>`COUNT(DISTINCT ${gscPageMetrics.month})`,
+          })
+          .from(gscPageMetrics)
+          .where(and(
+            eq(gscPageMetrics.territoryId, territoryId),
+            eq(gscPageMetrics.year, prevYear),
+            inArray(gscPageMetrics.month, monthList),
+          ))
+        : [{ clicks: 0, impressions: 0, months: 0 }];
+
+      const currentClicks = Number(currentPages?.clicks || 0);
+      const prevClicks = Number(prevPages?.clicks || 0);
+      const currentImpressions = Number(currentPages?.impressions || 0);
+      const prevImpressions = Number(prevPages?.impressions || 0);
+
+      return {
+        year,
+        prevYear,
+        monthsCovered: Number(currentPages?.months || 0),
+        prevMonthsCovered: Number(prevPages?.months || 0),
+        clicks: { current: currentClicks, previous: prevClicks },
+        impressions: { current: currentImpressions, previous: prevImpressions },
+        ctr: {
+          current: currentImpressions > 0 ? (currentClicks / currentImpressions) * 100 : 0,
+          previous: prevImpressions > 0 ? (prevClicks / prevImpressions) * 100 : 0,
+        },
+      };
+    }),
+
+  /**
+   * GSC monthly trend — clicks and impressions by month for a territory.
+   * Powers the organic search trend line chart in the DashThis replacement.
+   */
+  getSearchConsoleMonthlyTrend: publicProcedure
+    .input(z.object({
+      territoryId: z.string(),
+      startYear: z.number().int(),
+      endYear: z.number().int(),
+    }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return [];
+
+      const results = await db
+        .select({
+          year: gscPageMetrics.year,
+          month: gscPageMetrics.month,
+          clicks: sql<number>`SUM(${gscPageMetrics.clicks})`,
+          impressions: sql<number>`SUM(${gscPageMetrics.impressions})`,
+        })
+        .from(gscPageMetrics)
+        .where(and(
+          eq(gscPageMetrics.territoryId, input.territoryId),
+          sql`${gscPageMetrics.year} >= ${input.startYear}`,
+          sql`${gscPageMetrics.year} <= ${input.endYear}`,
+        ))
+        .groupBy(gscPageMetrics.year, gscPageMetrics.month)
+        .orderBy(gscPageMetrics.year, gscPageMetrics.month);
+
+      return results.map(row => ({
+        year: row.year,
+        month: row.month,
+        clicks: Number(row.clicks),
+        impressions: Number(row.impressions),
+        ctr: Number(row.impressions) > 0 ? (Number(row.clicks) / Number(row.impressions)) * 100 : 0,
+      }));
+    }),
+
+  /**
+   * List all territories that have GSC data available (ready status).
+   * Used by the dashboard to show which territories have organic search data.
+   */
+  getSearchConsoleReadyTerritories: publicProcedure.query(() => {
+    return GSC_TERRITORY_SCOPES
+      .filter(t => t.status === "ready")
+      .map(t => ({ id: t.territoryId, paths: t.registeredPaths, notes: t.notes }));
+  }),
 
   /**
    * Get the 19 parent territories for the dropdowns.
