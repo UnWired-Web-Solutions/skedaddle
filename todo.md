@@ -2,7 +2,7 @@
 
 ## Repository Updates Review (Aug 18, 2026)
 - [x] Inspect and assess newly available repository updates before integration — `codex/meeting-report-priorities` validated (76 passed, 1 skipped); needs one GSC query-scope safeguard before merge
-- [ ] Publish and verify the merged `codex/meeting-report-priorities` update — safeguard, merge, database migration, TypeScript, and 76 passing tests complete
+- [x] Publish and verify the merged `codex/meeting-report-priorities` update — safeguard, merge, database migration, TypeScript, and 76 passing tests complete
 
 ## Core Portal
 - [x] Portal home page with franchise location cards
