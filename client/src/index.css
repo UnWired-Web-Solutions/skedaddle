@@ -5,7 +5,7 @@
    SKEDADDLE FRANCHISE PORTAL — Design System
    Theme: "Field Operations Manual"
    Aesthetic: Editorial, data-dense, authority-first
-   Primary: Deep forest green (#1a4a2e → oklch equivalent)
+   Accent: Skedaddle green (#69BE28); neutral surfaces and charcoal navigation
    Typography: Playfair Display (headings) + Inter (body)
    ============================================================ */
 
@@ -57,7 +57,7 @@
 }
 
 :root {
-  /* Skedaddle brand green #69BE28 — rgb(105, 190, 40) */
+  /* Skedaddle brand green #69BE28 — reserved for actions and emphasis */
   --forest:        oklch(0.68 0.20 140);
   --forest-light:  oklch(0.75 0.18 140);
   --forest-dark:   oklch(0.55 0.18 140);
@@ -68,7 +68,7 @@
   --primary:             oklch(0.68 0.20 140);
   --primary-foreground:  oklch(0.98 0 0);
 
-  /* Sidebar = Skedaddle brand green */
+  /* Sidebar = charcoal; green remains an accent, not a wall of colour */
   --sidebar-primary:             oklch(0.68 0.20 140);
   --sidebar-primary-foreground:  oklch(0.98 0 0);
 
@@ -101,11 +101,11 @@
   --ring:              oklch(0.68 0.20 140);
 
   /* Sidebar */
-  --sidebar:                     oklch(0.68 0.20 140);
+  --sidebar:                     #34394D;
   --sidebar-foreground:          oklch(0.95 0.005 80);
-  --sidebar-accent:              oklch(0.55 0.18 140);
+  --sidebar-accent:              #454B60;
   --sidebar-accent-foreground:   oklch(0.98 0 0);
-  --sidebar-border:              oklch(0.55 0.18 140);
+  --sidebar-border:              #4F556B;
   --sidebar-ring:                oklch(0.68 0.20 140);
 }
 

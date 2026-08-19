@@ -1,5 +1,5 @@
 // Skedaddle Franchise Portal — Persistent Sidebar Layout
-// Field Operations Manual aesthetic: deep forest green sidebar, parchment content area
+// Skedaddle portal: charcoal navigation, warm editorial workspace, green action accent
 
 import { useAuth } from "@/contexts/AuthContext";
 import { FRANCHISE_LOCATIONS } from "@/data/franchises";
@@ -60,17 +60,18 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     <div className="flex flex-col h-full">
       {/* Brand header */}
       <div
-        className="px-4 py-4 border-b flex flex-col items-center"
-        style={{ borderColor: "oklch(0.55 0.18 140)", background: "oklch(0.58 0.18 140)" }}
+        className="px-4 py-5 border-b flex flex-col items-center"
+        style={{ borderColor: "#4F556B", background: "#F6F3EC" }}
       >
         <img
-          src="/manus-storage/skedaddle_logo_white_rgba_ef9c6122.png"
+          src="/manus-storage/skedaddle_logo_rgba_9fad4199.png"
           alt="Skedaddle Humane Wildlife Control"
-          className="w-32 h-auto mb-2"
+          className="w-28 h-auto mb-2"
+          style={{ mixBlendMode: "multiply" }}
         />
         <div
           className="text-xs font-semibold tracking-widest uppercase"
-          style={{ color: "oklch(0.55 0.08 145)", fontFamily: "Inter, sans-serif" }}
+          style={{ color: "#34394D", fontFamily: "Inter, sans-serif" }}
         >
           Franchise Portal
         </div>
@@ -87,11 +88,12 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             style={{
               fontFamily: "Inter, sans-serif",
               fontWeight: isActive(item.href) ? 600 : 400,
-              background: isActive(item.href) ? "oklch(0.55 0.18 140)" : "transparent",
-              color: isActive(item.href) ? "oklch(0.97 0.012 80)" : "oklch(0.75 0.06 80)",
+              background: isActive(item.href) ? "#4A5064" : "transparent",
+              color: isActive(item.href) ? "#FFFFFF" : "#E9EAEF",
+              borderLeft: isActive(item.href) ? "3px solid #69BE28" : "3px solid transparent",
             }}
           >
-            <span style={{ color: isActive(item.href) ? "oklch(0.72 0.10 145)" : "oklch(0.55 0.06 80)" }}>
+            <span style={{ color: isActive(item.href) ? "#9BD46B" : "#B6BAC7" }}>
               {item.icon}
             </span>
             {item.label}
@@ -102,7 +104,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       {/* Divider */}
       <div
         className="mx-3 my-2"
-        style={{ borderTop: "1px solid oklch(0.55 0.18 140)" }}
+        style={{ borderTop: "1px solid #4F556B" }}
       />
 
       {/* Locations list */}
@@ -124,12 +126,13 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
               className="flex items-center justify-between px-3 py-2 rounded-sm text-sm mb-0.5 transition-colors group"
               style={{
                 fontFamily: "Inter, sans-serif",
-                background: active ? "oklch(0.55 0.18 140)" : "transparent",
-                color: active ? "oklch(0.97 0.012 80)" : "oklch(0.72 0.06 80)",
+                background: active ? "#4A5064" : "transparent",
+                color: active ? "#FFFFFF" : "#E9EAEF",
+                borderLeft: active ? "3px solid #69BE28" : "3px solid transparent",
               }}
             >
               <div className="flex items-center gap-2 min-w-0">
-                <FileText size={14} style={{ flexShrink: 0, color: active ? "oklch(0.72 0.10 145)" : "oklch(0.50 0.06 80)" }} />
+                <FileText size={14} style={{ flexShrink: 0, color: active ? "#9BD46B" : "#A6AAB7" }} />
                 <span className="truncate">{loc.city}</span>
                 {loc.status === "coming_soon" && (
                   <span
@@ -143,7 +146,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
               <ChevronRight
                 size={12}
                 className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                style={{ color: "oklch(0.55 0.06 80)" }}
+                style={{ color: "#B6BAC7" }}
               />
             </Link>
           );
@@ -153,19 +156,19 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       {/* User footer */}
       <div
         className="px-5 py-4 border-t"
-        style={{ borderColor: "oklch(0.55 0.18 140)" }}
+        style={{ borderColor: "#4F556B" }}
       >
         <div className="flex items-center justify-between">
           <div>
             <div
               className="text-xs font-semibold"
-              style={{ color: "oklch(0.85 0.005 80)", fontFamily: "Inter, sans-serif" }}
+              style={{ color: "#FFFFFF", fontFamily: "Inter, sans-serif" }}
             >
               {user?.username}
             </div>
             <div
               className="text-xs"
-              style={{ color: "oklch(0.55 0.06 80)", fontFamily: "Inter, sans-serif" }}
+              style={{ color: "#B6BAC7", fontFamily: "Inter, sans-serif" }}
             >
               {user?.role === "admin" ? "Administrator" : "Franchise Owner"}
             </div>
@@ -175,7 +178,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             className="p-1.5 rounded-sm transition-colors hover:bg-[oklch(0.28_0.10_140)]"
             title="Sign out"
           >
-            <LogOut size={15} style={{ color: "oklch(0.55 0.06 80)" }} />
+            <LogOut size={15} style={{ color: "#B6BAC7" }} />
           </button>
         </div>
       </div>
@@ -187,7 +190,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       {/* Desktop sidebar */}
       <aside
         className="hidden lg:flex flex-col w-56 flex-shrink-0 h-full"
-        style={{ background: "oklch(0.68 0.20 140)" }}
+        style={{ background: "#34394D" }}
       >
         <SidebarContent />
       </aside>
@@ -202,7 +205,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           />
           <aside
             className="relative w-64 h-full flex flex-col"
-            style={{ background: "oklch(0.68 0.20 140)" }}
+            style={{ background: "#34394D" }}
           >
             <button
               className="absolute top-4 right-4"
@@ -221,7 +224,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         {/* Mobile topbar */}
         <div
           className="lg:hidden flex items-center gap-3 px-4 py-3 border-b"
-          style={{ background: "oklch(0.68 0.20 140)", borderColor: "oklch(0.55 0.18 140)" }}
+          style={{ background: "#34394D", borderColor: "#4F556B" }}
         >
           <button onClick={() => setMobileOpen(true)}>
             <Menu size={20} style={{ color: "oklch(0.85 0.005 80)" }} />

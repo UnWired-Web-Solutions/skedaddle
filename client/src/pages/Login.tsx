@@ -1,5 +1,4 @@
-// Skedaddle Franchise Portal — Login Page
-// Field Operations Manual aesthetic: editorial, authority-first, deep forest green
+// Skedaddle portal sign-in: warm neutral surface with official logo and green action accent
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useState } from "react";
@@ -13,12 +12,11 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
     setError("");
     setLoading(true);
 
-    // Slight delay for UX feel
     setTimeout(() => {
       const result = login(username, password);
       if (result.success) {
@@ -31,40 +29,37 @@ export default function Login() {
   };
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center"
-      style={{ background: "oklch(0.68 0.20 140)" }}
-    >
+    <div className="min-h-screen flex items-center justify-center" style={{ background: "#F6F3EC" }}>
       <div className="w-full max-w-md px-6">
-        {/* Logo / Brand mark */}
         <div className="text-center mb-10">
           <img
-            src="/manus-storage/skedaddle_logo_white_305bb903.png"
+            src="/manus-storage/skedaddle_logo_rgba_9fad4199.png"
             alt="Skedaddle Humane Wildlife Control"
-            className="w-44 h-auto mx-auto mb-4"
+            className="w-40 h-auto mx-auto mb-4"
+            style={{ mixBlendMode: "multiply" }}
           />
           <h1
-            className="text-lg font-semibold tracking-widest uppercase"
-            style={{ color: "oklch(0.65 0.08 80)", fontFamily: "Inter, sans-serif" }}
+            className="text-sm font-semibold tracking-[0.22em] uppercase"
+            style={{ color: "#34394D", fontFamily: "Inter, sans-serif" }}
           >
             Franchise Portal
           </h1>
         </div>
 
-        {/* Login card */}
         <div
-          className="rounded-sm p-8"
+          className="rounded-md p-8"
           style={{
-            background: "oklch(0.97 0.012 80)",
-            boxShadow: "0 24px 60px oklch(0 0 0 / 0.4)",
+            background: "#FFFFFF",
+            border: "1px solid #E1DED6",
+            boxShadow: "0 18px 48px rgb(52 57 77 / 0.12)",
           }}
         >
           <div
             className="text-xs font-semibold tracking-widest uppercase mb-6 pb-3"
             style={{
-              color: "oklch(0.68 0.20 140)",
+              color: "#69BE28",
               fontFamily: "Inter, sans-serif",
-              borderBottom: "2px solid oklch(0.68 0.20 140)",
+              borderBottom: "2px solid #69BE28",
             }}
           >
             Sign In
@@ -75,7 +70,7 @@ export default function Login() {
               <label
                 htmlFor="username"
                 className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
-                style={{ color: "oklch(0.40 0.015 65)", fontFamily: "Inter, sans-serif" }}
+                style={{ color: "#34394D", fontFamily: "Inter, sans-serif" }}
               >
                 Username
               </label>
@@ -84,17 +79,17 @@ export default function Login() {
                 type="text"
                 autoComplete="username"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(event) => setUsername(event.target.value)}
                 required
                 className="w-full px-3 py-2.5 text-sm rounded-sm border transition-colors focus:outline-none"
                 style={{
-                  background: "oklch(1 0 0)",
-                  border: "1px solid oklch(0.88 0.012 80)",
-                  color: "oklch(0.18 0.015 65)",
+                  background: "#FFFFFF",
+                  border: "1px solid #E1DED6",
+                  color: "#34394D",
                   fontFamily: "Inter, sans-serif",
                 }}
-                onFocus={(e) => (e.target.style.borderColor = "oklch(0.68 0.20 140)")}
-                onBlur={(e) => (e.target.style.borderColor = "oklch(0.88 0.012 80)")}
+                onFocus={(event) => (event.target.style.borderColor = "#69BE28")}
+                onBlur={(event) => (event.target.style.borderColor = "#E1DED6")}
                 placeholder="e.g. milwaukee"
               />
             </div>
@@ -103,7 +98,7 @@ export default function Login() {
               <label
                 htmlFor="password"
                 className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
-                style={{ color: "oklch(0.40 0.015 65)", fontFamily: "Inter, sans-serif" }}
+                style={{ color: "#34394D", fontFamily: "Inter, sans-serif" }}
               >
                 Password
               </label>
@@ -112,17 +107,17 @@ export default function Login() {
                 type="password"
                 autoComplete="current-password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(event) => setPassword(event.target.value)}
                 required
                 className="w-full px-3 py-2.5 text-sm rounded-sm border transition-colors focus:outline-none"
                 style={{
-                  background: "oklch(1 0 0)",
-                  border: "1px solid oklch(0.88 0.012 80)",
-                  color: "oklch(0.18 0.015 65)",
+                  background: "#FFFFFF",
+                  border: "1px solid #E1DED6",
+                  color: "#34394D",
                   fontFamily: "Inter, sans-serif",
                 }}
-                onFocus={(e) => (e.target.style.borderColor = "oklch(0.68 0.20 140)")}
-                onBlur={(e) => (e.target.style.borderColor = "oklch(0.88 0.012 80)")}
+                onFocus={(event) => (event.target.style.borderColor = "#69BE28")}
+                onBlur={(event) => (event.target.style.borderColor = "#E1DED6")}
                 placeholder="••••••••"
               />
             </div>
@@ -146,8 +141,8 @@ export default function Login() {
               disabled={loading}
               className="w-full py-3 text-sm font-semibold rounded-sm transition-all active:scale-[0.98]"
               style={{
-                background: loading ? "oklch(0.45 0.07 145)" : "oklch(0.68 0.20 140)",
-                color: "oklch(0.98 0 0)",
+                background: loading ? "#4F8D1E" : "#69BE28",
+                color: "#FFFFFF",
                 fontFamily: "Inter, sans-serif",
                 letterSpacing: "0.05em",
                 textTransform: "uppercase",
@@ -160,7 +155,7 @@ export default function Login() {
 
         <p
           className="text-center text-xs mt-6"
-          style={{ color: "oklch(0.55 0.06 80)", fontFamily: "Inter, sans-serif" }}
+          style={{ color: "#6B7180", fontFamily: "Inter, sans-serif" }}
         >
           Access is restricted to authorised franchise owners and Skedaddle staff.
         </p>

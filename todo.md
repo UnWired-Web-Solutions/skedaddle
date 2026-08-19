@@ -4,6 +4,8 @@
 - [x] Inspect and assess newly available repository updates before integration — `codex/meeting-report-priorities` validated (76 passed, 1 skipped); needs one GSC query-scope safeguard before merge
 - [x] Publish and verify the merged `codex/meeting-report-priorities` update — safeguard, merge, database migration, TypeScript, and 76 passing tests complete
 - [x] Generate and review a live Strategy Report Generator output after the Claude model repair — Hamilton completed all 13 sections with no Claude API error or missing-data placeholder
+- [ ] Verify the dashboard-header overlap after the portal-layout merge — anonymous preview cannot access the authenticated dashboard route
+- [x] Refine portal brand treatment: official Skedaddle logo with selective brand-green accents — neutral login surface, charcoal navigation, official colour logo, green reserved for actions and active states
 
 ## Core Portal
 - [x] Portal home page with franchise location cards
