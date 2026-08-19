@@ -53,6 +53,23 @@ describe("analyticsRouter", () => {
     expect(mod.analyticsRouter._def.procedures.getSummaryKPIs).toBeDefined();
   });
 
+  it("should expose territory-filtered Search Console reporting", async () => {
+    const mod = await import("./analyticsRouter");
+    expect(mod.analyticsRouter._def.procedures.getSearchConsoleOverview).toBeDefined();
+  });
+
+  it("should expose verified territory close-rate snapshots", async () => {
+    const mod = await import("./analyticsRouter");
+    expect(mod.analyticsRouter._def.procedures.getTerritoryCloseRate).toBeDefined();
+  });
+
+  it("should define durable GSC and Salesforce performance tables", async () => {
+    const schema = await import("../drizzle/schema");
+    expect(schema.gscPageMetrics).toBeDefined();
+    expect(schema.gscQueryMetrics).toBeDefined();
+    expect(schema.salesforcePerformanceSnapshots).toBeDefined();
+  });
+
   it("should be wired into the main app router", async () => {
     const mod = await import("./routers");
     // tRPC v11 nested routers are accessible via record key

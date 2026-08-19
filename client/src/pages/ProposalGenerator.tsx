@@ -17,6 +17,9 @@ interface ProposalConfig {
   acceleratorPrice: number;
   acceleratorBlogPosts: number;
   acceleratorGbpPosts: number;
+  implementationFee: number;
+  estimatedTokenCost: number;
+  tokenBufferPercent: number;
   scopeNotes: string;
 }
 
@@ -33,6 +36,7 @@ export default function ProposalGenerator() {
     essentialPrice: 0, essentialBlogPosts: 0, essentialGbpPosts: 0,
     growthPrice: 0, growthBlogPosts: 0, growthGbpPosts: 0,
     acceleratorPrice: 0, acceleratorBlogPosts: 0, acceleratorGbpPosts: 0,
+    implementationFee: 0, estimatedTokenCost: 0, tokenBufferPercent: 0,
     scopeNotes: "",
   });
 
@@ -105,7 +109,9 @@ export default function ProposalGenerator() {
   const formatRevenue = (revenue: number, id: string) => {
     const territory = territories?.find((t) => t.id === id);
     const symbol = territory?.country === "CA" ? "CA$" : "$";
-    return `${symbol}${(revenue / 1000).toFixed(0)}K`;
+    return revenue >= 1_000_000
+      ? `${symbol}${(revenue / 1_000_000).toFixed(2)}M`
+      : `${symbol}${(revenue / 1_000).toFixed(0)}K`;
   };
 
   if (user?.role !== "admin") {
@@ -273,6 +279,26 @@ export default function ProposalGenerator() {
                   </tbody>
                 </table>
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+                {([
+                  ["Implementation fee", "implementationFee"],
+                  ["Estimated token cost", "estimatedTokenCost"],
+                  ["Exploration buffer (%)", "tokenBufferPercent"],
+                ] as Array<[string, keyof ProposalConfig]>).map(([label, key]) => (
+                  <label key={key}>
+                    <span className="text-xs font-medium" style={{ color: "oklch(0.52 0.016 80)" }}>{label}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max={key === "tokenBufferPercent" ? "100" : undefined}
+                      value={config[key] as number}
+                      onChange={event => updateNumber(key, event.target.value)}
+                      className="mt-1 w-full border rounded-sm px-2 py-1.5"
+                      style={{ borderColor: "oklch(0.88 0.012 80)" }}
+                    />
+                  </label>
+                ))}
+              </div>
               <label className="block mt-3">
                 <span className="text-xs font-medium" style={{ color: "oklch(0.52 0.016 80)" }}>Approved scope notes</span>
                 <textarea
@@ -291,7 +317,7 @@ export default function ProposalGenerator() {
               </label>
               <label className="flex items-start gap-2 mt-3 text-xs" style={{ color: "oklch(0.35 0.015 65)" }}>
                 <input type="checkbox" checked={termsConfirmed} disabled={!config.scopeNotes.trim()} onChange={event => setTermsConfirmed(event.target.checked)} className="mt-0.5" />
-                <span>I confirmed these prices, deliverable volumes, currency, and scope for this territory.</span>
+                <span>I confirmed these prices, deliverable volumes, token allowance and buffer, currency, and scope for this territory.</span>
               </label>
             </div>
           )}

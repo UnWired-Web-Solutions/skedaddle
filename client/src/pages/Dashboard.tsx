@@ -10,7 +10,9 @@ import {
   LineChart, Line, Legend, PieChart, Pie, Cell
 } from "recharts";
 import { DASHBOARD_DATA } from "@/data/dashboardData";
-import { NETWORK_CLOSE_RATES, getNetworkBenchmark } from "@shared/closeRateData";
+import { trpc } from "@/lib/trpc";
+import PortalLayout from "@/components/PortalLayout";
+import { NETWORK_OVERALL_CLOSE_RATE, getNetworkBenchmark } from "@shared/closeRateData";
 import { ArrowLeft, TrendingUp, DollarSign, Users, Search, Phone, MousePointer, MapPin, AlertCircle } from "lucide-react";
 
 // ─── colour palette ───────────────────────────────────────────────────────────
@@ -90,15 +92,21 @@ export default function Dashboard() {
   const params = useParams<{ id: string }>();
   const id = params.id?.toLowerCase() || "";
   const data = DASHBOARD_DATA[id];
+  const { data: closeRateSnapshot } = trpc.analytics.getTerritoryCloseRate.useQuery(
+    { territoryId: id },
+    { enabled: Boolean(data) },
+  );
 
   if (!data) {
     return (
-      <div style={{ padding: 48, textAlign: "center", color: FOREST }}>
-        <AlertCircle size={40} style={{ margin: "0 auto 16px", color: RUST }} />
-        <h2 style={{ fontFamily: "'Playfair Display', serif" }}>Dashboard not available</h2>
-        <p style={{ color: "#666", marginBottom: 24 }}>Data for this location hasn't been loaded yet.</p>
-        <Link href={`/location/${id}`} style={{ color: SAGE, textDecoration: "underline" }}>← Back to location</Link>
-      </div>
+      <PortalLayout>
+        <div style={{ padding: 48, textAlign: "center", color: FOREST }}>
+          <AlertCircle size={40} style={{ margin: "0 auto 16px", color: RUST }} />
+          <h2 style={{ fontFamily: "'Playfair Display', serif" }}>Dashboard not available</h2>
+          <p style={{ color: "#666", marginBottom: 24 }}>Data for this location hasn't been loaded yet.</p>
+          <Link href={`/location/${id}`} style={{ color: SAGE, textDecoration: "underline" }}>← Back to location</Link>
+        </div>
+      </PortalLayout>
     );
   }
 
@@ -124,25 +132,17 @@ export default function Dashboard() {
   const gbpChart = data.gbp.monthly.slice(-12);
 
   return (
-    <div style={{ background: "#f9f7f3", minHeight: "100vh" }}>
-      {/* Header */}
-      <div style={{ background: FOREST, padding: "20px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <Link href={`/location/${id}`} style={{ color: GOLD, display: "flex", alignItems: "center", gap: 6, fontSize: 13, textDecoration: "none", opacity: 0.85 }}>
-            <ArrowLeft size={14} /> Back to Location
-          </Link>
-          <div style={{ width: 1, height: 20, background: "#ffffff30" }} />
-          <div>
-            <div style={{ color: GOLD, fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em" }}>Strategy Dashboard</div>
-            <div style={{ color: CREAM, fontSize: 20, fontWeight: 700, fontFamily: "'Playfair Display', serif" }}>
-              Skedaddle {data.name}
-            </div>
-          </div>
-        </div>
-        <div style={{ color: "#ffffff60", fontSize: 12 }}>Data: Salesforce snapshot (Jul 24, 2026){hasGsc ? " + GSC" : ""}{hasGbp ? " + GBP" : ""}</div>
-      </div>
-
+    <PortalLayout>
+      <div style={{ background: "#f9f7f3", minHeight: "100vh" }}>
       <div style={{ padding: "32px 32px 48px", maxWidth: 1200, margin: "0 auto" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 8, marginBottom: 20 }}>
+          <Link href={`/location/${id}`} style={{ color: SAGE, display: "flex", alignItems: "center", gap: 6, fontSize: 13, textDecoration: "none" }}>
+            <ArrowLeft size={14} /> Back to {data.name}
+          </Link>
+          <span style={{ color: "#888", fontSize: 11 }}>
+            Salesforce snapshot: Jul 24, 2026{hasGsc ? " · GSC connected" : ""}{hasGbp ? " · GBP connected" : ""}
+          </span>
+        </div>
 
         {/* ── KPI Strip ── */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 40 }}>
@@ -196,26 +196,43 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* ── Close Rate Benchmark ── */}
+        {/* ── Territory vs network close rate ── */}
         <div style={{ background: CREAM, borderRadius: 10, padding: 24, border: `1px solid ${MIST}`, marginBottom: 32 }}>
           <SectionHeader
-            title="Network Close-Rate Context by Species"
-            subtitle="Territory revenue and jobs shown beside network PA close rates. Territory-level PAs are not available, so this is context—not a territory-vs-network comparison."
+            title="Inspection-to-Sale Performance"
+            subtitle={closeRateSnapshot
+              ? `${closeRateSnapshot.periodStart} to ${closeRateSnapshot.periodEnd} · ${closeRateSnapshot.sourceLabel}`
+              : "Territory inspections are pending a verified Salesforce performance import; network rates remain visible as context."}
           />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 18 }}>
+            {[
+              { label: "Territory Inspections", value: closeRateSnapshot?.total.inspections.toLocaleString() || "Pending" },
+              { label: "Territory Closed Jobs", value: closeRateSnapshot?.total.closedJobs.toLocaleString() || "Pending" },
+              { label: "Territory Close Rate", value: closeRateSnapshot?.total.closeRate == null ? "Pending" : `${closeRateSnapshot.total.closeRate.toFixed(1)}%` },
+              { label: "Network Close Rate", value: `${NETWORK_OVERALL_CLOSE_RATE.toFixed(1)}%` },
+            ].map(item => (
+              <div key={item.label} style={{ background: "#fff", border: `1px solid ${MIST}`, borderRadius: 6, padding: "12px 14px" }}>
+                <div style={{ fontSize: 10, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em" }}>{item.label}</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: FOREST, marginTop: 4 }}>{item.value}</div>
+              </div>
+            ))}
+          </div>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: `2px solid ${MIST}` }}>
                   <th style={{ textAlign: "left", padding: "8px 12px", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Species</th>
                   <th style={{ textAlign: "right", padding: "8px 12px", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Territory Revenue</th>
+                  <th style={{ textAlign: "right", padding: "8px 12px", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Inspections</th>
                   <th style={{ textAlign: "right", padding: "8px 12px", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Closed Jobs</th>
+                  <th style={{ textAlign: "right", padding: "8px 12px", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Territory Close Rate</th>
                   <th style={{ textAlign: "right", padding: "8px 12px", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Network Close Rate</th>
-                  <th style={{ textAlign: "left", padding: "8px 12px", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Close Rate Bar</th>
                 </tr>
               </thead>
               <tbody>
                 {data.species.map((s, i) => {
                   const benchmark = getNetworkBenchmark(s.species);
+                  const territory = closeRateSnapshot?.species.find(row => row.species.toLowerCase() === s.species.toLowerCase());
                   return (
                     <tr key={i} style={{ borderBottom: `1px solid ${MIST}`, background: i % 2 === 0 ? "transparent" : "#faf8f4" }}>
                       <td style={{ padding: "10px 12px", color: FOREST, fontWeight: i < 3 ? 600 : 400 }}>
@@ -223,7 +240,11 @@ export default function Dashboard() {
                         {s.species}
                       </td>
                       <td style={{ padding: "10px 12px", textAlign: "right", color: FOREST, fontWeight: 600 }}>{fmt$(s.total_revenue, data.currency)}</td>
-                      <td style={{ padding: "10px 12px", textAlign: "right", color: "#666" }}>{s.total_jobs}</td>
+                      <td style={{ padding: "10px 12px", textAlign: "right", color: "#666" }}>{territory?.inspections.toLocaleString() || "—"}</td>
+                      <td style={{ padding: "10px 12px", textAlign: "right", color: "#666" }}>{territory?.closedJobs.toLocaleString() || s.total_jobs.toLocaleString()}</td>
+                      <td style={{ padding: "10px 12px", textAlign: "right", color: FOREST, fontWeight: 700 }}>
+                        {territory?.closeRate == null ? "—" : `${territory.closeRate.toFixed(1)}%`}
+                      </td>
                       <td style={{ padding: "10px 12px", textAlign: "right" }}>
                         {benchmark !== null ? (
                           <span style={{
@@ -236,20 +257,6 @@ export default function Dashboard() {
                           <span style={{ color: "#bbb", fontSize: 11 }}>No data</span>
                         )}
                       </td>
-                      <td style={{ padding: "10px 12px", minWidth: 120 }}>
-                        {benchmark !== null ? (
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <div style={{ background: MIST, borderRadius: 3, height: 8, flex: 1 }}>
-                              <div style={{
-                                background: benchmark >= 55 ? SAGE : benchmark >= 45 ? GOLD : RUST,
-                                borderRadius: 3, height: 8,
-                                width: `${Math.min(benchmark, 100)}%`,
-                                transition: "width 0.5s ease"
-                              }} />
-                            </div>
-                          </div>
-                        ) : null}
-                      </td>
                     </tr>
                   );
                 })}
@@ -257,7 +264,7 @@ export default function Dashboard() {
             </table>
           </div>
           <div style={{ marginTop: 12, fontSize: 11, color: "#999", display: "flex", gap: 16 }}>
-            <span>Network benchmarks only. Add territory PA and sale counts before making close-rate recommendations. Source: Looker Studio Salesforce (all territories, trailing period).</span>
+            <span>Inspections are Salesforce Primary Actions Sought (PAS). Blank territory cells mean the verified import does not include that species; no values are inferred from revenue.</span>
           </div>
         </div>
 
@@ -377,6 +384,7 @@ export default function Dashboard() {
         </div>}
 
       </div>
-    </div>
+      </div>
+    </PortalLayout>
   );
 }

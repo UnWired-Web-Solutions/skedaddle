@@ -101,6 +101,14 @@ describe("Proposal Generator", () => {
       expect(procedures.generate).toBeDefined();
       expect(procedures.exportPdf).toBeDefined();
     });
+
+    it("should keep token cost and exploration buffer explicit", async () => {
+      const source = await import("node:fs/promises").then(fs => fs.readFile(new URL("./proposalRouter.ts", import.meta.url), "utf-8"));
+      expect(source).toContain("estimatedTokenCost");
+      expect(source).toContain("tokenBufferPercent");
+      expect(source).toContain("Only the deliverables explicitly listed in the approved scope notes");
+      expect(source).not.toContain('<td class="check">✓</td>');
+    });
   });
 
   describe("Territory Data Completeness for Ottawa", () => {

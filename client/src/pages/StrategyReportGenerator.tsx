@@ -207,13 +207,13 @@ export default function StrategyReportGenerator() {
             className="text-3xl font-bold mb-2"
             style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "oklch(0.18 0.015 65)" }}
           >
-            Strategy Report Generator
+            Initial Sales Strategy Report
           </h1>
           <p
             className="text-sm"
             style={{ color: "oklch(0.52 0.016 80)", fontFamily: "Inter, sans-serif" }}
           >
-            Generate a reviewable territory strategy from verified demand/performance data and explicitly confirmed campaign inputs.
+            Generate the sales-focused report used before client acquisition. Quarterly post-sale performance reporting is intentionally deferred.
           </p>
           <div className="mt-3" style={{ borderTop: "2px solid oklch(0.68 0.20 140)", width: "48px" }} />
         </div>

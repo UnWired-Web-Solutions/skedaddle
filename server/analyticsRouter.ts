@@ -7,7 +7,13 @@
 import { z } from "zod";
 import { publicProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
-import { ga4Sessions, gbpMetrics } from "../drizzle/schema";
+import {
+  ga4Sessions,
+  gbpMetrics,
+  gscPageMetrics,
+  gscQueryMetrics,
+  salesforcePerformanceSnapshots,
+} from "../drizzle/schema";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { TERRITORY_GROUPS, UNMAPPED_GA4, UNMAPPED_GBP, getSubLocations } from "../shared/territoryMapping";
 
@@ -37,7 +43,11 @@ export const analyticsRouter = router({
    */
   getDateRange: publicProcedure.query(async () => {
     const db = await getDb();
-    if (!db) return { ga4: { minYear: 2022, maxYear: 2026 }, gbp: { minYear: 2024, maxYear: 2026 } };
+    if (!db) return {
+      ga4: { minYear: 2022, maxYear: 2026 },
+      gbp: { minYear: 2024, maxYear: 2026 },
+      gsc: { minYear: 2026, maxYear: 2026 },
+    };
 
     const [ga4Range] = await db
       .select({
@@ -53,9 +63,17 @@ export const analyticsRouter = router({
       })
       .from(gbpMetrics);
 
+    const [gscRange] = await db
+      .select({
+        minYear: sql<number>`MIN(year)`,
+        maxYear: sql<number>`MAX(year)`,
+      })
+      .from(gscPageMetrics);
+
     return {
       ga4: { minYear: ga4Range.minYear, maxYear: ga4Range.maxYear },
       gbp: { minYear: gbpRange.minYear, maxYear: gbpRange.maxYear },
+      gsc: { minYear: gscRange.minYear, maxYear: gscRange.maxYear },
     };
   }),
 
@@ -70,19 +88,23 @@ export const analyticsRouter = router({
     const [gbpLatest] = await db
       .select({ period: sql<number>`MAX(${gbpMetrics.year} * 100 + ${gbpMetrics.month})` })
       .from(gbpMetrics);
+    const [gscLatest] = await db
+      .select({ period: sql<number>`MAX(${gscPageMetrics.year} * 100 + ${gscPageMetrics.month})` })
+      .from(gscPageMetrics);
 
     const decode = (period: number | null | undefined) => period
       ? { year: Math.floor(Number(period) / 100), month: Number(period) % 100 }
       : null;
     const ga4 = decode(ga4Latest?.period);
     const gbp = decode(gbpLatest?.period);
+    const gsc = decode(gscLatest?.period);
     // Use the latest period covered by both feeds (the earlier feed boundary)
     // so default reports do not silently pair a current metric with a missing one.
     const latest = [ga4, gbp]
       .filter((period): period is { year: number; month: number } => Boolean(period))
       .sort((a, b) => (a.year * 100 + a.month) - (b.year * 100 + b.month))[0] || null;
 
-    return { ga4, gbp, latest };
+    return { ga4, gbp, gsc, latest };
   }),
 
   /**
@@ -270,6 +292,108 @@ export const analyticsRouter = router({
       return {
         totalSessions: ga4Summary?.total || 0,
         gbp: Object.fromEntries(gbpSummary.map(r => [r.metricType, r.total])),
+      };
+    }),
+
+  /**
+   * DashThis replacement: domain-property Search Console totals, top 25 pages,
+   * and top 25 queries for an explicitly territory-filtered monthly import.
+   */
+  getSearchConsoleOverview: publicProcedure
+    .input(z.object({
+      territoryId: z.string(),
+      year: z.number().int(),
+      month: z.number().int().min(1).max(12),
+    }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return null;
+
+      const conditions = and(
+        eq(gscPageMetrics.territoryId, input.territoryId),
+        eq(gscPageMetrics.year, input.year),
+        eq(gscPageMetrics.month, input.month),
+      );
+      const queryConditions = and(
+        eq(gscQueryMetrics.territoryId, input.territoryId),
+        eq(gscQueryMetrics.year, input.year),
+        eq(gscQueryMetrics.month, input.month),
+      );
+
+      const [pages, queries] = await Promise.all([
+        db.select().from(gscPageMetrics).where(conditions),
+        db.select().from(gscQueryMetrics).where(queryConditions),
+      ]);
+
+      const summarize = <T extends { clicks: number; impressions: number; positionHundredths: number }>(rows: T[]) => {
+        const clicks = rows.reduce((sum, row) => sum + Number(row.clicks), 0);
+        const impressions = rows.reduce((sum, row) => sum + Number(row.impressions), 0);
+        const weightedPosition = rows.reduce(
+          (sum, row) => sum + Number(row.positionHundredths) * Number(row.impressions),
+          0,
+        );
+        return {
+          clicks,
+          impressions,
+          ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+          averagePosition: impressions > 0 ? weightedPosition / impressions / 100 : 0,
+        };
+      };
+
+      const mapRow = <T extends { clicks: number; impressions: number; positionHundredths: number }>(row: T) => ({
+        ...row,
+        clicks: Number(row.clicks),
+        impressions: Number(row.impressions),
+        ctr: Number(row.impressions) > 0 ? (Number(row.clicks) / Number(row.impressions)) * 100 : 0,
+        position: Number(row.positionHundredths) / 100,
+      });
+
+      return {
+        dataAvailable: pages.length > 0 || queries.length > 0,
+        summary: summarize(pages),
+        topPages: pages.sort((a, b) => Number(b.clicks) - Number(a.clicks)).slice(0, 25).map(mapRow),
+        topQueries: queries.sort((a, b) => Number(b.clicks) - Number(a.clicks)).slice(0, 25).map(mapRow),
+        sourceProperty: pages[0]?.sourceProperty || queries[0]?.sourceProperty || null,
+        pathPrefix: pages[0]?.pathPrefix || queries[0]?.pathPrefix || null,
+      };
+    }),
+
+  /** Latest verified Salesforce inspection-to-sale snapshot for a territory. */
+  getTerritoryCloseRate: publicProcedure
+    .input(z.object({ territoryId: z.string() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return null;
+
+      const [latest] = await db
+        .select({ periodEnd: sql<string>`MAX(${salesforcePerformanceSnapshots.periodEnd})` })
+        .from(salesforcePerformanceSnapshots)
+        .where(eq(salesforcePerformanceSnapshots.territoryId, input.territoryId));
+      if (!latest?.periodEnd) return null;
+
+      const rows = await db
+        .select()
+        .from(salesforcePerformanceSnapshots)
+        .where(and(
+          eq(salesforcePerformanceSnapshots.territoryId, input.territoryId),
+          eq(salesforcePerformanceSnapshots.periodEnd, latest.periodEnd),
+        ));
+      const total = rows.find(row => row.species === "__ALL__");
+      if (!total) return null;
+
+      const toResult = (row: (typeof rows)[number]) => ({
+        species: row.species,
+        inspections: Number(row.inspections),
+        closedJobs: Number(row.closedJobs),
+        closeRate: Number(row.inspections) > 0 ? Number(row.closedJobs) / Number(row.inspections) * 100 : null,
+      });
+
+      return {
+        periodStart: total.periodStart,
+        periodEnd: total.periodEnd,
+        sourceLabel: total.sourceLabel,
+        total: toResult(total),
+        species: rows.filter(row => row.species !== "__ALL__").map(toResult),
       };
     }),
 

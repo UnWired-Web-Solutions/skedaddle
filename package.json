@@ -10,6 +10,8 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
+    "ingest:gsc": "node scripts/ingest-search-console.mjs",
+    "ingest:salesforce-performance": "node scripts/ingest-salesforce-performance.mjs",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
   },
   "dependencies": {

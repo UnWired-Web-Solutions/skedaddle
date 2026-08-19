@@ -1,0 +1,28 @@
+name: Validate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      ANTHROPIC_API_KEY: test-key-not-for-api-calls
+      BUILT_IN_FORGE_API_URL: https://example.invalid
+      BUILT_IN_FORGE_API_KEY: test-key-not-for-api-calls
+      SONAR_API_KEY: test-key-not-for-api-calls
+      RUN_LIVE_API_TESTS: "0"
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm test
+      - run: pnpm build
