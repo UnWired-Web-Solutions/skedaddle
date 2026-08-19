@@ -8,6 +8,11 @@
 - [x] Refine portal brand treatment: official Skedaddle logo with selective brand-green accents — neutral login surface, charcoal navigation, official colour logo, green reserved for actions and active states
 - [x] Verify authorised Google Search Console access and document the portal connection path — `uws@unwiredwebsolutions.com` is a verified owner of `sc-domain:skedaddlewildlife.com`; production API credential setup remains next
 - [x] Create, authorise, and verify the least-privilege Google Search Console service-account connection — Search Console API enabled, dedicated service account granted Full property access, JSON key stored securely, and live API property test passed
+- [x] Confirm the property model — location entries are URL-prefix properties beneath the parent domain; approved domain-property plus verified path-filter model documented
+- [x] Create and save the complete owner-account inventory of authorised Skedaddle domain and URL-prefix properties — 72 owner-visible Skedaddle properties saved in `GSC_OWNER_PROPERTY_INVENTORY_2026-08-19.json`
+- [x] Create an explicit Search Console scope-decision registry for all 19 territories — `ready`, `partial`, and `review_required` states prevent unverified imports
+- [ ] Resolve and document canonical Search Console path(s) for territories currently marked `partial` or `review_required`
+- [ ] Confirm import boundaries for overlapping and multi-city territories, including Durham, Ottawa, Hamilton, Milwaukee, Baltimore, and Windsor/London
 
 ## Core Portal
 - [x] Portal home page with franchise location cards
