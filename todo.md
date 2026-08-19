@@ -30,7 +30,8 @@
 - [x] Add GSC YTD KPI cards to Analytics page (organic clicks, impressions, avg CTR with YoY delta)
 - [x] Add GSC monthly trend line chart to Analytics page (clicks + impressions over time)
 - [ ] Add GSC YoY comparison to the existing YoY detail table
-- [ ] Build GA4 client code (ready for when access is granted)
+- [x] Build GA4 client code (ready for when access is granted) — googleAnalyticsClient.ts with verifyGA4Access, fetchGA4SessionsByPage, fetchGA4TopCities, fetchGA4ChannelBreakdown
+- [x] Add GA4 connection status procedure to analytics router (getGA4ConnectionStatus)
 - [x] Enable guarded live Search Console imports for verified ready territories only — July 2026 data imported for Minneapolis, Montreal, Madison, Maryland Central, Columbus, and Pittsburgh; dashboard refresh control blocks ambiguous territories and incomplete months
 - [x] Backfill all available Search Console metrics for ready territories through July 2026 — each ready territory has April 2025–July 2026 coverage (16 months)
 - [x] Determine whether verified Search Console data exists before April 2025; label Jan–Mar reporting as unavailable rather than estimating it — all ready territory paths returned zero rows before April 2025

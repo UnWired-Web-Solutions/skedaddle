@@ -17,6 +17,7 @@ import {
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { TERRITORY_GROUPS, UNMAPPED_GA4, UNMAPPED_GBP, getSubLocations } from "../shared/territoryMapping";
 import { verifySearchConsoleAccess } from "./googleSearchConsoleClient";
+import { verifyGA4Access } from "./googleAnalyticsClient";
 import { importSearchConsoleTerritoryMonth } from "./googleSearchConsoleImporter";
 import { getGscTerritoryScope } from "../shared/gscTerritoryPaths";
 import { GSC_TERRITORY_SCOPES } from "../shared/gscTerritoryPaths";
@@ -34,6 +35,19 @@ export const analyticsRouter = router({
         property: null,
         permissionLevel: null,
         error: error instanceof Error ? error.message : "Unable to verify Search Console access.",
+      };
+    }
+  }),
+
+  /** Confirm the server-side GA4 Data API connection status. */
+  getGA4ConnectionStatus: publicProcedure.query(async () => {
+    try {
+      return await verifyGA4Access();
+    } catch (error) {
+      return {
+        connected: false,
+        propertyId: "properties/394014501",
+        error: error instanceof Error ? error.message : "Unable to verify GA4 access.",
       };
     }
   }),
