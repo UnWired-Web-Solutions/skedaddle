@@ -1,4 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 // Mock the database module
 vi.mock("./db", () => ({
@@ -58,6 +60,12 @@ describe("analyticsRouter", () => {
     expect(mod.analyticsRouter._def.procedures.getSearchConsoleOverview).toBeDefined();
     expect(mod.analyticsRouter._def.procedures.getSearchConsoleScope).toBeDefined();
     expect(mod.analyticsRouter._def.procedures.syncSearchConsoleTerritory).toBeDefined();
+  });
+
+  it("marks pre-April 2025 Search Console history as unavailable rather than estimating it", () => {
+    const page = readFileSync(resolve(process.cwd(), "client/src/pages/Analytics.tsx"), "utf8");
+    expect(page).toContain("Verified territory-filtered Search Console history begins in April 2025");
+    expect(page).toContain("unavailable rather than estimated");
   });
 
   it("should expose verified territory close-rate snapshots", async () => {
