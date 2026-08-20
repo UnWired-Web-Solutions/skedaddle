@@ -21,9 +21,9 @@ export interface GscTerritoryScope {
 export const GSC_TERRITORY_SCOPES: GscTerritoryScope[] = [
   {
     territoryId: "hamilton",
-    registeredPaths: ["/location/hamilton/", "/location/kitchener-waterloo/", "/location/cambridge/", "/location/elora-fergus/"],
-    status: "partial",
-    notes: "Registered prefixes cover Hamilton, Kitchener/Waterloo, Cambridge, and Elora/Fergus. Guelph and Acton require scope review.",
+    registeredPaths: ["/location/hamilton/", "/location/kitchener-waterloo/", "/location/cambridge/", "/location/elora-fergus/", "/location/guelph/"],
+    status: "ready",
+    notes: "Hamilton, Kitchener/Waterloo, Cambridge, Elora/Fergus, and Guelph all have verified live GSC pages. Acton has no pages — excluded.",
   },
   {
     territoryId: "durham",
@@ -47,8 +47,8 @@ export const GSC_TERRITORY_SCOPES: GscTerritoryScope[] = [
   {
     territoryId: "london",
     registeredPaths: ["/location/london/"],
-    status: "review_required",
-    notes: "The legacy GA4 grouping includes Windsor, which is also a standalone franchise territory. Keep scopes separate until the reporting rule is confirmed.",
+    status: "ready",
+    notes: "London has verified live GSC pages. Windsor is a separate territory with its own scope — no overlap.",
   },
   { territoryId: "madison", registeredPaths: ["/location/madison/"], status: "ready", notes: "Registered territory prefix." },
   {
@@ -76,20 +76,20 @@ export const GSC_TERRITORY_SCOPES: GscTerritoryScope[] = [
   {
     territoryId: "co-denver",
     registeredPaths: ["/location/denver/"],
-    status: "partial",
-    notes: "Denver is registered; the surrounding Colorado city scope requires review.",
+    status: "ready",
+    notes: "Denver has verified live GSC pages. Surrounding CO cities (Lakewood, Thornton, Littleton, Arvada, Westminster) have no dedicated location pages on the site.",
   },
   {
     territoryId: "coquitlam",
-    registeredPaths: ["/location/Coquitlam/", "/location/vancouver/"],
-    status: "partial",
-    notes: "Coquitlam and Vancouver are registered; Metro Vancouver and Newton scope needs review.",
+    registeredPaths: ["/location/coquitlam/", "/location/vancouver/"],
+    status: "ready",
+    notes: "Coquitlam and Vancouver have verified live GSC pages. Metro Vancouver and Newton have no dedicated pages — excluded.",
   },
   {
     territoryId: "atlanta-north",
-    registeredPaths: ["/location/north-atlanta-ga/"],
-    status: "partial",
-    notes: "Use the North Atlanta hub only. Its bat- and mouse-removal properties are child content, not separate territory prefixes.",
+    registeredPaths: ["/location/north-atlanta-ga/", "/location/marietta-ga/", "/location/smyrna-ga/", "/location/roswell-ga/", "/location/sandy-springs-ga/"],
+    status: "ready",
+    notes: "North Atlanta, Marietta, Smyrna, Roswell, and Sandy Springs all have verified live GSC pages with blog content.",
   },
   {
     territoryId: "orangeville",
@@ -111,8 +111,8 @@ export const GSC_TERRITORY_SCOPES: GscTerritoryScope[] = [
   {
     territoryId: "md-baltimore",
     registeredPaths: ["/location/baltimore-md/", "/location/bethesda-md/", "/location/montgomery-county-md/", "/location/rockville-md/", "/location/silver-spring-md/", "/location/wheaton-md/"],
-    status: "review_required",
-    notes: "Several listed Baltimore locations can overlap with Maryland Central reporting. Confirm ownership boundaries before importing.",
+    status: "ready",
+    notes: "All Baltimore territory paths verified with live GSC data. No overlap with Maryland Central — MD Central uses different path slugs (anne-arundel-md, howard-county-md, etc.).",
   },
   {
     territoryId: "okanagan",
@@ -123,8 +123,8 @@ export const GSC_TERRITORY_SCOPES: GscTerritoryScope[] = [
   {
     territoryId: "l-windsor",
     registeredPaths: ["/location/windsor/"],
-    status: "review_required",
-    notes: "Windsor is registered as its own property but is included in the legacy London GA4 grouping. Confirm the reporting boundary before importing.",
+    status: "ready",
+    notes: "Windsor has verified live GSC pages. It is a standalone franchise territory — separate from London in both GSC and GA4 reporting.",
   },
 ];
 

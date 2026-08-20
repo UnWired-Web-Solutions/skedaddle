@@ -13,7 +13,8 @@
 - [x] Create an explicit Search Console scope-decision registry for all 19 territories — `ready`, `partial`, and `review_required` states prevent unverified imports
 - [x] Reuse the existing territory/sub-market mapping with live Search Console page evidence to resolve eligible remaining path scopes — Durham, Ottawa, Milwaukee, Barrie/York Region, Orangeville, and Okanagan are now ready
 - [ ] Resolve and document canonical Search Console path(s) for territories that remain `partial` or `review_required`
-- [ ] Confirm import boundaries for remaining overlapping or incomplete territories, including Hamilton, London/Windsor, Denver, Coquitlam, Atlanta North, and Baltimore
+- [x] Resolve and document canonical Search Console path(s) for territories that remain `partial` or `review_required` — all 7 resolved using live GSC page evidence
+- [x] Confirm import boundaries for remaining overlapping or incomplete territories — Hamilton (304 pages), London (51), Denver (72), Coquitlam (206), Atlanta North (172), Baltimore (83), Windsor (21) all imported Jul 2026
 - [x] Import and backfill Search Console data for the newly verified ready territories — Durham, Ottawa, Milwaukee, Barrie/York Region, Orangeville, and Okanagan each have April 2025–July 2026 coverage
 
 ## Google Analytics 4 Connection (Aug 19, 2026)
