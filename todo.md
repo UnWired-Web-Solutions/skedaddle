@@ -55,24 +55,29 @@
 - [x] franchises.ts with all 19 territory definitions
 
 ## GBP Image Generator
-- [x] Backend router (gbpImageRouter.ts) with fal.ai Flux Pro integration
-- [x] LLM prompt builder from post title/body
-- [x] Sharp brand overlay (Skedaddle green bar, service label, city, Skedaddle name)
+- [x] Backend router (gbpImageRouter.ts) with GPT Image 2 integration (upgraded from fal.ai Flux Pro)
+- [x] GPT-5.6 structured prompt builder grounded in post title/body, species, action, scene, season, territory, and suburb
+- [x] Sharp brand overlay (semi-transparent Skedaddle bar, service label, city, and verified official logo on a neutral plate)
 - [x] storagePut integration for image hosting
 - [x] getTerritories procedure
 - [x] getSuburbs procedure
 - [x] generateSingle procedure
-- [x] generateBulk procedure (up to 50 images)
+- [x] generateBulk procedure (up to 50 images, concurrency-limited, duplicate-safe, persistent progress/results)
 - [x] GbpImageGenerator.tsx frontend page
 - [x] Single Post input method
 - [x] Bulk Manual input method (add/remove rows)
-- [x] CSV Upload input method with template download
+- [x] RFC 4180-aware CSV Upload input method with validation, row errors, scheduling, and template download
 - [x] Progress bar during generation
 - [x] Image gallery with individual download
 - [x] Download All as ZIP
 - [x] GBP Images nav item in PortalLayout sidebar
 - [x] Route /gbp-images wired in App.tsx
-- [x] Vitest tests for router and FAL_KEY
+- [x] Automated tests for router prompt rules, GPT Image 2 configuration, exact output sizing, QA fail-closed behavior, and CSV parsing
+- [x] Vision QA for species, humane handling, anatomy, realism, setting, and professional quality with up to two retries
+- [x] Persistent draft/in-review/approved/rejected asset workflow with a human review queue
+- [x] Approval guard: QA must pass and the official logo must be present
+- [x] GBP-post-only compliance warning; AI images must never be used as documentary job photos or in the consumer-facing GBP gallery
+- [x] DB tables: gbp_image_assets and gbp_image_jobs for persistent workflow
 
 ## Lightbox Enhancements
 - [x] Lightbox: add prev/next arrow navigation through all generated images

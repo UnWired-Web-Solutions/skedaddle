@@ -9,6 +9,9 @@ import { existsSync, readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import { ENV } from "./_core/env";
+import { and, desc, eq } from "drizzle-orm";
+import { gbpImageAssets, gbpImageJobs } from "../drizzle/schema";
+import { getDb } from "./db";
 
 // ── Logo PNG loading (module scope, loaded once) ────────────────────────────
 // Place the real Skedaddle logo at: server/assets/skedaddle-logo.png
@@ -16,13 +19,41 @@ import { ENV } from "./_core/env";
 const __filename_local = fileURLToPath(import.meta.url);
 const __dirname_local = dirname(__filename_local);
 const LOGO_PATH = resolve(__dirname_local, "assets", "skedaddle-logo.png");
+const DEFAULT_LOGO_URL = "https://www.skedaddlewildlife.com/wp-content/uploads/2021/02/skedaddle-logo.png";
 let logoPngBuffer: Buffer | null = null;
+let remoteLogoPromise: Promise<Buffer | null> | null = null;
 try {
   if (existsSync(LOGO_PATH)) {
     logoPngBuffer = readFileSync(LOGO_PATH);
   }
 } catch {
   // Logo not available — will use text fallback
+}
+
+async function getOfficialLogoBuffer(): Promise<Buffer | null> {
+  if (logoPngBuffer) return logoPngBuffer;
+  if (remoteLogoPromise) return remoteLogoPromise;
+
+  remoteLogoPromise = (async () => {
+    try {
+      const logoUrl = process.env.SKEDADDLE_LOGO_URL || DEFAULT_LOGO_URL;
+      const response = await fetch(logoUrl, { signal: AbortSignal.timeout(8_000) });
+      if (!response.ok) return null;
+      const candidate = Buffer.from(await response.arrayBuffer());
+      const meta = await sharp(candidate).metadata();
+      if (!meta.width || !meta.height) return null;
+      logoPngBuffer = await sharp(candidate).png().toBuffer();
+      return logoPngBuffer;
+    } catch {
+      return null;
+    }
+  })();
+
+  const resolvedLogo = await remoteLogoPromise;
+  // A transient network failure should not disable branded approvals until the
+  // next process restart. Successful fetches remain cached in logoPngBuffer.
+  if (!resolvedLogo) remoteLogoPromise = null;
+  return resolvedLogo;
 }
 
 // ── Territory data ────────────────────────────────────────────────────────────
@@ -68,9 +99,6 @@ function toAsciiSlug(s: string, maxLen = 40): string {
 }
 
 // ── Species size classification ─────────────────────────────────────────────
-// Animals that need vision QA (any species that has been observed rendering incorrectly)
-// This now includes ALL species since Flux Pro can confuse any animal
-const QA_REQUIRED_ANIMALS = ["mouse", "mice", "bat", "bats", "vole", "voles", "chipmunk", "chipmunks", "mole", "moles", "shrew", "shrews", "skunk", "skunks", "raccoon", "raccoons", "squirrel", "squirrels", "opossum", "opossums", "groundhog", "groundhogs"];
 const SMALL_ANIMALS = ["mouse", "mice", "bat", "bats", "vole", "voles", "chipmunk", "chipmunks", "mole", "moles", "shrew", "shrews"];
 const LARGE_ANIMALS = ["raccoon", "raccoons", "squirrel", "squirrels", "opossum", "opossums", "groundhog", "groundhogs", "fox", "foxes", "coyote", "coyotes", "deer", "skunk", "skunks"];
 
@@ -105,31 +133,10 @@ function getSpeciesDescription(species: string): string {
   return species;
 }
 
-// ── Action/framing variety pool (rotated per generation for anti-spam) ──────
-// NOTE: The technician must NEVER be shown touching, holding, or grabbing the animal.
-// Skedaddle uses humane exclusion: one-way doors, screening, entry-point sealing.
-const ACTION_FRAMINGS = [
-  "technician inspecting a roofline while the animal watches from a safe distance",
-  "technician crouching near a foundation vent installing mesh screening, with the animal visible nearby on the ground",
-  "technician installing a one-way exclusion device on a soffit, animal observing from a tree branch",
-  "technician on a ladder sealing an entry point near the roofline, animal perched on the roof edge several feet away",
-  "technician examining and sealing entry points on a deck, animal peeking out from under the structure",
-  "wide shot of a suburban home exterior with technician working on exclusion hardware and animal in the mid-ground",
-  "technician walking toward a detached garage carrying exclusion materials, animal visible near the structure",
-  "technician documenting damage near a chimney cap with clipboard, animal perched above at a distance",
-];
-
-let actionFramingCounter = 0;
-function getNextActionFraming(): string {
-  const framing = ACTION_FRAMINGS[actionFramingCounter % ACTION_FRAMINGS.length];
-  actionFramingCounter++;
-  return framing;
-}
-
 // ── #4+#5+#6: Structured-intermediate prompt builder ────────────────────────
 // Step 1: LLM extracts structured fields from post content
-// Step 2: Deterministic template assembles the final Flux Pro prompt
-interface ExtractedFields {
+// Step 2: Deterministic template assembles the final GPT Image 2 prompt
+export interface ExtractedFields {
   species: string;
   sizeClass: "small" | "large" | "unknown";
   action: string;
@@ -162,7 +169,7 @@ Return JSON with these fields:
 - serviceLabel: short label for the service (e.g. "Raccoon Removal", "Squirrel Exclusion", "Bat Exclusion", "Mouse Removal")`;
 
   const result = await invokeLLM({
-    model: "gpt-5-mini",
+    model: "gpt-5.6",
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: `Title: ${title}\n\nBody: ${body || "(no body provided)"}` },
@@ -229,13 +236,23 @@ Return JSON with these fields:
   }
 }
 
+export function sanitizeAction(action: string): string {
+  const normalized = action.trim() || "performing humane wildlife exclusion";
+  const directHandling = /\b(catch(?:ing)?|captur(?:e|ing)|grab(?:bing)?|hold(?:ing)?|trap(?:ping)?|kill(?:ing)?|poison(?:ing)?|touch(?:ing)?)\b/i;
+  if (directHandling.test(normalized)) {
+    return "inspecting the wildlife entry point and installing a humane one-way exclusion device";
+  }
+  return normalized;
+}
+
 // Step 2: Deterministic template builds the final prompt from extracted fields
-function buildPromptFromFields(
+export function buildPromptFromFields(
   fields: ExtractedFields,
   cityState: string,
   suburbText: string,
+  variationKey = "default",
 ): string {
-  const { species, sizeClass, scene, season } = fields;
+  const { species, action, scene, season } = fields;
 
   // Season-specific lighting
   const seasonLighting: Record<string, string> = {
@@ -248,7 +265,7 @@ function buildPromptFromFields(
 
   // Get detailed species description for accurate rendering
   const speciesDesc = getSpeciesDescription(species);
-  const speciesName = species.toLowerCase();
+  const speciesName = species.toLowerCase().trim();
 
   // STRATEGY: Realistic wildlife control job photos.
   // The technician and animal are in the SAME frame — this is what real job photos look like.
@@ -326,18 +343,38 @@ function buildPromptFromFields(
     ],
   };
 
-  // Pick a random job scene for this species
-  const speciesScenes = jobScenes[speciesName] || jobScenes["raccoon"];
-  const randomScene = speciesScenes[Math.floor(Math.random() * speciesScenes.length)];
+  const canonicalSpecies = Object.keys(jobScenes).find((key) =>
+    speciesName === key || speciesName.includes(key) || key.includes(speciesName),
+  );
+  const speciesScenes = canonicalSpecies ? jobScenes[canonicalSpecies] : [];
+  const sceneHash = createHash("sha256")
+    .update(`${speciesName}|${action}|${scene}|${suburbText}|${variationKey}`)
+    .digest("hex");
+  const sceneIndex = speciesScenes.length > 0
+    ? Number.parseInt(sceneHash.slice(0, 8), 16) % speciesScenes.length
+    : 0;
+  const fallbackScene = `A Skedaddle humane wildlife technician in a bright lime-green polo, black work pants, black work gloves, and a black cap, ${sanitizeAction(action)} at ${scene}. A ${speciesDesc} is clearly visible nearby at a biologically realistic size and safe distance`;
+  const composedSceneWithLegacyBrandCues = action && action !== "performing wildlife exclusion"
+    ? fallbackScene
+    : (speciesScenes[sceneIndex] || fallbackScene);
+  // Older scene templates described a small uniform logo. Image models render
+  // logos unreliably, so strip those cues and add the verified logo afterward.
+  const composedScene = composedSceneWithLegacyBrandCues
+    .replace(/ with a small raccoon-in-circle logo on the left chest/gi, "")
+    .replace(/ with the same green raccoon logo/gi, "")
+    .replace(/ with the same logo/gi, "");
 
-  // Build a natural-looking prompt
+  // Build a natural-looking prompt. The extracted post action and setting are
+  // authoritative; species templates only provide a fallback composition.
   const prompt = [
-    `${randomScene}.`,
+    `${composedScene}.`,
     `Suburban residential home in ${suburbText}, ${cityState}.`,
     `${lighting}.`,
-    `The technician's hands are holding tools or working on building materials only. The animal is nearby but not being touched or held.`,
-    `Candid photo taken by a coworker on a phone during the job. Natural lighting, realistic, not posed or staged.`,
+    `The source post setting is ${scene}; preserve that property type and service context.`,
+    `The technician's hands are holding tools or working on building materials only. The animal is not trapped, touched, held, grabbed, injured, distressed, or placed in an implausible pose.`,
+    `Photorealistic editorial illustration with a candid field-photography composition. Natural lighting, realistic anatomy and tools, professional and not posed or staged. Do not imply that this is a real customer or job photograph.`,
     `The ${speciesName} is clearly identifiable as a ${speciesDesc}.`,
+    `Do not generate readable text, watermarks, or imitation logos inside the photograph; verified Skedaddle branding will be applied after generation.`,
   ].join(" ");
 
   return prompt;
@@ -349,20 +386,38 @@ async function buildPrompt(
   body: string,
   territory: string,
   suburb: string,
+  variationKey = "default",
 ): Promise<{ prompt: string; serviceLabel: string; fields: ExtractedFields }> {
   const territoryData = TERRITORIES[territory];
   const cityState = territoryData?.cityState ?? territory;
   const suburbText = suburb || (territoryData?.suburbs[0] ?? cityState);
 
   const fields = await extractFieldsFromPost(title, body, territory, suburb);
-  const prompt = buildPromptFromFields(fields, cityState, suburbText);
+  const prompt = buildPromptFromFields(fields, cityState, suburbText, variationKey);
 
   return { prompt, serviceLabel: fields.serviceLabel, fields };
 }
 
-// ── #3: Vision-QA check (is the CORRECT species clearly identifiable?) ───────
-// This checks both that an animal is present AND that it's the correct species.
-async function visionQACheck(imageUrl: string, species: string): Promise<boolean> {
+export interface ImageQAResult {
+  status: "passed" | "failed" | "unavailable";
+  correctSpecies: boolean;
+  animalVisible: boolean;
+  humaneInteraction: boolean;
+  realisticAnatomy: boolean;
+  professionalQuality: boolean;
+  settingMatches: boolean;
+  confidence: "high" | "medium" | "low";
+  actualSpecies: string;
+  qualityScore: number;
+  issues: string[];
+}
+
+// ── Vision QA: species, humane treatment, realism, and professional fit ─────
+async function visionQACheck(
+  imageUrl: string,
+  species: string,
+  scene: string,
+): Promise<ImageQAResult> {
   const speciesDesc = getSpeciesDescription(species);
   try {
     const result = await invokeLLM({
@@ -370,15 +425,22 @@ async function visionQACheck(imageUrl: string, species: string): Promise<boolean
       messages: [{
         role: "user",
         content: [
-          { type: "text", text: `Look at this photograph carefully. I need you to verify whether the animal shown is specifically a ${species}.
+          { type: "text", text: `Review this AI-generated image for a Skedaddle Humane Wildlife Control GBP post. It must be safe for an internal reviewer to approve, but it must never be presented as a documentary customer/job photo.
 
-Key identifying features of a ${speciesDesc}.
+The intended animal is a ${species}. Identifying features: ${speciesDesc}.
+The intended service setting is: ${scene}.
 
-Answer with JSON:
-- "correctSpecies": true if the animal in the image is clearly a ${species} (has the correct distinguishing features), false if it looks like a different animal or is unidentifiable
-- "animalVisible": true if any animal is clearly visible in the image, false if no animal is present
-- "confidence": "high", "medium", or "low" based on how certain you are
-- "actualSpecies": your best guess of what animal is actually shown (e.g. "raccoon", "groundhog", "generic rodent")` },
+Check all of the following and answer with JSON:
+- correctSpecies: the animal is clearly the intended species
+- animalVisible: the animal is clearly visible at a biologically plausible scale
+- humaneInteraction: no person is touching, holding, grabbing, trapping, injuring, or distressing the animal
+- realisticAnatomy: animals, people, hands, tools, rooflines, and building details are anatomically/structurally plausible
+- professionalQuality: photorealistic, credible, appropriately composed, and free of gibberish text, fake watermarks, or distorted logos
+- settingMatches: the scene is consistent with the intended service setting and a North American residential property
+- confidence: high, medium, or low
+- actualSpecies: best identification of the animal shown
+- qualityScore: integer from 1 to 10
+- issues: concrete problems an image generator should correct; empty array only when no problem is visible` },
           { type: "image_url", image_url: { url: imageUrl, detail: "auto" } },
         ],
       }],
@@ -391,10 +453,16 @@ Answer with JSON:
             properties: {
               correctSpecies: { type: "boolean" },
               animalVisible: { type: "boolean" },
+              humaneInteraction: { type: "boolean" },
+              realisticAnatomy: { type: "boolean" },
+              professionalQuality: { type: "boolean" },
+              settingMatches: { type: "boolean" },
               confidence: { type: "string", enum: ["high", "medium", "low"] },
               actualSpecies: { type: "string" },
+              qualityScore: { type: "integer", minimum: 1, maximum: 10 },
+              issues: { type: "array", items: { type: "string" } },
             },
-            required: ["correctSpecies", "animalVisible", "confidence", "actualSpecies"],
+            required: ["correctSpecies", "animalVisible", "humaneInteraction", "realisticAnatomy", "professionalQuality", "settingMatches", "confidence", "actualSpecies", "qualityScore", "issues"],
             additionalProperties: false,
           },
           strict: true,
@@ -405,11 +473,42 @@ Answer with JSON:
     const rawContent = result.choices[0]?.message?.content;
     const contentStr = typeof rawContent === "string" ? rawContent : JSON.stringify(rawContent);
     const parsed = JSON.parse(contentStr);
-    // Pass only if the correct species is visible with at least medium confidence
-    return parsed.correctSpecies === true && parsed.animalVisible === true && parsed.confidence !== "low";
-  } catch {
-    // If vision check fails, pass the image through (don't block on QA failure)
-    return true;
+    const passed = parsed.correctSpecies === true
+      && parsed.animalVisible === true
+      && parsed.humaneInteraction === true
+      && parsed.realisticAnatomy === true
+      && parsed.professionalQuality === true
+      && parsed.settingMatches === true
+      && parsed.confidence !== "low"
+      && Number(parsed.qualityScore) >= 7;
+
+    return {
+      status: passed ? "passed" : "failed",
+      correctSpecies: parsed.correctSpecies === true,
+      animalVisible: parsed.animalVisible === true,
+      humaneInteraction: parsed.humaneInteraction === true,
+      realisticAnatomy: parsed.realisticAnatomy === true,
+      professionalQuality: parsed.professionalQuality === true,
+      settingMatches: parsed.settingMatches === true,
+      confidence: parsed.confidence,
+      actualSpecies: String(parsed.actualSpecies || "unknown"),
+      qualityScore: Number(parsed.qualityScore || 0),
+      issues: Array.isArray(parsed.issues) ? parsed.issues.map(String) : [],
+    };
+  } catch (error) {
+    return {
+      status: "unavailable",
+      correctSpecies: false,
+      animalVisible: false,
+      humaneInteraction: false,
+      realisticAnatomy: false,
+      professionalQuality: false,
+      settingMatches: false,
+      confidence: "low",
+      actualSpecies: "unverified",
+      qualityScore: 0,
+      issues: [`Automated QA unavailable: ${error instanceof Error ? error.message : String(error)}`],
+    };
   }
 }
 
@@ -422,7 +521,7 @@ async function addBrandOverlay(
   imageBuffer: Buffer,
   serviceLabel: string,
   cityState: string,
-): Promise<Buffer> {
+): Promise<{ buffer: Buffer; brandAsset: "official_logo" | "text_fallback" }> {
   const meta = await sharp(imageBuffer).metadata();
   const W = meta.width ?? 1200;
   const H = meta.height ?? 900;
@@ -480,15 +579,32 @@ async function addBrandOverlay(
   ];
 
   // Brand mark: either the real logo PNG or rendered "Skedaddle" text
-  if (logoPngBuffer) {
+  const officialLogo = await getOfficialLogoBuffer();
+  if (officialLogo) {
     const logoHeight = Math.round(barH * 0.6);
-    const resizedLogo = await sharp(logoPngBuffer)
+    const resizedLogo = await sharp(officialLogo)
       .resize({ height: logoHeight, fit: "inside" })
       .toBuffer();
     const logoMeta = await sharp(resizedLogo).metadata();
     const logoWidth = logoMeta.width ?? logoHeight * 3;
     const logoLeft = W - Math.round(W * 0.04) - logoWidth;
     const logoTop = barY + Math.round((barH - logoHeight) / 2);
+    const platePaddingX = 12;
+    const platePaddingY = 8;
+    const logoPlate = await sharp({
+      create: {
+        width: logoWidth + platePaddingX * 2,
+        height: logoHeight + platePaddingY * 2,
+        channels: 4,
+        background: { r: 255, g: 255, b: 255, alpha: 235 },
+      },
+    }).png().toBuffer();
+    composites.push({
+      input: logoPlate,
+      top: Math.max(barY, logoTop - platePaddingY),
+      left: Math.max(0, logoLeft - platePaddingX),
+      blend: "over",
+    });
     composites.push({ input: resizedLogo, top: logoTop, left: logoLeft, blend: "over" });
   } else {
     // Render "Skedaddle" brand text
@@ -509,10 +625,11 @@ async function addBrandOverlay(
     composites.push({ input: brandBuf, top: brandTop, left: brandLeft, blend: "over" });
   }
 
-  return await sharp(imageBuffer)
+  const buffer = await sharp(imageBuffer)
     .composite(composites)
     .jpeg({ quality: 92 })
     .toBuffer();
+  return { buffer, brandAsset: officialLogo ? "official_logo" : "text_fallback" };
 }
 
 // Escape text for Pango markup (XML-like)
@@ -578,7 +695,7 @@ async function generateImageViaGPT(prompt: string): Promise<Buffer> {
       prompt,
       original_images: [],
       model: "MODEL_GPT_IMAGE_2",
-      quality: "medium",
+      quality: "high",
     }),
   });
 
@@ -591,244 +708,437 @@ async function generateImageViaGPT(prompt: string): Promise<Buffer> {
   return Buffer.from(result.image.b64Json, "base64");
 }
 
-// ── Generate single image (with vision QA retry) ────────────────────────────
+export interface GeneratedImageResult {
+  assetId: number | null;
+  url: string;
+  filename: string;
+  serviceLabel: string;
+  species: string;
+  brandAsset: "official_logo" | "text_fallback";
+  prompt: string;
+  status: "draft";
+  qa: ImageQAResult;
+  generationAttempts: number;
+  persisted: boolean;
+}
+
+interface GenerateOptions {
+  variationKey?: string;
+  generationJobId?: string;
+  scheduledFor?: string;
+}
+
 async function generateSingleImage(
   title: string,
   body: string,
   territory: string,
   suburb: string,
-): Promise<{ url: string; filename: string; serviceLabel: string; prompt: string }> {
+  options: GenerateOptions = {},
+): Promise<GeneratedImageResult> {
   const territoryData = TERRITORIES[territory];
-  const cityState = territoryData?.cityState ?? territory;
+  if (!territoryData) throw new Error(`Unknown territory: ${territory}`);
+  const cityState = territoryData.cityState;
+  const variationKey = options.variationKey || "default";
+  const { prompt, serviceLabel, fields } = await buildPrompt(title, body, territory, suburb, variationKey);
 
-  const { prompt, serviceLabel, fields } = await buildPrompt(title, body, territory, suburb);
+  let finalPrompt = prompt;
+  let rawBuffer: Buffer | null = null;
+  let qa: ImageQAResult = {
+    status: "unavailable",
+    correctSpecies: false,
+    animalVisible: false,
+    humaneInteraction: false,
+    realisticAnatomy: false,
+    professionalQuality: false,
+    settingMatches: false,
+    confidence: "low",
+    actualSpecies: "unverified",
+    qualityScore: 0,
+    issues: ["Image has not been checked"],
+  };
+  let generationAttempts = 0;
 
-  // Generate image via GPT Image 2 (built-in forge API)
-  let rawBuffer = await generateImageViaGPT(prompt);
-  console.log(`[GBP] Generated image via GPT Image 2 for species: ${fields.species}`);
-
-  // #3: Vision QA check — retry up to 2 times for species accuracy
-  const needsQA = QA_REQUIRED_ANIMALS.some(a => fields.species.toLowerCase().includes(a));
-  console.log(`[GBP] Species: ${fields.species}, needsQA: ${needsQA}, sizeClass: ${fields.sizeClass}`);
-  if (needsQA) {
-    const speciesDesc = getSpeciesDescription(fields.species);
-
-    for (let attempt = 0; attempt < 2; attempt++) {
-      // Upload current buffer as temp for vision QA check
-      const tempResized = await sharp(rawBuffer)
-        .resize(1200, 900, { fit: "cover", position: "center" })
-        .jpeg({ quality: 80 })
-        .toBuffer();
-      const { url: tempUrl } = await storagePut(`gbp-images/qa-temp-${Date.now()}-${attempt}.jpg`, tempResized, "image/jpeg");
-
-      const passed = await visionQACheck(tempUrl, fields.species);
-      console.log(`[GBP] QA attempt ${attempt}: passed=${passed} for species=${fields.species}`);
-      if (passed) break;
-      // Retry with increasingly specific prompt
-      const retryPrompt = attempt === 0
-        ? `Close-up wildlife photograph: a ${speciesDesc} clearly visible in the center foreground, occupying at least 30% of the frame. The animal is sitting on the ground near a suburban home foundation. Sharp focus on the animal showing its distinctive features. The animal is NOT being held or touched by anyone. Behind in soft bokeh: a Skedaddle wildlife technician in bright lime-green Skedaddle polo shirt with raccoon logo on chest, black cap with raccoon logo, inspecting the home exterior in ${cityState}. Photorealistic, Canon EOS R5, 85mm f/1.8, golden hour natural light.`
-        : `Extreme close-up nature photograph of a single ${speciesDesc}. The animal fills most of the frame, photographed at eye level in a suburban backyard setting. Ultra-sharp detail on fur/feathers and distinctive markings. No humans visible. Shallow depth of field, background is a blurred residential home. Shot in ${suburb || cityState}. Photorealistic, Nikon Z9, 105mm macro lens, f/2.8.`;
-      try {
-        rawBuffer = await generateImageViaGPT(retryPrompt);
-      } catch {
-        // If retry fails, keep the current image and break
-        break;
-      }
+  // Generate and validate every candidate. The second retry is also validated;
+  // no unreviewed final retry can silently become the returned image.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    generationAttempts = attempt + 1;
+    if (attempt > 0) {
+      const corrections = qa.issues.length > 0 ? qa.issues.join("; ") : "improve species clarity and realism";
+      finalPrompt = `${prompt} Regenerate a different composition and correct these review issues: ${corrections}. Keep the post action, setting, species, humane-treatment rules, and local context unchanged.`;
     }
+
+    rawBuffer = await generateImageViaGPT(finalPrompt);
+    const qaBuffer = await sharp(rawBuffer)
+      .resize(1200, 900, { fit: "cover", position: "center" })
+      .jpeg({ quality: 82 })
+      .toBuffer();
+    const qaDataUrl = `data:image/jpeg;base64,${qaBuffer.toString("base64")}`;
+    qa = await visionQACheck(qaDataUrl, fields.species, fields.scene);
+    console.log(`[GBP] QA attempt ${generationAttempts}: ${qa.status}, score=${qa.qualityScore}, species=${fields.species}`);
+    if (qa.status === "passed" || qa.status === "unavailable") break;
   }
 
-  const rawMeta = await sharp(rawBuffer).metadata();
-  console.log(`[GBP] Raw image from GPT Image 2: ${rawMeta.width}x${rawMeta.height}`);
-
-  // Enforce exact 1200x900 dimensions regardless of what the model returns
+  if (!rawBuffer) throw new Error("Image generation returned no image");
   const resizedBuffer = await sharp(rawBuffer)
     .resize(1200, 900, { fit: "cover", position: "center" })
     .jpeg({ quality: 95 })
     .toBuffer();
-  const resizedMeta = await sharp(resizedBuffer).metadata();
-  console.log(`[GBP] After resize: ${resizedMeta.width}x${resizedMeta.height}`);
+  const displayLocation = suburb ? `${suburb}, ${cityState}` : cityState;
+  const branded = await addBrandOverlay(resizedBuffer, serviceLabel, displayLocation);
 
-  const branded = await addBrandOverlay(resizedBuffer, serviceLabel, cityState);
-  const brandedMeta = await sharp(branded).metadata();
-  console.log(`[GBP] After overlay: ${brandedMeta.width}x${brandedMeta.height}`);
-
-  // #2: Collision-safe filename with content hash
   const hash8 = contentHash8(title, body, territory, suburb);
-  const slug = toAsciiSlug(title, 30);
+  const variant8 = createHash("sha256").update(`${variationKey}|${Date.now()}`).digest("hex").slice(0, 8);
+  const slug = toAsciiSlug(title, 30) || "gbp-post";
   const safeTerritory = toAsciiSlug(territory, 20);
-  const filename = `${safeTerritory}_${slug}_${hash8}.jpg`;
-  const storageKey = `gbp-images/${filename}`;
-  const { url: storedUrl } = await storagePut(storageKey, branded, "image/jpeg");
+  const filename = `${safeTerritory}_${slug}_${hash8}_${variant8}.jpg`;
+  const { url: storedUrl } = await storagePut(`gbp-images/${filename}`, branded.buffer, "image/jpeg");
 
-  return { url: storedUrl, filename, serviceLabel, prompt };
+  let assetId: number | null = null;
+  const db = await getDb();
+  if (db) {
+    try {
+      const sourceHash = createHash("sha256")
+        .update(`${title}|${body}|${territory}|${suburb}`)
+        .digest("hex");
+      const [inserted] = await db.insert(gbpImageAssets).values({
+        generationJobId: options.generationJobId || null,
+        sourceHash,
+        title,
+        body: body || null,
+        territoryId: territory,
+        suburb: suburb || null,
+        serviceLabel,
+        species: fields.species,
+        prompt: finalPrompt,
+        imageUrl: storedUrl,
+        filename,
+        brandAsset: branded.brandAsset,
+        status: "draft",
+        qaStatus: qa.status,
+        qaJson: JSON.stringify(qa),
+        generationAttempts,
+        scheduledFor: options.scheduledFor || null,
+      });
+      assetId = inserted.insertId;
+    } catch (error) {
+      console.error("[GBP] Generated image could not be persisted:", error);
+    }
+  }
+
+  return {
+    assetId,
+    url: storedUrl,
+    filename,
+    serviceLabel,
+    species: fields.species,
+    brandAsset: branded.brandAsset,
+    prompt: finalPrompt,
+    status: "draft",
+    qa,
+    generationAttempts,
+    persisted: assetId !== null,
+  };
 }
 
-// ── In-memory job store for bulk generation ─────────────────────────────────
+type BulkJobStatus = "pending" | "running" | "completed" | "partial" | "failed" | "interrupted";
+interface BulkResult extends Omit<GeneratedImageResult, "status"> {
+  index: number;
+  status: "draft";
+  success: boolean;
+  error?: string;
+}
 interface BulkJob {
   id: string;
-  status: "pending" | "running" | "completed" | "failed";
+  status: BulkJobStatus;
   total: number;
   completed: number;
-  results: Array<{
-    index: number;
-    url: string;
-    filename: string;
-    serviceLabel: string;
-    prompt: string;
-    success: boolean;
-    error?: string;
-  }>;
+  failed: number;
+  results: BulkResult[];
   createdAt: number;
+  updatedAt: number;
+  errorMessage?: string;
 }
 
 const jobStore = new Map<string, BulkJob>();
 
-// Clean up old jobs (older than 1 hour)
 function cleanupOldJobs() {
   const oneHourAgo = Date.now() - 3600_000;
   jobStore.forEach((job, id) => {
-    if (job.createdAt < oneHourAgo) jobStore.delete(id);
+    if (job.createdAt < oneHourAgo && !["pending", "running"].includes(job.status)) jobStore.delete(id);
   });
 }
 
-// ── tRPC Router ───────────────────────────────────────────────────────────────
+async function persistJob(job: BulkJob): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const values = {
+    id: job.id,
+    status: job.status,
+    total: job.total,
+    completed: job.completed,
+    failed: job.failed,
+    resultsJson: JSON.stringify(job.results),
+    errorMessage: job.errorMessage || null,
+  };
+  await db.insert(gbpImageJobs).values(values).onDuplicateKeyUpdate({ set: values });
+}
+
+async function readPersistedJob(jobId: string): Promise<BulkJob | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const [row] = await db.select().from(gbpImageJobs).where(eq(gbpImageJobs.id, jobId)).limit(1);
+  if (!row) return null;
+  let status = row.status as BulkJobStatus;
+  const updatedAt = row.updatedAt?.getTime?.() ?? Date.now();
+  if (["pending", "running"].includes(status) && Date.now() - updatedAt > 15 * 60_000) {
+    status = "interrupted";
+    await db.update(gbpImageJobs).set({ status }).where(eq(gbpImageJobs.id, jobId));
+  }
+  let results: BulkResult[] = [];
+  if (row.resultsJson) {
+    try {
+      const parsed = JSON.parse(row.resultsJson);
+      if (Array.isArray(parsed)) results = parsed as BulkResult[];
+    } catch {
+      status = "interrupted";
+    }
+  }
+  return {
+    id: row.id,
+    status,
+    total: row.total,
+    completed: row.completed,
+    failed: row.failed,
+    results,
+    createdAt: row.createdAt?.getTime?.() ?? updatedAt,
+    updatedAt,
+    errorMessage: row.errorMessage || undefined,
+  };
+}
+
+const territoryIdSchema = z.string().trim().refine((id) => Boolean(TERRITORIES[id]), {
+  message: "Select a recognized Skedaddle territory",
+});
+function isIsoCalendarDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return parsed.getUTCFullYear() === year
+    && parsed.getUTCMonth() === month - 1
+    && parsed.getUTCDate() === day;
+}
+
+const scheduledForSchema = z.string().refine(isIsoCalendarDate, {
+  message: "Scheduled date must be a real calendar date in YYYY-MM-DD format",
+}).optional();
+const generationPostSchema = z.object({
+  title: z.string().trim().min(1).max(255),
+  body: z.string().max(5000).default(""),
+  territory: territoryIdSchema,
+  suburb: z.string().trim().max(128).default(""),
+  scheduledFor: scheduledForSchema,
+  variationKey: z.string().trim().max(64).optional(),
+});
+
+function parseStoredQa(value: string | null): ImageQAResult | null {
+  if (!value) return null;
+  try { return JSON.parse(value) as ImageQAResult; } catch { return null; }
+}
+
 export const gbpImageRouter = router({
-  getTerritories: publicProcedure.query(() => {
-    return Object.entries(TERRITORIES).map(([id, t]) => ({
-      id,
-      label: t.label,
-      suburbs: t.suburbs,
-    }));
-  }),
+  getTerritories: publicProcedure.query(() => Object.entries(TERRITORIES).map(([id, t]) => ({
+    id,
+    label: t.label,
+    suburbs: t.suburbs,
+  }))),
 
   getSuburbs: publicProcedure
-    .input(z.object({ territoryId: z.string() }))
-    .query(({ input }) => {
-      const t = TERRITORIES[input.territoryId];
-      return t ? t.suburbs : [];
-    }),
+    .input(z.object({ territoryId: territoryIdSchema }))
+    .query(({ input }) => TERRITORIES[input.territoryId].suburbs),
 
-  // Single post → single image
   generateSingle: publicProcedure
-    .input(z.object({
-      title: z.string().min(1),
-      body: z.string().default(""),
-      territory: z.string().min(1),
-      suburb: z.string().default(""),
-    }))
-    .mutation(async ({ input }) => {
-      const result = await generateSingleImage(
-        input.title,
-        input.body,
-        input.territory,
-        input.suburb,
-      );
-      return result;
-    }),
+    .input(generationPostSchema)
+    .mutation(async ({ input }) => generateSingleImage(
+      input.title,
+      input.body,
+      input.territory,
+      input.suburb,
+      { variationKey: input.variationKey, scheduledFor: input.scheduledFor },
+    )),
 
-  // #1: Bulk generation — submit job and return jobId immediately
   generateBulk: publicProcedure
-    .input(z.object({
-      posts: z.array(z.object({
-        title: z.string().min(1),
-        body: z.string().default(""),
-        territory: z.string().min(1),
-        suburb: z.string().default(""),
-      })).min(1).max(50),
-    }))
+    .input(z.object({ posts: z.array(generationPostSchema).min(1).max(50) }))
     .mutation(async ({ input }) => {
       cleanupOldJobs();
-
       const jobId = createHash("sha256")
         .update(JSON.stringify(input.posts) + Date.now())
         .digest("hex")
         .slice(0, 16);
-
       const job: BulkJob = {
         id: jobId,
         status: "running",
         total: input.posts.length,
         completed: 0,
+        failed: 0,
         results: [],
         createdAt: Date.now(),
+        updatedAt: Date.now(),
       };
       jobStore.set(jobId, job);
+      await persistJob(job);
 
-      // Process concurrently with p-limit (6 concurrent)
-      const limit = pLimit(6);
-
-      // Fire and don't await — return jobId immediately
+      const limit = pLimit(4);
+      const byHash = new Map<string, Promise<GeneratedImageResult>>();
+      let persistenceChain = Promise.resolve();
+      const queuePersist = () => {
+        const snapshot: BulkJob = { ...job, results: [...job.results] };
+        persistenceChain = persistenceChain
+          .catch((error) => { console.error("[GBP] Job persistence failed:", error); })
+          .then(() => persistJob(snapshot));
+        return persistenceChain;
+      };
       const processAll = async () => {
-        const tasks = input.posts.map((post, i) =>
-          limit(async () => {
-            // Idempotency: check if already generated (same content hash)
-            const hash = contentHash8(post.title, post.body, post.territory, post.suburb);
-            const existingResult = job.results.find(r =>
-              r.filename.includes(hash) && r.success
-            );
-            if (existingResult) {
-              job.completed++;
-              return;
-            }
+        const tasks = input.posts.map(async (post, index) => {
+          const hash = createHash("sha256")
+            .update(`${post.title}|${post.body}|${post.territory}|${post.suburb}|${post.scheduledFor || ""}`)
+            .digest("hex");
+          let generation = byHash.get(hash);
+          if (!generation) {
+            generation = limit(() => generateSingleImage(
+              post.title,
+              post.body,
+              post.territory,
+              post.suburb,
+              {
+                variationKey: post.variationKey || hash.slice(0, 12),
+                generationJobId: jobId,
+                scheduledFor: post.scheduledFor,
+              },
+            ));
+            byHash.set(hash, generation);
+          }
 
-            try {
-              const result = await generateSingleImage(
-                post.title,
-                post.body,
-                post.territory,
-                post.suburb,
-              );
-              job.results.push({
-                index: i,
-                url: result.url,
-                filename: result.filename,
-                serviceLabel: result.serviceLabel,
-                prompt: result.prompt,
-                success: true,
-              });
-            } catch (err) {
-              job.results.push({
-                index: i,
-                url: "",
-                filename: "",
-                serviceLabel: "",
-                prompt: "",
-                success: false,
-                error: String(err),
-              });
-            }
+          try {
+            const result = await generation;
+            job.results.push({ ...result, index, success: true });
+          } catch (error) {
+            job.failed++;
+            job.results.push({
+              index,
+              assetId: null,
+              url: "",
+              filename: "",
+              serviceLabel: "",
+              species: "",
+              brandAsset: "text_fallback",
+              prompt: "",
+              status: "draft",
+              qa: {
+                status: "unavailable",
+                correctSpecies: false,
+                animalVisible: false,
+                humaneInteraction: false,
+                realisticAnatomy: false,
+                professionalQuality: false,
+                settingMatches: false,
+                confidence: "low",
+                actualSpecies: "unverified",
+                qualityScore: 0,
+                issues: [String(error)],
+              },
+              generationAttempts: 0,
+              persisted: false,
+              success: false,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          } finally {
             job.completed++;
-          })
-        );
+            job.updatedAt = Date.now();
+            job.results.sort((a, b) => a.index - b.index);
+            await queuePersist();
+          }
+        });
 
         await Promise.all(tasks);
-        job.status = job.results.some(r => !r.success) ? "completed" : "completed";
-        // Sort results by index for consistent ordering
-        job.results.sort((a, b) => a.index - b.index);
+        job.status = job.failed === 0 ? "completed" : job.failed === job.total ? "failed" : "partial";
+        job.updatedAt = Date.now();
+        await queuePersist();
       };
 
-      // Start processing in background (don't await)
-      processAll().catch(() => {
+      processAll().catch(async (error) => {
         job.status = "failed";
+        job.errorMessage = error instanceof Error ? error.message : String(error);
+        job.updatedAt = Date.now();
+        await queuePersist().catch(() => undefined);
       });
 
       return { jobId };
     }),
 
-  // #1: Poll job status
   getJobStatus: publicProcedure
-    .input(z.object({ jobId: z.string() }))
-    .query(({ input }) => {
-      const job = jobStore.get(input.jobId);
+    .input(z.object({ jobId: z.string().min(1).max(64) }))
+    .query(async ({ input }) => {
+      const job = jobStore.get(input.jobId) || await readPersistedJob(input.jobId);
       if (!job) {
-        return { found: false as const, status: "not_found" as const, total: 0, completed: 0, results: [] };
+        return { found: false as const, status: "not_found" as const, total: 0, completed: 0, failed: 0, results: [] };
       }
       return {
         found: true as const,
         status: job.status,
         total: job.total,
         completed: job.completed,
+        failed: job.failed,
         results: job.results,
+        errorMessage: job.errorMessage,
       };
+    }),
+
+  listAssets: publicProcedure
+    .input(z.object({
+      territoryId: territoryIdSchema.optional(),
+      status: z.enum(["draft", "in_review", "approved", "rejected", "posted"]).optional(),
+      limit: z.number().int().min(1).max(200).default(100),
+    }).optional())
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return { available: false as const, assets: [] };
+      const limit = input?.limit ?? 100;
+      const rows = input?.territoryId && input.status
+        ? await db.select().from(gbpImageAssets).where(and(eq(gbpImageAssets.territoryId, input.territoryId), eq(gbpImageAssets.status, input.status))).orderBy(desc(gbpImageAssets.createdAt)).limit(limit)
+        : input?.territoryId
+          ? await db.select().from(gbpImageAssets).where(eq(gbpImageAssets.territoryId, input.territoryId)).orderBy(desc(gbpImageAssets.createdAt)).limit(limit)
+          : input?.status
+            ? await db.select().from(gbpImageAssets).where(eq(gbpImageAssets.status, input.status)).orderBy(desc(gbpImageAssets.createdAt)).limit(limit)
+            : await db.select().from(gbpImageAssets).orderBy(desc(gbpImageAssets.createdAt)).limit(limit);
+      return { available: true as const, assets: rows.map((asset) => ({ ...asset, qa: parseStoredQa(asset.qaJson) })) };
+    }),
+
+  updateAssetReview: publicProcedure
+    .input(z.object({
+      id: z.number().int().positive(),
+      status: z.enum(["draft", "in_review", "approved", "rejected"]),
+      reviewerName: z.string().trim().min(1).max(128),
+      reviewerNotes: z.string().trim().max(2000).optional(),
+      scheduledFor: scheduledForSchema.nullable(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available; review state cannot be saved");
+      const [asset] = await db.select().from(gbpImageAssets).where(eq(gbpImageAssets.id, input.id)).limit(1);
+      if (!asset) throw new Error("Generated image not found");
+      if (input.status === "approved" && asset.qaStatus !== "passed") {
+        throw new Error("This image cannot be approved until automated QA passes");
+      }
+      if (input.status === "approved" && asset.brandAsset !== "official_logo") {
+        throw new Error("This image cannot be approved because the official Skedaddle logo was unavailable");
+      }
+      await db.update(gbpImageAssets).set({
+        status: input.status,
+        reviewerNotes: input.reviewerNotes || null,
+        reviewedBy: input.reviewerName,
+        reviewedAt: new Date(),
+        scheduledFor: input.scheduledFor ?? asset.scheduledFor,
+      }).where(eq(gbpImageAssets.id, input.id));
+      return { success: true, status: input.status };
     }),
 });
