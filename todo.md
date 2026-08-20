@@ -23,7 +23,12 @@
 - [x] Build the GA4 client (googleAnalyticsClient.ts) and territory-filtered reporting endpoint
 - [x] Create GA4 territory property mapping (shared/ga4TerritoryProperties.ts)
 - [ ] Add the service account as Viewer on the Skedaddle Wildlife GA4 account (account-level access grants access to all properties)
-- [ ] Import and persist GA4 metrics for verified territories
+- [x] Add the service account as Administrator on the Skedaddle Wildlife GA4 account — done via Analytics Admin API (accounts/39401450/accessBindings)
+- [x] Live GA4 Data API connection verified — Ottawa 1,887 sessions, Minneapolis 1,004 sessions (Jan-Jul 2026)
+- [x] Rewrote GA4 client to aggregate across territory sub-location properties (129 properties → 19 territories)
+- [x] Added live GA4 territory procedures: getGA4TerritoryMonthly, getGA4TerritoryTopPages, getGA4TerritoryTopCities, getGA4TerritoryChannelBreakdown, getGA4ReadyTerritories
+- [x] Added live GA4 panels to Analytics page: Top Pages table, Top Cities list, Channel Breakdown bars
+- [ ] Import and persist GA4 metrics for verified territories (for historical comparison)
 
 ## DashThis Replacement — GSC Enhancements (Aug 19, 2026)
 - [x] Add getSearchConsoleYTD procedure — YTD clicks/impressions with same-period-last-year comparison

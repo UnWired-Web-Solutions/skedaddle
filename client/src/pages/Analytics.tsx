@@ -15,7 +15,7 @@ import {
 import {
   TrendingUp, TrendingDown, Phone, MousePointer, MapPin, Activity,
   Calendar, ChevronDown, ArrowUpRight, ArrowDownRight, Minus,
-  AlertTriangle, CheckCircle, Info, Download, Lightbulb, Search, RefreshCw,
+  AlertTriangle, CheckCircle, Info, Download, Lightbulb, Search, RefreshCw, Globe, BarChart3,
 } from "lucide-react";
 
 // ─── Colour Palette (Skedaddle brand) ────────────────────────────────────────
@@ -808,6 +808,15 @@ export default function Analytics() {
           )}
         </div>
 
+
+        {/* ─── Live GA4: Top Pages (from GA4 Data API) ─────────────────────────── */}
+        <GA4LiveTopPages territoryId={selectedTerritory} year={selectedYear} />
+
+        {/* ─── Live GA4: Top Cities + Channel Breakdown ───────────────────────── */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 28 }}>
+          <GA4LiveTopCities territoryId={selectedTerritory} year={selectedYear} />
+          <GA4LiveChannelBreakdown territoryId={selectedTerritory} year={selectedYear} />
+        </div>
         {/* ─── GBP Metrics Chart ───────────────────────────────────────────────── */}
         <div style={{ background: "#fff", borderRadius: 10, border: `1px solid ${MIST}`, padding: "24px 20px", marginBottom: 28 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
@@ -920,5 +929,119 @@ export default function Analytics() {
         </div>
       </div>
     </PortalLayout>
+  );
+}
+
+// ─── Live GA4 Sub-Components (use territory-aggregated API) ─────────────────
+
+function GA4LiveTopPages({ territoryId, year }: { territoryId: string; year: number }) {
+  const { data, isLoading } = trpc.analytics.getGA4TerritoryTopPages.useQuery(
+    { territoryId, startDate: `${year}-01-01`, endDate: `${year}-12-31`, limit: 15 },
+    { enabled: !!territoryId },
+  );
+
+  return (
+    <div style={{ background: "#fff", borderRadius: 10, border: `1px solid ${MIST}`, padding: "24px 20px", marginBottom: 28 }}>
+      <h2 style={{ fontSize: 15, fontWeight: 700, color: FOREST, marginBottom: 4, fontFamily: "'Playfair Display', serif", display: "flex", alignItems: "center", gap: 8 }}>
+        <Globe size={16} color={SAGE} /> Live GA4: Top Pages by Sessions
+      </h2>
+      <p style={{ fontSize: 12, color: "#888", marginBottom: 16 }}>Real-time data from Google Analytics 4 — {year} YTD</p>
+      {isLoading ? (
+        <div style={{ height: 120, display: "flex", alignItems: "center", justifyContent: "center", color: "#aaa" }}>Loading live GA4 data...</div>
+      ) : !data || data.length === 0 ? (
+        <div style={{ height: 80, display: "flex", alignItems: "center", justifyContent: "center", color: "#aaa" }}>No GA4 data available for this territory</div>
+      ) : (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            <thead>
+              <tr style={{ borderBottom: `2px solid ${MIST}` }}>
+                <th style={{ textAlign: "left", padding: "8px 10px", color: SAGE, fontWeight: 700 }}>#</th>
+                <th style={{ textAlign: "left", padding: "8px 10px", color: SAGE, fontWeight: 700 }}>Page Path</th>
+                <th style={{ textAlign: "right", padding: "8px 10px", color: SAGE, fontWeight: 700 }}>Sessions</th>
+                <th style={{ textAlign: "right", padding: "8px 10px", color: SAGE, fontWeight: 700 }}>Users</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((row, i) => (
+                <tr key={row.pagePath} style={{ borderBottom: `1px solid ${MIST}`, background: i % 2 === 0 ? "#fff" : CREAM }}>
+                  <td style={{ padding: "6px 10px", color: "#888" }}>{i + 1}</td>
+                  <td style={{ padding: "6px 10px", color: FOREST, fontFamily: "monospace", fontSize: 11, maxWidth: 350, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.pagePath}</td>
+                  <td style={{ padding: "6px 10px", textAlign: "right", fontWeight: 600, color: FOREST }}>{row.sessions.toLocaleString()}</td>
+                  <td style={{ padding: "6px 10px", textAlign: "right", color: "#666" }}>{row.activeUsers.toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GA4LiveTopCities({ territoryId, year }: { territoryId: string; year: number }) {
+  const { data, isLoading } = trpc.analytics.getGA4TerritoryTopCities.useQuery(
+    { territoryId, startDate: `${year}-01-01`, endDate: `${year}-12-31`, limit: 10 },
+    { enabled: !!territoryId },
+  );
+
+  return (
+    <div style={{ background: "#fff", borderRadius: 10, border: `1px solid ${MIST}`, padding: "20px 18px" }}>
+      <h3 style={{ fontSize: 13, fontWeight: 700, color: FOREST, marginBottom: 14, display: "flex", alignItems: "center", gap: 6 }}>
+        <MapPin size={14} color={SAGE} /> Top Cities
+      </h3>
+      {isLoading ? (
+        <div style={{ height: 80, display: "flex", alignItems: "center", justifyContent: "center", color: "#aaa", fontSize: 12 }}>Loading...</div>
+      ) : !data || data.length === 0 ? (
+        <div style={{ height: 60, display: "flex", alignItems: "center", justifyContent: "center", color: "#aaa", fontSize: 12 }}>No data</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {data.slice(0, 10).map((row, i) => (
+            <div key={row.city} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: i < 9 ? `1px solid ${MIST}` : "none" }}>
+              <span style={{ fontSize: 12, color: FOREST }}>{row.city}</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: SAGE }}>{row.sessions.toLocaleString()}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GA4LiveChannelBreakdown({ territoryId, year }: { territoryId: string; year: number }) {
+  const { data, isLoading } = trpc.analytics.getGA4TerritoryChannelBreakdown.useQuery(
+    { territoryId, startDate: `${year}-01-01`, endDate: `${year}-12-31` },
+    { enabled: !!territoryId },
+  );
+
+  const total = useMemo(() => data?.reduce((sum, r) => sum + r.sessions, 0) || 0, [data]);
+
+  return (
+    <div style={{ background: "#fff", borderRadius: 10, border: `1px solid ${MIST}`, padding: "20px 18px" }}>
+      <h3 style={{ fontSize: 13, fontWeight: 700, color: FOREST, marginBottom: 14, display: "flex", alignItems: "center", gap: 6 }}>
+        <BarChart3 size={14} color={SAGE} /> Traffic Channels
+      </h3>
+      {isLoading ? (
+        <div style={{ height: 80, display: "flex", alignItems: "center", justifyContent: "center", color: "#aaa", fontSize: 12 }}>Loading...</div>
+      ) : !data || data.length === 0 ? (
+        <div style={{ height: 60, display: "flex", alignItems: "center", justifyContent: "center", color: "#aaa", fontSize: 12 }}>No data</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {data.slice(0, 8).map((row) => {
+            const pct = total > 0 ? (row.sessions / total) * 100 : 0;
+            return (
+              <div key={row.channel}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                  <span style={{ fontSize: 11, color: FOREST }}>{row.channel}</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: SAGE }}>{pct.toFixed(1)}%</span>
+                </div>
+                <div style={{ height: 6, background: MIST, borderRadius: 3, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${pct}%`, background: SAGE, borderRadius: 3, transition: "width 0.3s ease" }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }

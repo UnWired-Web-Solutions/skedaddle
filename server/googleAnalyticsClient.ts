@@ -1,24 +1,18 @@
 /**
  * googleAnalyticsClient.ts — GA4 Data API client using the same service account
- * as the Search Console integration (skedaddle-search-console-reader@uws-gbp-analytics.iam.gserviceaccount.com).
+ * as the Search Console integration (skedaddle-search-console-reade@uws-gbp-analytics.iam.gserviceaccount.com).
  *
- * PREREQUISITE: The service account must be granted at least Viewer access on the
- * Skedaddle Wildlife GA4 property (p394014501) before any data can be fetched.
- * As of Aug 19 2026, this access has NOT been granted — the property is visible
- * in the GA4 picker but returns "Missing permissions" for the UWS account.
+ * CONNECTED: Aug 20 2026 — service account granted Administrator access at account level
+ * via the Analytics Admin API (accounts/39401450/accessBindings).
  *
- * Once access is granted, this client will be used by the GA4 importer to pull:
- * - Sessions by page path (for territory-filtered reporting)
- * - Top converting pages
- * - Top cities by sessions
- * - Channel breakdown (organic, direct, referral, etc.)
+ * Skedaddle uses 129 separate GA4 properties (one per sub-location city),
+ * all under account 39401450. This client aggregates data across all properties
+ * belonging to a territory using the mapping in shared/ga4TerritoryProperties.ts.
  */
 
 import { google, type analyticsdata_v1beta } from "googleapis";
 import { ENV } from "./_core/env";
-
-export const SKEDADDLE_GA4_PROPERTY_ID = "properties/394014501";
-export const SKEDADDLE_GA4_ACCOUNT_ID = "39401450";
+import { getGA4PropertiesForTerritory, GA4_TERRITORY_PROPERTIES, SKEDADDLE_GA4_CONTROL_PROPERTY } from "../shared/ga4TerritoryProperties";
 
 type ServiceAccountCredential = {
   client_email: string;
@@ -55,7 +49,6 @@ function getCredential(): ServiceAccountCredential {
 
 /**
  * Returns an authenticated GA4 Data API client (analyticsdata v1beta).
- * Requires the service account to have Viewer access on the GA4 property.
  */
 export function getGA4Client() {
   const auth = new google.auth.GoogleAuth({
@@ -69,19 +62,20 @@ export function getGA4Client() {
 type RunReportRow = analyticsdata_v1beta.Schema$Row;
 
 /**
- * Verify that the service account can access the Skedaddle GA4 property.
- * Returns connection status with property metadata.
+ * Verify that the service account can access the GA4 account.
+ * Tests against the first available territory property.
  */
 export async function verifyGA4Access(): Promise<{
   connected: boolean;
-  propertyId: string;
+  accountId: string;
+  territoriesAvailable: number;
   error?: string;
 }> {
   try {
     const client = getGA4Client();
-    // Run a minimal report to verify access (1 row, 1 metric)
+    // Test with the control property (main skedaddlewildlife.com)
     await client.properties.runReport({
-      property: SKEDADDLE_GA4_PROPERTY_ID,
+      property: `properties/${SKEDADDLE_GA4_CONTROL_PROPERTY}`,
       requestBody: {
         dateRanges: [{ startDate: "7daysAgo", endDate: "today" }],
         metrics: [{ name: "activeUsers" }],
@@ -91,146 +85,218 @@ export async function verifyGA4Access(): Promise<{
 
     return {
       connected: true,
-      propertyId: SKEDADDLE_GA4_PROPERTY_ID,
+      accountId: "39401450",
+      territoriesAvailable: GA4_TERRITORY_PROPERTIES.length,
     };
   } catch (error: any) {
     const message = error?.message || "Unknown error verifying GA4 access";
     return {
       connected: false,
-      propertyId: SKEDADDLE_GA4_PROPERTY_ID,
+      accountId: "39401450",
+      territoriesAvailable: 0,
       error: message.includes("403") || message.includes("permission")
-        ? "Service account does not have Viewer access on the Skedaddle Wildlife GA4 property. Ask Dave/Nina/Ares to add the service account as a Viewer."
+        ? "Service account does not have access to the Skedaddle Wildlife GA4 account."
         : message,
     };
   }
 }
 
 /**
- * Fetch sessions by page path for a given date range.
- * This will be used to build territory-filtered GA4 reporting once access is granted.
- *
- * @param startDate - YYYY-MM-DD format
- * @param endDate - YYYY-MM-DD format
- * @param pathFilter - Optional URL path prefix to filter (e.g., "/location/minneapolis/")
+ * Fetch total sessions and users for a territory by aggregating across all its GA4 properties.
+ * This is the primary function for the DashThis replacement.
  */
-export async function fetchGA4SessionsByPage(
+export async function fetchGA4TerritorySessionsMonthly(
+  territoryId: string,
   startDate: string,
   endDate: string,
-  pathFilter?: string,
+): Promise<Array<{ yearMonth: string; sessions: number; activeUsers: number }>> {
+  const propertyIds = getGA4PropertiesForTerritory(territoryId);
+  if (propertyIds.length === 0) return [];
+
+  const client = getGA4Client();
+  const monthlyMap = new Map<string, { sessions: number; activeUsers: number }>();
+
+  // Query each property and aggregate by month
+  for (const propId of propertyIds) {
+    try {
+      const res = await client.properties.runReport({
+        property: `properties/${propId}`,
+        requestBody: {
+          dateRanges: [{ startDate, endDate }],
+          dimensions: [{ name: "yearMonth" }],
+          metrics: [{ name: "sessions" }, { name: "activeUsers" }],
+          limit: "100",
+        },
+      });
+
+      for (const row of res.data.rows || []) {
+        const ym = row.dimensionValues?.[0]?.value || "";
+        const sessions = parseInt(row.metricValues?.[0]?.value || "0", 10);
+        const users = parseInt(row.metricValues?.[1]?.value || "0", 10);
+        const existing = monthlyMap.get(ym) || { sessions: 0, activeUsers: 0 };
+        monthlyMap.set(ym, {
+          sessions: existing.sessions + sessions,
+          activeUsers: existing.activeUsers + users,
+        });
+      }
+    } catch {
+      // Skip properties that error (may be empty or misconfigured)
+    }
+  }
+
+  return Array.from(monthlyMap.entries())
+    .map(([yearMonth, data]) => ({ yearMonth, ...data }))
+    .sort((a, b) => a.yearMonth.localeCompare(b.yearMonth));
+}
+
+/**
+ * Fetch top pages by sessions for a territory (aggregated across all its properties).
+ */
+export async function fetchGA4TerritoryTopPages(
+  territoryId: string,
+  startDate: string,
+  endDate: string,
+  limit = 25,
 ): Promise<Array<{ pagePath: string; sessions: number; activeUsers: number }>> {
+  const propertyIds = getGA4PropertiesForTerritory(territoryId);
+  if (propertyIds.length === 0) return [];
+
   const client = getGA4Client();
+  const pageMap = new Map<string, { sessions: number; activeUsers: number }>();
 
-  const dimensionFilter: analyticsdata_v1beta.Schema$FilterExpression | undefined = pathFilter
-    ? {
-        filter: {
-          fieldName: "pagePath",
-          stringFilter: {
-            matchType: "BEGINS_WITH",
-            value: pathFilter,
-          },
+  for (const propId of propertyIds) {
+    try {
+      const res = await client.properties.runReport({
+        property: `properties/${propId}`,
+        requestBody: {
+          dateRanges: [{ startDate, endDate }],
+          dimensions: [{ name: "pagePath" }],
+          metrics: [{ name: "sessions" }, { name: "activeUsers" }],
+          limit: "100",
+          orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
         },
+      });
+
+      for (const row of res.data.rows || []) {
+        const path = row.dimensionValues?.[0]?.value || "";
+        const sessions = parseInt(row.metricValues?.[0]?.value || "0", 10);
+        const users = parseInt(row.metricValues?.[1]?.value || "0", 10);
+        const existing = pageMap.get(path) || { sessions: 0, activeUsers: 0 };
+        pageMap.set(path, {
+          sessions: existing.sessions + sessions,
+          activeUsers: existing.activeUsers + users,
+        });
       }
-    : undefined;
+    } catch {
+      // Skip erroring properties
+    }
+  }
 
-  const res = await client.properties.runReport({
-    property: SKEDADDLE_GA4_PROPERTY_ID,
-    requestBody: {
-      dateRanges: [{ startDate, endDate }],
-      dimensions: [{ name: "pagePath" }],
-      metrics: [{ name: "sessions" }, { name: "activeUsers" }],
-      dimensionFilter,
-      limit: "500",
-      orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
-    },
-  });
-
-  return (res.data.rows || []).map((row: RunReportRow) => ({
-    pagePath: row.dimensionValues?.[0]?.value || "",
-    sessions: parseInt(row.metricValues?.[0]?.value || "0", 10),
-    activeUsers: parseInt(row.metricValues?.[1]?.value || "0", 10),
-  }));
+  return Array.from(pageMap.entries())
+    .map(([pagePath, data]) => ({ pagePath, ...data }))
+    .sort((a, b) => b.sessions - a.sessions)
+    .slice(0, limit);
 }
 
 /**
- * Fetch top cities by sessions for a given date range.
- * Used for the "Top Cities" panel in the DashThis replacement.
+ * Fetch top cities by sessions for a territory (aggregated across all its properties).
  */
-export async function fetchGA4TopCities(
+export async function fetchGA4TerritoryTopCities(
+  territoryId: string,
   startDate: string,
   endDate: string,
-  pathFilter?: string,
+  limit = 20,
 ): Promise<Array<{ city: string; sessions: number; activeUsers: number }>> {
+  const propertyIds = getGA4PropertiesForTerritory(territoryId);
+  if (propertyIds.length === 0) return [];
+
   const client = getGA4Client();
+  const cityMap = new Map<string, { sessions: number; activeUsers: number }>();
 
-  const dimensionFilter: analyticsdata_v1beta.Schema$FilterExpression | undefined = pathFilter
-    ? {
-        filter: {
-          fieldName: "pagePath",
-          stringFilter: {
-            matchType: "BEGINS_WITH",
-            value: pathFilter,
-          },
+  for (const propId of propertyIds) {
+    try {
+      const res = await client.properties.runReport({
+        property: `properties/${propId}`,
+        requestBody: {
+          dateRanges: [{ startDate, endDate }],
+          dimensions: [{ name: "city" }],
+          metrics: [{ name: "sessions" }, { name: "activeUsers" }],
+          limit: "50",
+          orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
         },
+      });
+
+      for (const row of res.data.rows || []) {
+        const city = row.dimensionValues?.[0]?.value || "(not set)";
+        const sessions = parseInt(row.metricValues?.[0]?.value || "0", 10);
+        const users = parseInt(row.metricValues?.[1]?.value || "0", 10);
+        const existing = cityMap.get(city) || { sessions: 0, activeUsers: 0 };
+        cityMap.set(city, {
+          sessions: existing.sessions + sessions,
+          activeUsers: existing.activeUsers + users,
+        });
       }
-    : undefined;
+    } catch {
+      // Skip erroring properties
+    }
+  }
 
-  const res = await client.properties.runReport({
-    property: SKEDADDLE_GA4_PROPERTY_ID,
-    requestBody: {
-      dateRanges: [{ startDate, endDate }],
-      dimensions: [{ name: "city" }],
-      metrics: [{ name: "sessions" }, { name: "activeUsers" }],
-      dimensionFilter,
-      limit: "50",
-      orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
-    },
-  });
-
-  return (res.data.rows || []).map((row: RunReportRow) => ({
-    city: row.dimensionValues?.[0]?.value || "(not set)",
-    sessions: parseInt(row.metricValues?.[0]?.value || "0", 10),
-    activeUsers: parseInt(row.metricValues?.[1]?.value || "0", 10),
-  }));
+  return Array.from(cityMap.entries())
+    .map(([city, data]) => ({ city, ...data }))
+    .sort((a, b) => b.sessions - a.sessions)
+    .slice(0, limit);
 }
 
 /**
- * Fetch channel breakdown (session default channel group) for a given date range.
- * Used for the traffic sources breakdown in the DashThis replacement.
+ * Fetch channel breakdown for a territory (aggregated across all its properties).
  */
-export async function fetchGA4ChannelBreakdown(
+export async function fetchGA4TerritoryChannelBreakdown(
+  territoryId: string,
   startDate: string,
   endDate: string,
-  pathFilter?: string,
 ): Promise<Array<{ channel: string; sessions: number; activeUsers: number }>> {
+  const propertyIds = getGA4PropertiesForTerritory(territoryId);
+  if (propertyIds.length === 0) return [];
+
   const client = getGA4Client();
+  const channelMap = new Map<string, { sessions: number; activeUsers: number }>();
 
-  const dimensionFilter: analyticsdata_v1beta.Schema$FilterExpression | undefined = pathFilter
-    ? {
-        filter: {
-          fieldName: "pagePath",
-          stringFilter: {
-            matchType: "BEGINS_WITH",
-            value: pathFilter,
-          },
+  for (const propId of propertyIds) {
+    try {
+      const res = await client.properties.runReport({
+        property: `properties/${propId}`,
+        requestBody: {
+          dateRanges: [{ startDate, endDate }],
+          dimensions: [{ name: "sessionDefaultChannelGroup" }],
+          metrics: [{ name: "sessions" }, { name: "activeUsers" }],
+          limit: "20",
+          orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
         },
+      });
+
+      for (const row of res.data.rows || []) {
+        const channel = row.dimensionValues?.[0]?.value || "(not set)";
+        const sessions = parseInt(row.metricValues?.[0]?.value || "0", 10);
+        const users = parseInt(row.metricValues?.[1]?.value || "0", 10);
+        const existing = channelMap.get(channel) || { sessions: 0, activeUsers: 0 };
+        channelMap.set(channel, {
+          sessions: existing.sessions + sessions,
+          activeUsers: existing.activeUsers + users,
+        });
       }
-    : undefined;
+    } catch {
+      // Skip erroring properties
+    }
+  }
 
-  const res = await client.properties.runReport({
-    property: SKEDADDLE_GA4_PROPERTY_ID,
-    requestBody: {
-      dateRanges: [{ startDate, endDate }],
-      dimensions: [{ name: "sessionDefaultChannelGroup" }],
-      metrics: [{ name: "sessions" }, { name: "activeUsers" }],
-      dimensionFilter,
-      limit: "20",
-      orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
-    },
-  });
+  return Array.from(channelMap.entries())
+    .map(([channel, data]) => ({ channel, ...data }))
+    .sort((a, b) => b.sessions - a.sessions);
+}
 
-  return (res.data.rows || []).map((row: RunReportRow) => ({
-    channel: row.dimensionValues?.[0]?.value || "(not set)",
-    sessions: parseInt(row.metricValues?.[0]?.value || "0", 10),
-    activeUsers: parseInt(row.metricValues?.[1]?.value || "0", 10),
-  }));
+/**
+ * List all territories that have GA4 properties mapped.
+ */
+export function getGA4ReadyTerritories(): string[] {
+  return GA4_TERRITORY_PROPERTIES.map(t => t.territoryId);
 }

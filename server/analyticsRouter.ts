@@ -18,6 +18,7 @@ import { eq, and, sql, inArray } from "drizzle-orm";
 import { TERRITORY_GROUPS, UNMAPPED_GA4, UNMAPPED_GBP, getSubLocations } from "../shared/territoryMapping";
 import { verifySearchConsoleAccess } from "./googleSearchConsoleClient";
 import { verifyGA4Access } from "./googleAnalyticsClient";
+import { fetchGA4TerritorySessionsMonthly, fetchGA4TerritoryTopPages, fetchGA4TerritoryTopCities, fetchGA4TerritoryChannelBreakdown, getGA4ReadyTerritories } from "./googleAnalyticsClient";
 import { importSearchConsoleTerritoryMonth } from "./googleSearchConsoleImporter";
 import { getGscTerritoryScope } from "../shared/gscTerritoryPaths";
 import { GSC_TERRITORY_SCOPES } from "../shared/gscTerritoryPaths";
@@ -46,11 +47,53 @@ export const analyticsRouter = router({
     } catch (error) {
       return {
         connected: false,
-        propertyId: "properties/394014501",
+        accountId: "39401450",
+        territoriesAvailable: 0,
         error: error instanceof Error ? error.message : "Unable to verify GA4 access.",
       };
     }
   }),
+
+  /** Get GA4 monthly sessions for a territory (aggregated across all sub-location properties). */
+  getGA4TerritoryMonthly: publicProcedure
+    .input(z.object({
+      territoryId: z.string(),
+      startDate: z.string(),
+      endDate: z.string(),
+    }))
+    .query(async ({ input }) => fetchGA4TerritorySessionsMonthly(input.territoryId, input.startDate, input.endDate)),
+
+  /** Get GA4 top pages for a territory (aggregated across all sub-location properties). */
+  getGA4TerritoryTopPages: publicProcedure
+    .input(z.object({
+      territoryId: z.string(),
+      startDate: z.string(),
+      endDate: z.string(),
+      limit: z.number().optional().default(25),
+    }))
+    .query(async ({ input }) => fetchGA4TerritoryTopPages(input.territoryId, input.startDate, input.endDate, input.limit)),
+
+  /** Get GA4 top cities for a territory (aggregated across all sub-location properties). */
+  getGA4TerritoryTopCities: publicProcedure
+    .input(z.object({
+      territoryId: z.string(),
+      startDate: z.string(),
+      endDate: z.string(),
+      limit: z.number().optional().default(20),
+    }))
+    .query(async ({ input }) => fetchGA4TerritoryTopCities(input.territoryId, input.startDate, input.endDate, input.limit)),
+
+  /** Get GA4 channel breakdown for a territory (aggregated across all sub-location properties). */
+  getGA4TerritoryChannelBreakdown: publicProcedure
+    .input(z.object({
+      territoryId: z.string(),
+      startDate: z.string(),
+      endDate: z.string(),
+    }))
+    .query(async ({ input }) => fetchGA4TerritoryChannelBreakdown(input.territoryId, input.startDate, input.endDate)),
+
+  /** List all territories that have GA4 properties mapped and ready for data pull. */
+  getGA4ReadyTerritories: publicProcedure.query(() => getGA4ReadyTerritories()),
 
   /**
    * Pull a completed calendar month from the live parent-domain property.
