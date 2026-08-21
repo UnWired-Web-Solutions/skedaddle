@@ -203,14 +203,14 @@ describe("Suburb Page Content Generator", () => {
   });
 
   describe("Anthropic API Configuration", () => {
-    it("should have ANTHROPIC_API_KEY available in environment", () => {
+    it.runIf(process.env.RUN_LIVE_API_TESTS === "1")("should have ANTHROPIC_API_KEY available in environment", () => {
       expect(process.env.ANTHROPIC_API_KEY).toBeDefined();
       expect(process.env.ANTHROPIC_API_KEY!.length).toBeGreaterThan(10);
     });
   });
 
   describe("Sonar API Configuration", () => {
-    it("should have SONAR_API_KEY available in environment", () => {
+    it.runIf(process.env.RUN_LIVE_API_TESTS === "1")("should have SONAR_API_KEY available in environment", () => {
       expect(process.env.SONAR_API_KEY).toBeDefined();
       expect(process.env.SONAR_API_KEY!.length).toBeGreaterThan(10);
     });

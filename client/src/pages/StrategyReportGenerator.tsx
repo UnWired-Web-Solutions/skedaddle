@@ -18,6 +18,7 @@ export default function StrategyReportGenerator() {
   const { user } = useAuth();
   const [selectedTerritory, setSelectedTerritory] = useState("");
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [draftId, setDraftId] = useState<string | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -44,6 +45,7 @@ export default function StrategyReportGenerator() {
       setError(null);
       setPdfUrl(null);
       setPreviewHtml(null);
+      setDraftId(null);
       setProgress(0);
       setProgressLabel("Initializing...");
       // Simulate progress since we can't stream from tRPC mutation
@@ -51,36 +53,13 @@ export default function StrategyReportGenerator() {
     },
     onSuccess: (data) => {
       setPreviewHtml(data.html);
+      setDraftId(data.draftId);
       setProgress(100);
       setProgressLabel(`Complete — ${data.sectionCount} sections generated`);
       setIsGenerating(false);
     },
     onError: (err) => {
       setError(err.message || "Failed to generate report preview");
-      setIsGenerating(false);
-      setProgress(0);
-    },
-  });
-
-  // Full generation mutation (HTML + PDF)
-  const generateMutation = trpc.strategyReport.generate.useMutation({
-    onMutate: () => {
-      setIsGenerating(true);
-      setError(null);
-      setPdfUrl(null);
-      setProgress(0);
-      setProgressLabel("Generating report + PDF...");
-      simulateProgress();
-    },
-    onSuccess: (data) => {
-      setPdfUrl(data.url);
-      setPreviewHtml(data.html);
-      setProgress(100);
-      setProgressLabel(`Complete — PDF ready (${data.sectionCount} sections)`);
-      setIsGenerating(false);
-    },
-    onError: (err) => {
-      setError(err.message || "Failed to generate report");
       setIsGenerating(false);
       setProgress(0);
     },
@@ -149,14 +128,14 @@ export default function StrategyReportGenerator() {
 
   function handleGeneratePdf() {
     if (!selectedTerritory) return;
+    if (!draftId) {
+      setError("Preview and review the report before exporting its saved draft.");
+      return;
+    }
     if ((window as any).__strategyProgressInterval) {
       clearInterval((window as any).__strategyProgressInterval);
     }
-    if (previewHtml) {
-      exportMutation.mutate({ territoryId: selectedTerritory, html: previewHtml });
-    } else {
-      generateMutation.mutate({ territoryId: selectedTerritory, config });
-    }
+    exportMutation.mutate({ draftId });
   }
 
   function handleReset() {
@@ -165,6 +144,7 @@ export default function StrategyReportGenerator() {
     }
     setSelectedTerritory("");
     setPreviewHtml(null);
+    setDraftId(null);
     setPdfUrl(null);
     setError(null);
     setProgress(0);
@@ -189,6 +169,7 @@ export default function StrategyReportGenerator() {
   const updateConfigNumber = (key: keyof StrategyConfig, value: string) => {
     setConfig(previous => ({ ...previous, [key]: Math.max(0, Number(value) || 0) }));
     setPreviewHtml(null);
+    setDraftId(null);
     setPdfUrl(null);
   };
 
@@ -241,6 +222,7 @@ export default function StrategyReportGenerator() {
                 onChange={(e) => {
                   setSelectedTerritory(e.target.value);
                   setPreviewHtml(null);
+                  setDraftId(null);
                   setPdfUrl(null);
                   setError(null);
                 }}
@@ -296,6 +278,7 @@ export default function StrategyReportGenerator() {
                       onChange={event => {
                         setConfig(previous => ({ ...previous, campaignNotes: event.target.value }));
                         setPreviewHtml(null);
+                        setDraftId(null);
                         setPdfUrl(null);
                       }}
                       rows={3}
@@ -322,14 +305,15 @@ export default function StrategyReportGenerator() {
                   </button>
                   <button
                     onClick={handleGeneratePdf}
+                    disabled={!draftId}
                     className="flex items-center gap-2 px-4 py-2 rounded-sm text-sm font-semibold transition-all"
                     style={{
-                      background: "oklch(0.18 0.015 65)",
+                      background: draftId ? "oklch(0.18 0.015 65)" : "oklch(0.75 0.01 65)",
                       color: "white",
                       fontFamily: "Inter, sans-serif",
                     }}
                   >
-                    <Download size={14} /> Generate PDF
+                    <Download size={14} /> {draftId ? "Export Reviewed PDF" : "Preview First"}
                   </button>
                 </div>
               )}

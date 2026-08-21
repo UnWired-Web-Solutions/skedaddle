@@ -4,7 +4,6 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Dashboard from "./pages/Dashboard";
-import PrintReport from "./pages/PrintReport";
 import TriggerReport from "./pages/TriggerReport";
 import Home from "./pages/Home";
 import LocationDetail from "./pages/LocationDetail";
@@ -19,7 +18,7 @@ import SalesforceConnect from "./pages/SalesforceConnect";
 import ProposalGenerator from "./pages/ProposalGenerator";
 import StrategyReportGenerator from "./pages/StrategyReportGenerator";
 import SuburbPageGenerator from "./pages/SuburbPageGenerator";
-import { Redirect, Route, Switch } from "wouter";
+import { Redirect, Route, Switch, useParams } from "wouter";
 
 // Protected route — redirects to /login if not authenticated
 function ProtectedRoute({
@@ -33,6 +32,11 @@ function ProtectedRoute({
   if (!isAuthenticated) return <Redirect to="/login" />;
   if (adminOnly && user?.role !== "admin") return <Redirect to="/" />;
   return <Component />;
+}
+
+function LegacyReportRedirect() {
+  const { id } = useParams<{ id: string }>();
+  return <Redirect to={`/location/${id}`} />;
 }
 function Router() {
   const { isAuthenticated } = useAuth();
@@ -61,7 +65,7 @@ function Router() {
         <ProtectedRoute component={Dashboard} />
       </Route>
       <Route path="/report/:id">
-        <ProtectedRoute component={PrintReport} />
+        <ProtectedRoute component={LegacyReportRedirect} />
       </Route>
       <Route path="/trigger/:id">
         <ProtectedRoute component={TriggerReport} />

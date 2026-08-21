@@ -1,11 +1,22 @@
 import { z } from "zod";
-import { publicProcedure, router } from "./_core/trpc";
+import { adminProcedure, router } from "./_core/trpc";
 import { invokeLLM } from "./_core/llm";
 import { ENV } from "./_core/env";
 import { storagePut } from "./storage";
 import puppeteer from "puppeteer";
-import { loadTerritoryReportingAnalytics } from "./territoryReportingData";
-import { suburbSlugMatchesPage } from "../shared/ga4PageClassifier";
+import {
+  loadTerritoryCloseRate,
+  loadTerritoryReportingAnalytics,
+  matchedMonthComparison,
+} from "./territoryReportingData";
+import { dedicatedSuburbHubMatchesPage } from "../shared/ga4PageClassifier";
+import {
+  INITIAL_SALES_REPORT_WINDOW,
+  previousYearWindow,
+  reportingMonthIso,
+  reportingWindowLabel,
+} from "../shared/reportingPeriod";
+import { createReportDraft, getReportDraft, markReportDraftExported } from "./reportDraftStore";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -72,6 +83,8 @@ export interface TerritoryDataObject {
     monthly: Array<{ month: string; clicks: number; impressions: number; avg_position: number }>;
     totalClicks: number;
     totalImpressions: number;
+    topPages: Array<{ pageUrl: string; clicks: number; impressions: number }>;
+    topQueries: Array<{ query: string; clicks: number; impressions: number }>;
   };
   ga4: {
     monthly: Array<{
@@ -81,6 +94,8 @@ export interface TerritoryDataObject {
       activeUsers: number;
       priorityPageSessions: number;
       complete: boolean;
+      propertiesExpected: number;
+      propertiesSucceeded: number;
     }>;
     totalSessions: number;
     totalPriorityPageSessions: number;
@@ -99,6 +114,27 @@ export interface TerritoryDataObject {
     ga4: "persisted_data_api" | "unavailable";
     gsc: "persisted_search_console" | "historical_snapshot" | "unavailable";
   };
+  reportingPeriod: {
+    start: string;
+    end: string;
+    label: string;
+  };
+  yoy: {
+    months: number[];
+    ga4: { current: number; previous: number } | null;
+    gsc: { current: number; previous: number } | null;
+  } | null;
+  closeRate: {
+    inspections: number;
+    closedJobs: number;
+    closeRate: number | null;
+    periodStart: string;
+    periodEnd: string;
+    sourceLabel: string;
+    networkInspections: number;
+    networkClosedJobs: number;
+    networkCloseRate: number | null;
+  } | null;
   seasonalTiming: string;
   topSpeciesNames: string[];
   topSuburbNames: string[];
@@ -215,6 +251,14 @@ const KNOWN_SUBURB_PAGES: Record<string, Record<string, boolean>> = {
 
 // ─── Build Territory Data Object ─────────────────────────────────────────────
 
+function dashboardMonthInInitialReport(month: string): boolean {
+  const normalized = /^\d{4}-\d{2}$/.test(month) ? `${month}-01` : `${month} 1`;
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) return false;
+  const key = parsed.getFullYear() * 100 + parsed.getMonth() + 1;
+  return key >= 202507 && key <= 202606;
+}
+
 export async function buildTerritoryData(
   territoryId: string,
   config: StrategyConfig = DEFAULT_STRATEGY_CONFIG,
@@ -228,7 +272,12 @@ export async function buildTerritoryData(
 
   const dashData = DASHBOARD_DATA[territoryId];
   if (!dashData) throw new Error(`No dashboard data for: ${territoryId}`);
-  const reportingAnalytics = await loadTerritoryReportingAnalytics(territoryId);
+  const [reportingAnalytics, priorYearAnalytics, closeRate] = await Promise.all([
+    loadTerritoryReportingAnalytics(territoryId, INITIAL_SALES_REPORT_WINDOW),
+    loadTerritoryReportingAnalytics(territoryId, previousYearWindow(INITIAL_SALES_REPORT_WINDOW)),
+    loadTerritoryCloseRate(territoryId),
+  ]);
+  const yoy = matchedMonthComparison(reportingAnalytics, priorYearAnalytics);
 
   const totalRevenue = dashData.total_revenue;
   const totalJobs = dashData.total_jobs;
@@ -257,13 +306,12 @@ export async function buildTerritoryData(
 
   // Enrich suburb data with page existence validation
   const knownPages = KNOWN_SUBURB_PAGES[territoryId] || {};
-  const hasAnyKnownPages = Object.keys(knownPages).length > 0;
   const suburbs = dashData.suburbs.map((s: any) => {
     // Check if we have validated page data for this suburb
     const pageStatus = knownPages[s.suburb];
     const measuredPageExists = Boolean(
-      reportingAnalytics?.gsc.topPages.some(page => suburbSlugMatchesPage(page.pageUrl, s.suburb))
-      || reportingAnalytics?.ga4.topPages.some(page => suburbSlugMatchesPage(page.pagePath, s.suburb)),
+      reportingAnalytics?.gsc.topPages.some(page => dedicatedSuburbHubMatchesPage(page.pageUrl, s.suburb))
+      || reportingAnalytics?.ga4.topPages.some(page => dedicatedSuburbHubMatchesPage(page.pagePath, s.suburb)),
     );
     return {
       suburb: s.suburb,
@@ -276,12 +324,13 @@ export async function buildTerritoryData(
   });
 
   // Determine suburb page validation status
-  const suburbPageStatus: "validated" | "partial" | "unknown" = hasAnyKnownPages
-    ? (suburbs.every(s => s.hasPage !== null) ? "validated" : "partial")
-    : "unknown";
+  const measuredOrCuratedCount = suburbs.filter(s => s.hasPage !== null).length;
+  const suburbPageStatus: "validated" | "partial" | "unknown" = measuredOrCuratedCount === 0
+    ? "unknown"
+    : measuredOrCuratedCount === suburbs.length ? "validated" : "partial";
 
   // GBP aggregation
-  const gbpMonthly = dashData.gbp.monthly || [];
+  const gbpMonthly = (dashData.gbp.monthly || []).filter((row: { month: string }) => dashboardMonthInInitialReport(row.month));
   const totalSearches = gbpMonthly.reduce((sum: number, m: any) => sum + m.searches, 0);
   const totalCalls = gbpMonthly.reduce((sum: number, m: any) => sum + m.calls, 0);
   const totalClicks = gbpMonthly.reduce((sum: number, m: any) => sum + m.website_clicks, 0);
@@ -304,7 +353,7 @@ export async function buildTerritoryData(
   const hasPersistedGsc = Boolean(reportingAnalytics?.gsc.monthly.length);
   const gscMonthly = hasPersistedGsc
     ? reportingAnalytics!.gsc.monthly
-    : dashData.gsc.monthly || [];
+    : (dashData.gsc.monthly || []).filter((row: { month: string }) => dashboardMonthInInitialReport(row.month));
   const totalGscClicks = gscMonthly.reduce((sum: number, m: any) => sum + m.clicks, 0);
   const totalImpressions = gscMonthly.reduce((sum: number, m: any) => sum + m.impressions, 0);
 
@@ -335,6 +384,8 @@ export async function buildTerritoryData(
       monthly: gscMonthly,
       totalClicks: totalGscClicks,
       totalImpressions,
+      topPages: reportingAnalytics?.gsc.topPages ?? [],
+      topQueries: reportingAnalytics?.gsc.topQueries ?? [],
     },
     ga4: {
       monthly: reportingAnalytics?.ga4.monthly ?? [],
@@ -359,6 +410,13 @@ export async function buildTerritoryData(
         ? "persisted_search_console"
         : gscMonthly.length > 0 ? "historical_snapshot" : "unavailable",
     },
+    reportingPeriod: {
+      start: `${reportingMonthIso(INITIAL_SALES_REPORT_WINDOW.start)}-01`,
+      end: "2026-06-30",
+      label: reportingWindowLabel(INITIAL_SALES_REPORT_WINDOW),
+    },
+    yoy,
+    closeRate,
     seasonalTiming: SEASONAL_DATA[location.state] || SEASONAL_DATA["default"],
     topSpeciesNames: species.slice(0, 5).map((s: any) => s.species),
     topSuburbNames: suburbs.slice(0, 8).map((s: any) => s.suburb),
@@ -456,6 +514,14 @@ function escapeHtml(value: string): string {
   } as Record<string, string>)[character] || character);
 }
 
+function narrativeParagraphsHtml(text: string): string {
+  return text.split(/\n\n+/)
+    .map(paragraph => paragraph.trim())
+    .filter(Boolean)
+    .map(paragraph => `<p class="narrative">${escapeHtml(paragraph).replaceAll("\n", "<br>")}</p>`)
+    .join("\n");
+}
+
 // ─── Section Generators ──────────────────────────────────────────────────────
 
 async function generateExecutiveSummary(data: TerritoryDataObject): Promise<string> {
@@ -470,7 +536,7 @@ async function generateExecutiveSummary(data: TerritoryDataObject): Promise<stri
   const prompt = `You are writing the Executive Summary section of a franchise digital marketing strategy document for Skedaddle Humane Wildlife Control — the "${data.name}" territory (${data.city}, ${data.state}, ${data.country}).
 
 TERRITORY DATA:
-- Total closed revenue (trailing 12 months): ${formatCurrency(data.totalRevenue, data.currencySymbol)}
+- Total closed revenue (${data.reportingPeriod.label}): ${formatCurrency(data.totalRevenue, data.currencySymbol)}
 - Total closed jobs: ${formatNumber(data.totalJobs)}
 - Average job value: ${formatCurrency(data.avgJobValue, data.currencySymbol)}
 - Top species by revenue: ${data.topSpeciesNames.join(", ")}
@@ -498,14 +564,14 @@ Return ONLY the paragraph text (no headings, no HTML tags, no markdown). Use pla
   // Convert plain text paragraphs to HTML
   const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
   if (paragraphs.length > 0) {
-    return paragraphs.map(p => `<p class="narrative">${p.trim()}</p>`).join("\n");
+    return narrativeParagraphsHtml(text);
   }
 
   // Fallback: generate a data-driven executive summary if AI returned empty
   console.warn(`Executive Summary AI returned empty for ${data.name} — using data-driven fallback`);
   const topSpecies = data.topSpeciesNames.slice(0, 3).join(", ");
   const topSuburbs = data.topSuburbNames.slice(0, 3).join(", ");
-  return `<p class="narrative">${data.name} is a ${data.totalRevenue > 1000000 ? "proven" : "developing"} Skedaddle market generating ${formatCurrency(data.totalRevenue, data.currencySymbol)} in trailing 12-month revenue across ${formatNumber(data.totalJobs)} closed jobs, with an average ticket of ${formatCurrency(data.avgJobValue, data.currencySymbol)}. The territory's top revenue species are ${topSpecies}.</p>
+  return `<p class="narrative">${data.name} is a ${data.totalRevenue > 1000000 ? "proven" : "developing"} Skedaddle market generating ${formatCurrency(data.totalRevenue, data.currencySymbol)} from ${data.reportingPeriod.label} across ${formatNumber(data.totalJobs)} closed jobs, with an average ticket of ${formatCurrency(data.avgJobValue, data.currencySymbol)}. The territory's top revenue species are ${topSpecies}.</p>
 <p class="narrative">The Google Business Profile generated ${formatNumber(data.gbp.totalCalls)} calls and ${formatNumber(data.gbp.totalClicks)} website clicks over the available tracking period.${data.gsc.monthly.length ? ` The available ${data.analyticsSource.gsc === "persisted_search_console" ? "persisted Search Console import" : "historical Search Console snapshot"} recorded ${formatNumber(data.gsc.totalClicks)} organic clicks.` : " No Search Console history is available for this report."}${data.ga4.monthly.length ? ` Persisted GA4 imports recorded ${formatNumber(data.ga4.totalPriorityPageSessions)} species and location-page sessions.` : ""} Geographically, the primary markets are ${topSuburbs}.</p>
 <p class="narrative">This report outlines a structured digital marketing program built around local SEO, hub-and-spoke content architecture, and species-specific suburb pages to grow organic visibility and lead volume across the territory.</p>`;
 }
@@ -573,9 +639,12 @@ Return ONLY paragraph text (no headings, no HTML, no markdown).`;
 
   const text = await callClaude(prompt, "claude-opus-5", 1500);
   const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
-  if (paragraphs.length > 0) return paragraphs.map(p => `<p class="narrative">${p.trim()}</p>`).join("\n");
+  if (paragraphs.length > 0) return narrativeParagraphsHtml(text);
   console.warn(`AI section returned empty for ${data.name}`);
-  return `<p class="narrative">This section will be populated with territory-specific analysis during the full report generation. Please regenerate the report if this section appears empty.</p>`;
+  const audited = data.suburbs.filter(suburb => suburb.hasPage !== null);
+  const missing = audited.filter(suburb => suburb.hasPage === false);
+  const missingRevenue = missing.reduce((sum, suburb) => sum + suburb.revenue, 0);
+  return `<p class="narrative">${audited.length ? `${audited.length} revenue-producing suburbs have a documented page status. ${missing.length ? `${missing.length} confirmed gaps represent ${formatCurrency(missingRevenue, data.currencySymbol)} in closed revenue.` : "No dedicated suburb-hub gaps are confirmed in the audited set."}` : "Dedicated suburb-hub coverage has not been audited, so the first action is to verify the highest-revenue markets before describing a page gap."}</p><p class="narrative">Prioritize the audit in revenue order: ${escapeHtml(data.topSuburbNames.slice(0, 5).join(", "))}. A page recommendation becomes approved work only after the hub is verified and the scope is confirmed.</p>`;
 }
 
 async function generateProposedProgram(data: TerritoryDataObject, priorContext: string): Promise<string> {
@@ -610,9 +679,9 @@ Return ONLY paragraph text (no headings, no HTML, no markdown). Separate the 4 a
 
   const text = await callClaude(prompt, "claude-opus-5", 2500);
   const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
-  if (paragraphs.length > 0) return paragraphs.map(p => `<p class="narrative">${p.trim()}</p>`).join("\n");
+  if (paragraphs.length > 0) return narrativeParagraphsHtml(text);
   console.warn(`AI section returned empty for ${data.name}`);
-  return `<p class="narrative">This section will be populated with territory-specific analysis during the full report generation. Please regenerate the report if this section appears empty.</p>`;
+  return `<p class="narrative">The proposed program begins with measurement and a verified content audit. GBP and blog publishing remain at ${data.proposedGbpPostsPerMonth || "an unconfirmed"} and ${data.proposedBlogPostsPerMonth || "an unconfirmed"} posts per month respectively until capacity is approved.</p><p class="narrative">Phase 1 prioritizes up to ${data.proposedSuburbPages || "the approved number of"} dedicated suburb hubs in revenue order, beginning with ${escapeHtml(data.topSuburbNames.slice(0, 3).join(", "))}. Phase 2 adds up to ${data.proposedSpeciesLocationPages || "the approved number of"} species-by-location pages beneath verified hubs, weighted toward ${escapeHtml(data.topSpeciesNames.slice(0, 3).join(", "))}. Schema, citations, internal links, and rank tracking are audit recommendations—not claims about the current campaign.</p>`;
 }
 
 async function generateContentArchitecture(data: TerritoryDataObject, priorContext: string): Promise<string> {
@@ -639,9 +708,9 @@ Return ONLY paragraph text (no headings, no HTML, no markdown). Use double line 
 
   const text = await callClaude(prompt, "claude-opus-5", 3000);
   const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
-  if (paragraphs.length > 0) return paragraphs.map(p => `<p class="narrative">${p.trim()}</p>`).join("\n");
+  if (paragraphs.length > 0) return narrativeParagraphsHtml(text);
   console.warn(`AI section returned empty for ${data.name}`);
-  return `<p class="narrative">This section will be populated with territory-specific analysis during the full report generation. Please regenerate the report if this section appears empty.</p>`;
+  return `<p class="narrative">Use the main ${escapeHtml(data.name)} location page as the territory hub. In Phase 1, verify and then build approved suburb hubs in revenue order, beginning with ${escapeHtml(data.topSuburbNames.slice(0, 4).join(", "))}. Each hub should answer local service intent and link back to the territory hub.</p><p class="narrative">Only after those hubs are approved should Phase 2 add species-by-suburb pages, led by ${escapeHtml(data.topSpeciesNames.slice(0, 3).join(", "))}. Conversion-oriented seasonal articles can support these permanent pages, but they do not replace them and do not prove that a hub exists.</p>`;
 }
 
 async function generateGbpStrategy(data: TerritoryDataObject, priorContext: string): Promise<string> {
@@ -678,9 +747,9 @@ Return ONLY paragraph text (no headings, no HTML, no markdown). Use double line 
 
   const text = await callClaude(prompt, "claude-opus-5", 3000);
   const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
-  if (paragraphs.length > 0) return paragraphs.map(p => `<p class="narrative">${p.trim()}</p>`).join("\n");
+  if (paragraphs.length > 0) return narrativeParagraphsHtml(text);
   console.warn(`AI section returned empty for ${data.name}`);
-  return `<p class="narrative">This section will be populated with territory-specific analysis during the full report generation. Please regenerate the report if this section appears empty.</p>`;
+  return `<p class="narrative">The measured GBP baseline for the aligned reporting period is ${formatNumber(data.gbp.totalCalls)} calls and ${formatNumber(data.gbp.totalClicks)} website clicks. The approved publishing target is ${data.proposedGbpPostsPerMonth ? `${data.proposedGbpPostsPerMonth} posts per month` : "not yet provided"}; no volume is inferred from engagement.</p><p class="narrative">Rotate posts through ${escapeHtml(data.topSuburbNames.slice(0, 4).join(", "))} and lead with ${escapeHtml(data.topSpeciesNames.slice(0, 3).join(", "))} according to ${escapeHtml(data.seasonalTiming)}. Link posts to verified destination pages and review calls and clicks monthly.</p>`;
 }
 
 async function generateNinetyDayPlan(data: TerritoryDataObject, priorContext: string): Promise<string> {
@@ -720,7 +789,7 @@ Month 3 — Optimization
   const text = await callClaude(prompt, "claude-opus-5", 4000);
   if (text.trim().length > 50) return text;
   console.warn(`AI section returned near-empty for ${data.name}`);
-  return `This section will be populated during full report generation. Please regenerate if empty.`;
+  return `Month 1 — Foundation\nPriorities: Analytics owner — verify GA4, Search Console, GBP, and Salesforce coverage — produce an approved baseline; Content lead — audit dedicated hubs for ${data.topSuburbNames.slice(0, 3).join(", ")} — document confirmed gaps; SEO lead — prepare the approved Phase 1 hub briefs — obtain scope sign-off\n\nMonth 2 — Expansion\nPriorities: Content lead — publish only approved Phase 1 suburb hubs — establish measurable local landing pages; GBP owner — run the approved monthly post schedule around ${data.topSpeciesNames.slice(0, 2).join(" and ")} — link every post to a verified destination; Analyst — review complete-month traffic and search evidence — record early movement\n\nMonth 3 — Optimization\nPriorities: Analyst — compare matched complete months — identify evidence-backed winners; Content lead — propose Phase 2 species-by-suburb pages beneath approved hubs — obtain approval before production; Strategy owner — document the next 90-day plan — align capacity, seasonality, and measurement`;
 }
 
 async function generateRisksAndMitigations(data: TerritoryDataObject, priorContext: string): Promise<string> {
@@ -747,7 +816,7 @@ RISK: [risk statement] | IMPACT: [impact] | MITIGATION: [mitigation action]`;
   const text = await callClaude(prompt, "claude-opus-5", 2000);
   if (text.trim().length > 50) return text;
   console.warn(`AI section returned near-empty for ${data.name}`);
-  return `This section will be populated during full report generation. Please regenerate if empty.`;
+  return `RISK: Dedicated suburb-hub coverage is not fully verified | IMPACT: Page recommendations may duplicate existing work | MITIGATION: Complete and document the URL audit before approving Phase 1\nRISK: Publishing capacity is not confirmed | IMPACT: Proposed volume may be undeliverable | MITIGATION: Approve monthly GBP and blog counts before scheduling\nRISK: Partial GA4 imports exist | IMPACT: Incomplete traffic may be mistaken for a decline | MITIGATION: Use only complete months in headline totals and disclose coverage\nRISK: Local facts require franchise review | IMPACT: Content may contain inaccurate service-area detail | MITIGATION: Require territory-owner review before publishing\nRISK: Seasonal timing can shift | IMPACT: Planned topics may miss local demand | MITIGATION: Recheck complete-month GBP and search evidence each month`;
 }
 
 async function generateRecommendations(data: TerritoryDataObject, priorContext: string): Promise<string> {
@@ -778,7 +847,7 @@ Return as numbered list (1. ... 2. ... etc.) with no other formatting.`;
   const text = await callClaude(prompt, "claude-opus-5", 1500);
   if (text.trim().length > 50) return text;
   console.warn(`AI section returned near-empty for ${data.name}`);
-  return `This section will be populated during full report generation. Please regenerate if empty.`;
+  return `1. Audit dedicated suburb hubs in revenue order, beginning with ${data.topSuburbNames.slice(0, 3).join(", ")}, before approving new pages.\n2. Establish the measurement baseline using only complete GA4 months and territory-filtered Search Console data.\n3. Keep the ${data.name} territory page as the central search and GBP destination.\n4. Weight approved content toward ${data.topSpeciesNames.slice(0, 2).join(" and ")}, the leading revenue species.\n5. Recheck seasonal demand monthly before changing the production calendar.\n6. Set GBP volume from approved capacity and rotate verified suburb and species themes.\n7. Build approved permanent suburb hubs before species-by-suburb pages or supporting articles.\n8. Use closed revenue, jobs, inspections, close rate, and matched-month digital evidence to set the next priorities.`;
 }
 
 // ─── Deterministic Template Sections ─────────────────────────────────────────
@@ -802,7 +871,7 @@ function buildCurrentCampaignHtml(data: TerritoryDataObject): string {
 
   // Sub-market context
   const subMarketNote = data.subMarkets.length > 1
-    ? `<p class="narrative"><strong>Territory coverage:</strong> This territory encompasses ${data.subMarkets.length} sub-markets: ${data.subMarkets.join(", ")}. ${data.gbpSubListings.length > 1 ? `GBP listings active in: ${data.gbpSubListings.join(", ")}.` : `Single GBP listing covers the full territory.`}</p>`
+    ? `<p class="narrative"><strong>Configured territory mapping:</strong> ${data.subMarkets.length} GA4 sub-markets are mapped: ${data.subMarkets.map(escapeHtml).join(", ")}. ${data.gbpSubListings.length > 1 ? `Configured GBP mappings: ${data.gbpSubListings.map(escapeHtml).join(", ")}.` : `One GBP mapping is configured.`} This is configuration evidence, not a live listing audit.</p>`
     : "";
 
   return `
@@ -819,8 +888,8 @@ function buildCurrentCampaignHtml(data: TerritoryDataObject): string {
       <tbody>
         <tr>
           <td>Google Business Profile</td>
-          <td>Active listing${data.gbpSubListings.length > 1 ? ` (${data.gbpSubListings.length} listings)` : ""}</td>
-          <td>General / unstructured</td>
+          <td>${data.gbpSubListings.length} configured mapping${data.gbpSubListings.length === 1 ? "" : "s"}; live status not audited</td>
+          <td>Format not audited</td>
           <td>${data.currentGbpPostVolume}</td>
         </tr>
         <tr>
@@ -831,9 +900,9 @@ function buildCurrentCampaignHtml(data: TerritoryDataObject): string {
         </tr>
         <tr>
           <td>Static Pages</td>
-          <td>Existing species pages</td>
-          <td>Service descriptions</td>
-          <td>Existing only</td>
+          <td>Not audited</td>
+          <td>Species/service coverage to verify</td>
+          <td>Unknown</td>
         </tr>
         <tr>
           <td>Suburb/City Pages</td>
@@ -851,11 +920,11 @@ function buildCurrentCampaignHtml(data: TerritoryDataObject): string {
           <td>Citation/NAP</td>
           <td>Unknown / unaudited</td>
           <td>\u2014</td>
-          <td>Not tracked</td>
+          <td>Audit required</td>
         </tr>
       </tbody>
     </table>
-    <p class="narrative">The confirmed campaign inputs are ${data.currentGbpPostVolume} for GBP and ${data.currentBlogPostVolume} for blog content. During the available performance period, GBP generated ${formatNumber(Math.round(data.gbp.avgMonthlyCalls))} calls and ${formatNumber(Math.round(data.gbp.avgMonthlyClicks))} website clicks per month on average; engagement is not used to infer publishing volume. ${confirmedNoPages.length > 0 ? `${confirmedNoPages.length} suburbs generating significant revenue (${confirmedNoPages.map(s => s.suburb).join(", ")}) are confirmed without dedicated pages.` : data.suburbPageStatus === "unknown" ? "Suburb page coverage has not been audited; page recommendations remain provisional until the audit is complete." : "Existing suburb pages provide a foundation, with remaining confirmed gaps shown above."} ${data.campaignNotes ? `Campaign notes: ${escapeHtml(data.campaignNotes)}` : ""}</p>`;
+    <p class="narrative">The confirmed campaign inputs are ${data.currentGbpPostVolume} for GBP and ${data.currentBlogPostVolume} for blog content. During ${data.reportingPeriod.label}, GBP generated ${formatNumber(Math.round(data.gbp.avgMonthlyCalls))} calls and ${formatNumber(Math.round(data.gbp.avgMonthlyClicks))} website clicks per month on average; engagement is not used to infer publishing volume. ${confirmedNoPages.length > 0 ? `${confirmedNoPages.length} suburbs generating significant revenue (${confirmedNoPages.map(s => s.suburb).join(", ")}) are confirmed without dedicated pages.` : data.suburbPageStatus === "unknown" ? "Suburb page coverage has not been audited; page recommendations remain provisional until the audit is complete." : "Existing suburb pages provide a foundation, with remaining confirmed gaps shown above."} ${data.campaignNotes ? `Campaign notes: ${escapeHtml(data.campaignNotes)}` : ""}</p>`;
 }
 
 function buildSpeciesTableHtml(data: TerritoryDataObject): string {
@@ -982,12 +1051,18 @@ function buildOrganicAnalyticsHtml(data: TerritoryDataObject): string {
   const ga4Coverage = data.ga4.latestImport
     ? `${data.ga4.completeMonths}/${data.ga4.monthly.length} imported months complete · latest successful import ${data.ga4.latestImport.propertiesSucceeded}/${data.ga4.latestImport.propertiesExpected} mapped properties`
     : "No persisted GA4 import";
-  const topPageRows = data.ga4.topPages.slice(0, 8).map(page => `
+  const topPageRows = data.ga4.topPages.slice(0, 25).map(page => `
       <tr>
         <td>${escapeHtml(page.pagePath)}</td>
         <td>${escapeHtml(page.pageType.replaceAll("_", " "))}</td>
         <td class="num">${formatNumber(page.sessions)}</td>
       </tr>`).join("");
+  const gscPageRows = data.gsc.topPages.slice(0, 25).map(page => `<tr><td>${escapeHtml(page.pageUrl)}</td><td class="num">${formatNumber(page.clicks)}</td><td class="num">${formatNumber(page.impressions)}</td></tr>`).join("");
+  const gscQueryRows = data.gsc.topQueries.slice(0, 25).map(row => `<tr><td>${escapeHtml(row.query)}</td><td class="num">${formatNumber(row.clicks)}</td><td class="num">${formatNumber(row.impressions)}</td></tr>`).join("");
+  const change = (current: number, previous: number) => previous > 0 ? `${((current - previous) / previous * 100).toFixed(1)}%` : "Unavailable";
+  const yoyRows = data.yoy && (data.yoy.ga4 || data.yoy.gsc)
+    ? `${data.yoy.ga4 ? `<tr><td>GA4 sessions</td><td class="num">${formatNumber(data.yoy.ga4.current)}</td><td class="num">${formatNumber(data.yoy.ga4.previous)}</td><td class="num">${change(data.yoy.ga4.current, data.yoy.ga4.previous)}</td></tr>` : ""}${data.yoy.gsc ? `<tr><td>Search Console clicks</td><td class="num">${formatNumber(data.yoy.gsc.current)}</td><td class="num">${formatNumber(data.yoy.gsc.previous)}</td><td class="num">${change(data.yoy.gsc.current, data.yoy.gsc.previous)}</td></tr>` : ""}`
+    : "";
   const gscRows = data.gsc.monthly.length > 0
     ? `<tr><td>Organic clicks</td><td class="num">${formatNumber(data.gsc.totalClicks)}</td><td>${escapeHtml(data.analyticsSource.gsc.replaceAll("_", " "))} · ${gscPeriod}</td></tr>
         <tr><td>Search impressions</td><td class="num">${formatNumber(data.gsc.totalImpressions)}</td><td>${escapeHtml(data.analyticsSource.gsc.replaceAll("_", " "))} · ${gscPeriod}</td></tr>`
@@ -1005,8 +1080,14 @@ function buildOrganicAnalyticsHtml(data: TerritoryDataObject): string {
         ${ga4Rows}
       </tbody>
     </table>
-    ${topPageRows ? `<h3>Top Imported GA4 Pages</h3><table class="data-table"><thead><tr><th>Page</th><th>Type</th><th>Sessions</th></tr></thead><tbody>${topPageRows}</tbody></table>` : `<p class="narrative">No persisted GA4 page import is available. GA4 claims are intentionally omitted until a completed month is imported.</p>`}
-    ${data.ga4.partialMonths > 0 ? `<p class="narrative"><strong>Coverage warning:</strong> ${data.ga4.partialMonths} imported GA4 month${data.ga4.partialMonths === 1 ? " is" : "s are"} partial and must not be treated as complete territory totals.</p>` : ""}`;
+    <h3>Inspection-to-Sale Performance</h3>
+    ${data.closeRate ? `<table class="data-table"><thead><tr><th>Inspections</th><th>Closed Jobs</th><th>Territory Close Rate</th><th>Network Close Rate</th><th>Period / Source</th></tr></thead><tbody><tr><td class="num">${formatNumber(data.closeRate.inspections)}</td><td class="num">${formatNumber(data.closeRate.closedJobs)}</td><td class="num">${data.closeRate.closeRate === null ? "Unavailable" : formatPct(data.closeRate.closeRate)}</td><td class="num">${data.closeRate.networkCloseRate === null ? "Unavailable" : formatPct(data.closeRate.networkCloseRate)}</td><td>${escapeHtml(data.closeRate.periodStart)} to ${escapeHtml(data.closeRate.periodEnd)} · ${escapeHtml(data.closeRate.sourceLabel)}</td></tr></tbody></table>` : `<p class="narrative">Territory inspection and close-rate data is unavailable for this report.</p>`}
+    <h3>Matched-Month Year-over-Year</h3>
+    ${yoyRows ? `<p class="narrative">Comparison uses only complete months present in both years: ${data.yoy!.months.map(month => new Date(2026, month - 1, 1).toLocaleDateString("en-US", { month: "short" })).join(", ")}.</p><table class="data-table"><thead><tr><th>Metric</th><th>Current</th><th>Prior Year</th><th>YoY Change</th></tr></thead><tbody>${yoyRows}</tbody></table>` : `<p class="narrative">Matched-month YoY is unavailable because no comparable complete current/prior-year months were imported.</p>`}
+    ${topPageRows ? `<h3>Top 25 Imported GA4 Pages (Complete Months Only)</h3><table class="data-table"><thead><tr><th>Page</th><th>Type</th><th>Sessions</th></tr></thead><tbody>${topPageRows}</tbody></table>` : `<p class="narrative">No complete-month GA4 page import is available. GA4 page claims are intentionally omitted.</p>`}
+    ${gscPageRows ? `<h3>Top 25 Search Console Pages</h3><table class="data-table"><thead><tr><th>Page</th><th>Clicks</th><th>Impressions</th></tr></thead><tbody>${gscPageRows}</tbody></table>` : ""}
+    ${gscQueryRows ? `<h3>Top 25 Search Terms</h3><table class="data-table"><thead><tr><th>Query</th><th>Clicks</th><th>Impressions</th></tr></thead><tbody>${gscQueryRows}</tbody></table>` : ""}
+    ${data.ga4.partialMonths > 0 ? `<p class="narrative"><strong>Coverage warning:</strong> ${data.ga4.partialMonths} GA4 month${data.ga4.partialMonths === 1 ? " is" : "s are"} partial and excluded from headline totals, rankings, YoY, and AI context. ${data.ga4.monthly.filter(row => !row.complete).map(row => `${reportingMonthIso(row)} (${row.propertiesSucceeded}/${row.propertiesExpected} properties)`).join(", ")}.</p>` : ""}`;
 }
 
 function buildScaleComparisonHtml(data: TerritoryDataObject): string {
@@ -1052,21 +1133,21 @@ function buildScaleComparisonHtml(data: TerritoryDataObject): string {
         </tr>
         <tr>
           <td>Schema Markup</td>
-          <td>Basic</td>
-          <td>Full LocalBusiness + Service + FAQ</td>
-          <td>Expanded</td>
+          <td>Not audited</td>
+          <td>Audit, then approve applicable schema</td>
+          <td>Scope not confirmed</td>
         </tr>
         <tr>
           <td>Citation/NAP Audit</td>
-          <td>Not tracked</td>
-          <td>Audited + corrected</td>
-          <td class="highlight">Net new</td>
+          <td>Not audited</td>
+          <td>Audit and correction if approved</td>
+          <td>Scope not confirmed</td>
         </tr>
         <tr>
           <td>Rank Tracking</td>
-          <td>None</td>
-          <td>Weekly position monitoring</td>
-          <td class="highlight">Net new</td>
+          <td>Not audited</td>
+          <td>Confirm cadence and ownership</td>
+          <td>Scope not confirmed</td>
         </tr>
       </tbody>
     </table>`;
@@ -1440,9 +1521,10 @@ function buildFullReportHtml(data: TerritoryDataObject, sections: SectionResult[
   <div class="cover-subtitle">${data.name} Territory — ${data.city}, ${data.state}</div>
   <div class="cover-meta">
     <strong>Prepared by:</strong> Unwired Web Solutions<br>
-    <strong>Date:</strong> ${dateStr}<br>
-    <strong>Territory Revenue (T12):</strong> ${formatCurrency(data.totalRevenue, data.currencySymbol)}<br>
-    <strong>Closed Jobs (T12):</strong> ${formatNumber(data.totalJobs)}<br>
+    <strong>Generated:</strong> ${dateStr}<br>
+    <strong>Reporting period:</strong> ${data.reportingPeriod.start} through ${data.reportingPeriod.end}<br>
+    <strong>Territory Revenue:</strong> ${formatCurrency(data.totalRevenue, data.currencySymbol)}<br>
+    <strong>Closed Jobs:</strong> ${formatNumber(data.totalJobs)}<br>
     <strong>Data Sources:</strong> Salesforce CRM, Google Business Profile Insights${data.gsc.monthly.length > 0 ? data.analyticsSource.gsc === "persisted_search_console" ? ", persisted Google Search Console import" : ", historical Google Search Console snapshot" : ""}${data.ga4.monthly.length > 0 ? ", persisted Google Analytics 4 Data API import" : ""}
   </div>
 </div>
@@ -1488,7 +1570,7 @@ function formatNinetyDayPlanHtml(rawText: string): string {
         if (tasks.length > 0) {
           html += `<div class="action-category"><div class="action-category-title">${categoryNames[j - 1] || "Tasks"}</div><ul>`;
           tasks.slice(0, 6).forEach(task => {
-            html += `<li>${task.replace(/^[-•▪]\s*/, "")}</li>`;
+            html += `<li>${escapeHtml(task.replace(/^[-•▪]\s*/, ""))}</li>`;
           });
           html += `</ul></div>`;
         }
@@ -1498,7 +1580,7 @@ function formatNinetyDayPlanHtml(rawText: string): string {
       const tasks = monthContent.split(/[;\n]/).map(t => t.trim()).filter(t => t && t.length > 10);
       html += `<div class="action-category"><ul>`;
       tasks.slice(0, 12).forEach(task => {
-        html += `<li>${task.replace(/^[-•▪]\s*/, "").replace(/^—\s*/, "")}</li>`;
+        html += `<li>${escapeHtml(task.replace(/^[-•▪]\s*/, "").replace(/^—\s*/, ""))}</li>`;
       });
       html += `</ul></div>`;
     }
@@ -1521,22 +1603,22 @@ function formatRisksHtml(rawText: string): string {
       risks.slice(0, 7).forEach(risk => {
         const parts = risk.split(/\|/).map(p => p.trim());
         if (parts.length >= 3) {
-          html += `<tr><td>${parts[0]}</td><td>${parts[1]}</td><td>${parts[2]}</td></tr>`;
+          html += `<tr><td>${escapeHtml(parts[0])}</td><td>${escapeHtml(parts[1])}</td><td>${escapeHtml(parts[2])}</td></tr>`;
         } else {
-          html += `<tr><td colspan="3">${risk.trim()}</td></tr>`;
+          html += `<tr><td colspan="3">${escapeHtml(risk.trim())}</td></tr>`;
         }
       });
       html += `</tbody></table>`;
       return html;
     }
-    return `<p class="narrative">${rawText}</p>`;
+    return `<p class="narrative">${escapeHtml(rawText).replaceAll("\n", "<br>")}</p>`;
   }
 
   let html = `<table class="risk-table"><thead><tr><th>Risk</th><th>Impact</th><th>Mitigation</th></tr></thead><tbody>`;
   lines.forEach(line => {
     const riskMatch = line.match(/RISK:\s*(.+?)\s*\|\s*IMPACT:\s*(.+?)\s*\|\s*MITIGATION:\s*(.+)/i);
     if (riskMatch) {
-      html += `<tr><td>${riskMatch[1]}</td><td>${riskMatch[2]}</td><td>${riskMatch[3]}</td></tr>`;
+      html += `<tr><td>${escapeHtml(riskMatch[1])}</td><td>${escapeHtml(riskMatch[2])}</td><td>${escapeHtml(riskMatch[3])}</td></tr>`;
     }
   });
   html += `</tbody></table>`;
@@ -1547,11 +1629,11 @@ function formatRisksHtml(rawText: string): string {
 
 function formatRecommendationsHtml(rawText: string): string {
   const items = rawText.split(/\d+\.\s+/).filter(i => i.trim());
-  if (items.length === 0) return `<p class="narrative">${rawText}</p>`;
+  if (items.length === 0) return `<p class="narrative">${escapeHtml(rawText).replaceAll("\n", "<br>")}</p>`;
 
   let html = `<ol class="recommendations-list">`;
   items.slice(0, 8).forEach(item => {
-    html += `<li>${item.trim()}</li>`;
+    html += `<li>${escapeHtml(item.trim())}</li>`;
   });
   html += `</ol>`;
   return html;
@@ -1563,7 +1645,7 @@ export async function generateStrategyReport(
   territoryId: string,
   config: StrategyConfig = DEFAULT_STRATEGY_CONFIG,
   onProgress?: (section: string, pct: number) => void
-): Promise<{ html: string; pdfUrl?: string; sections: SectionResult[] }> {
+): Promise<{ html: string; pdfUrl?: string; sections: SectionResult[]; data: TerritoryDataObject }> {
   // Step 1: Build territory data object
   onProgress?.("Building territory data...", 5);
   const data = await buildTerritoryData(territoryId, config);
@@ -1671,7 +1753,7 @@ export async function generateStrategyReport(
   const fullHtml = buildFullReportHtml(data, sections);
 
   onProgress?.("Complete", 100);
-  return { html: fullHtml, sections };
+  return { html: fullHtml, sections, data };
 }
 
 // ─── PDF Generation ──────────────────────────────────────────────────────────
@@ -1703,7 +1785,7 @@ async function generatePdf(html: string): Promise<Buffer> {
 
 export const strategyReportRouter = router({
   // Get available territories for report generation
-  getTerritories: publicProcedure.query(async () => {
+  getTerritories: adminProcedure.query(async () => {
     const { DASHBOARD_DATA } = await import("../client/src/data/dashboardData");
     const { FRANCHISE_LOCATIONS } = await import("../client/src/data/franchises");
 
@@ -1720,47 +1802,58 @@ export const strategyReportRouter = router({
   }),
 
   // Generate strategy report (returns HTML for preview)
-  preview: publicProcedure
+  preview: adminProcedure
     .input(z.object({ territoryId: z.string(), config: strategyConfigSchema }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const result = await generateStrategyReport(input.territoryId, input.config);
-      return { html: result.html, sectionCount: result.sections.length };
+      const dataSnapshot = result.data;
+      const draftId = await createReportDraft({
+        reportType: "strategy",
+        territoryId: input.territoryId,
+        reportStart: dataSnapshot.reportingPeriod.start,
+        reportEnd: dataSnapshot.reportingPeriod.end,
+        config: input.config,
+        dataSnapshot,
+        sections: result.sections,
+        html: result.html,
+        createdByUserId: ctx.user.id,
+      });
+      return { draftId, html: result.html, sectionCount: result.sections.length };
     }),
 
-  // Generate strategy report + PDF
-  generate: publicProcedure
-    .input(z.object({ territoryId: z.string(), config: strategyConfigSchema }))
-    .mutation(async ({ input }) => {
+  // Backward-compatible PDF action; it only accepts an existing saved draft.
+  generate: adminProcedure
+    .input(z.object({ draftId: z.string().uuid() }))
+    .mutation(async ({ input, ctx }) => {
       const { DASHBOARD_DATA } = await import("../client/src/data/dashboardData");
-      const dashData = DASHBOARD_DATA[input.territoryId];
-      if (!dashData) throw new Error(`No data for territory: ${input.territoryId}`);
-
-      // Generate the full report
-      const result = await generateStrategyReport(input.territoryId, input.config);
-
-      // Generate PDF
-      const pdfBuffer = await generatePdf(result.html);
-
-      // Store PDF in S3
-      const filename = `strategy-reports/${input.territoryId}_strategy_report_${Date.now()}.pdf`;
+      const draft = await getReportDraft(input.draftId, "strategy");
+      const dashData = DASHBOARD_DATA[draft.territoryId];
+      if (!dashData) throw new Error(`No data for territory: ${draft.territoryId}`);
+      const pdfBuffer = await generatePdf(draft.html);
+      const filename = `strategy-reports/${draft.territoryId}_strategy_report_${Date.now()}.pdf`;
       const { url } = await storagePut(filename, pdfBuffer, "application/pdf");
+      await markReportDraftExported(draft.id, url, ctx.user.id);
+      const sections = Array.isArray(draft.sectionsJson) ? draft.sectionsJson : [];
 
       return {
         url,
-        html: result.html,
+        draftId: draft.id,
+        html: draft.html,
         territoryName: dashData.name,
-        sectionCount: result.sections.length,
+        sectionCount: sections.length,
         generatedAt: new Date().toISOString(),
       };
     }),
 
   // Render the exact reviewed HTML instead of re-running every AI section.
-  exportPdf: publicProcedure
-    .input(z.object({ territoryId: z.string(), html: z.string().min(1).max(3_000_000) }))
-    .mutation(async ({ input }) => {
-      const pdfBuffer = await generatePdf(input.html);
-      const filename = `strategy-reports/${input.territoryId}_strategy_report_${Date.now()}.pdf`;
+  exportPdf: adminProcedure
+    .input(z.object({ draftId: z.string().uuid() }))
+    .mutation(async ({ input, ctx }) => {
+      const draft = await getReportDraft(input.draftId, "strategy");
+      const pdfBuffer = await generatePdf(draft.html);
+      const filename = `strategy-reports/${draft.territoryId}_strategy_report_${Date.now()}.pdf`;
       const { url } = await storagePut(filename, pdfBuffer, "application/pdf");
+      await markReportDraftExported(draft.id, url, ctx.user.id);
       return { url, generatedAt: new Date().toISOString() };
     }),
 });

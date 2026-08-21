@@ -673,7 +673,7 @@ export default function Analytics() {
             <div style={{ padding: 32, color: "#aaa", textAlign: "center" }}>Loading Search Console data...</div>
           ) : !searchConsole?.dataAvailable ? (
             <div style={{ padding: "22px 18px", background: CREAM, borderRadius: 7, color: "#666", fontSize: 12 }}>
-              {selectedSearchConsolePeriod < 202504
+              {selectedReportingPeriod < 202504
                 ? "Verified territory-filtered Search Console history begins in April 2025. Earlier months were not returned by Google and are shown as unavailable rather than estimated."
                 : `No territory-filtered Search Console import is available for this month. ${searchConsoleScope?.status === "ready" ? "Use Refresh live data for this completed month." : "This territory remains blocked until its approved URL scope is confirmed."}`}
             </div>
@@ -1057,7 +1057,7 @@ function GA4CoverageNotice({ coverage }: {
 
 function GA4LiveTopPages({ territoryId, year }: { territoryId: string; year: number }) {
   const { data, isLoading } = trpc.analytics.getGA4TerritoryTopPages.useQuery(
-    { territoryId, startDate: `${year}-01-01`, endDate: `${year}-12-31`, limit: 15 },
+    { territoryId, startDate: `${year}-01-01`, endDate: `${year}-12-31`, limit: 25 },
     { enabled: !!territoryId },
   );
 

@@ -70,13 +70,13 @@ describe("gbpImage.getSuburbs", () => {
 
 // ── GPT Image 2 / Forge API validation ──────────────────────────────────────
 describe("GPT Image 2 (Forge API) environment", () => {
-  it("BUILT_IN_FORGE_API_URL is set and looks like a URL", () => {
+  it.runIf(process.env.RUN_LIVE_API_TESTS === "1")("BUILT_IN_FORGE_API_URL is set and looks like a URL", () => {
     const url = process.env.BUILT_IN_FORGE_API_URL;
     expect(url).toBeTruthy();
     expect(url).toMatch(/^https?:\/\//);
   });
 
-  it("BUILT_IN_FORGE_API_KEY is set and non-empty", () => {
+  it.runIf(process.env.RUN_LIVE_API_TESTS === "1")("BUILT_IN_FORGE_API_KEY is set and non-empty", () => {
     const key = process.env.BUILT_IN_FORGE_API_KEY;
     expect(key).toBeTruthy();
     expect(typeof key).toBe("string");
@@ -125,11 +125,11 @@ describe("gbpImage.getJobStatus", () => {
 
 // ── LLM model availability ───────────────────────────────────────────────────
 describe("LLM model configuration", () => {
-  it("BUILT_IN_FORGE_API_URL is configured", () => {
+  it.runIf(process.env.RUN_LIVE_API_TESTS === "1")("BUILT_IN_FORGE_API_URL is configured", () => {
     expect(process.env.BUILT_IN_FORGE_API_URL).toBeTruthy();
   });
 
-  it("BUILT_IN_FORGE_API_KEY is configured", () => {
+  it.runIf(process.env.RUN_LIVE_API_TESTS === "1")("BUILT_IN_FORGE_API_KEY is configured", () => {
     expect(process.env.BUILT_IN_FORGE_API_KEY).toBeTruthy();
   });
 });

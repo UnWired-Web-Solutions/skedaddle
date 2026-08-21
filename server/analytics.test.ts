@@ -88,6 +88,7 @@ describe("analyticsRouter", () => {
     expect(schema.ga4TerritoryPages).toBeDefined();
     expect(schema.ga4ImportRuns).toBeDefined();
     expect(schema.salesforcePerformanceSnapshots).toBeDefined();
+    expect(schema.reportDrafts).toBeDefined();
   });
 
   it("registers the GBP and GA4 migrations in the Drizzle journal", () => {
@@ -95,6 +96,7 @@ describe("analyticsRouter", () => {
     expect(journal.entries.map((entry: { tag: string }) => entry.tag)).toEqual(expect.arrayContaining([
       "0004_gbp_image_workflow",
       "0005_ga4_territory_imports",
+      "0006_report_generation_integrity",
     ]));
   });
 

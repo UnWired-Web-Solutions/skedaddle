@@ -163,7 +163,7 @@ function LocationCard({ loc }: { loc: FranchiseLocation }) {
             className="text-xs flex items-center gap-1 transition-opacity hover:opacity-70"
             style={{ color: "oklch(0.52 0.016 80)", fontFamily: "Inter, sans-serif" }}
           >
-            Monthly Report <ArrowUpRight size={11} />
+            Monthly Trigger Brief <ArrowUpRight size={11} />
           </Link>
         )}
       </div>

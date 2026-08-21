@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 describe("Anthropic API Key Validation", () => {
-  it("should have ANTHROPIC_API_KEY set", () => {
+  it.runIf(process.env.RUN_LIVE_API_TESTS === "1")("should have ANTHROPIC_API_KEY set", () => {
     expect(process.env.ANTHROPIC_API_KEY).toBeDefined();
     expect(process.env.ANTHROPIC_API_KEY!.length).toBeGreaterThan(10);
   });

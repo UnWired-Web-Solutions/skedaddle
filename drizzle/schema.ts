@@ -1,4 +1,4 @@
-import { index, int, json, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
+import { index, int, json, longtext, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -198,6 +198,42 @@ export const salesforcePerformanceSnapshots = mysqlTable("salesforce_performance
 
 export type SalesforcePerformanceSnapshot = typeof salesforcePerformanceSnapshots.$inferSelect;
 export type InsertSalesforcePerformanceSnapshot = typeof salesforcePerformanceSnapshots.$inferInsert;
+
+// ─── Auditable report generation ────────────────────────────────────────────
+
+/**
+ * Immutable-at-export report source. The browser receives a draft ID and PDF
+ * export renders this saved HTML, preventing client-side HTML substitution or
+ * a second AI pass from changing reviewed copy.
+ */
+export const reportDrafts = mysqlTable("report_drafts", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  reportType: mysqlEnum("reportType", ["strategy", "proposal"]).notNull(),
+  territoryId: varchar("territoryId", { length: 64 }).notNull(),
+  status: mysqlEnum("status", ["draft", "in_review", "approved", "exported", "rejected"]).default("draft").notNull(),
+  reportStart: varchar("reportStart", { length: 10 }).notNull(),
+  reportEnd: varchar("reportEnd", { length: 10 }).notNull(),
+  configJson: json("configJson").notNull(),
+  dataSnapshotJson: json("dataSnapshotJson").notNull(),
+  sectionsJson: json("sectionsJson"),
+  html: longtext("html").notNull(),
+  createdByUserId: int("createdByUserId").notNull(),
+  exportedByUserId: int("exportedByUserId"),
+  pdfUrl: text("pdfUrl"),
+  generatedAt: timestamp("generatedAt").defaultNow().notNull(),
+  exportedAt: timestamp("exportedAt"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  territoryTypeStatusIdx: index("report_drafts_territory_type_status_idx").on(
+    table.territoryId,
+    table.reportType,
+    table.status,
+    table.generatedAt,
+  ),
+}));
+
+export type ReportDraft = typeof reportDrafts.$inferSelect;
+export type InsertReportDraft = typeof reportDrafts.$inferInsert;
 
 // ─── GBP Content Production ─────────────────────────────────────────────────
 
