@@ -475,7 +475,9 @@ Return ONLY paragraph text (no headings, no HTML, no markdown).`;
 
   const text = await callClaude(prompt, "claude-opus-5", 1500);
   const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
-  return paragraphs.map(p => `<p class="narrative">${p.trim()}</p>`).join("\n");
+  if (paragraphs.length > 0) return paragraphs.map(p => `<p class="narrative">${p.trim()}</p>`).join("\n");
+  console.warn(`AI section returned empty for ${data.name}`);
+  return `<p class="narrative">This section will be populated with territory-specific analysis during the full report generation. Please regenerate the report if this section appears empty.</p>`;
 }
 
 async function generateProposedProgram(data: TerritoryDataObject, priorContext: string): Promise<string> {
@@ -510,7 +512,9 @@ Return ONLY paragraph text (no headings, no HTML, no markdown). Separate the 4 a
 
   const text = await callClaude(prompt, "claude-opus-5", 2500);
   const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
-  return paragraphs.map(p => `<p class="narrative">${p.trim()}</p>`).join("\n");
+  if (paragraphs.length > 0) return paragraphs.map(p => `<p class="narrative">${p.trim()}</p>`).join("\n");
+  console.warn(`AI section returned empty for ${data.name}`);
+  return `<p class="narrative">This section will be populated with territory-specific analysis during the full report generation. Please regenerate the report if this section appears empty.</p>`;
 }
 
 async function generateContentArchitecture(data: TerritoryDataObject, priorContext: string): Promise<string> {
@@ -537,7 +541,9 @@ Return ONLY paragraph text (no headings, no HTML, no markdown). Use double line 
 
   const text = await callClaude(prompt, "claude-opus-5", 3000);
   const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
-  return paragraphs.map(p => `<p class="narrative">${p.trim()}</p>`).join("\n");
+  if (paragraphs.length > 0) return paragraphs.map(p => `<p class="narrative">${p.trim()}</p>`).join("\n");
+  console.warn(`AI section returned empty for ${data.name}`);
+  return `<p class="narrative">This section will be populated with territory-specific analysis during the full report generation. Please regenerate the report if this section appears empty.</p>`;
 }
 
 async function generateGbpStrategy(data: TerritoryDataObject, priorContext: string): Promise<string> {
@@ -574,7 +580,9 @@ Return ONLY paragraph text (no headings, no HTML, no markdown). Use double line 
 
   const text = await callClaude(prompt, "claude-opus-5", 3000);
   const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
-  return paragraphs.map(p => `<p class="narrative">${p.trim()}</p>`).join("\n");
+  if (paragraphs.length > 0) return paragraphs.map(p => `<p class="narrative">${p.trim()}</p>`).join("\n");
+  console.warn(`AI section returned empty for ${data.name}`);
+  return `<p class="narrative">This section will be populated with territory-specific analysis during the full report generation. Please regenerate the report if this section appears empty.</p>`;
 }
 
 async function generateNinetyDayPlan(data: TerritoryDataObject, priorContext: string): Promise<string> {
@@ -612,7 +620,9 @@ Month 3 — Optimization
 [same format]`;
 
   const text = await callClaude(prompt, "claude-opus-5", 4000);
-  return text; // Will be formatted in the HTML builder
+  if (text.trim().length > 50) return text;
+  console.warn(`AI section returned near-empty for ${data.name}`);
+  return `This section will be populated during full report generation. Please regenerate if empty.`;
 }
 
 async function generateRisksAndMitigations(data: TerritoryDataObject, priorContext: string): Promise<string> {
@@ -637,7 +647,9 @@ Return as plain text in this format (one per line):
 RISK: [risk statement] | IMPACT: [impact] | MITIGATION: [mitigation action]`;
 
   const text = await callClaude(prompt, "claude-opus-5", 2000);
-  return text; // Will be formatted into a table in HTML builder
+  if (text.trim().length > 50) return text;
+  console.warn(`AI section returned near-empty for ${data.name}`);
+  return `This section will be populated during full report generation. Please regenerate if empty.`;
 }
 
 async function generateRecommendations(data: TerritoryDataObject, priorContext: string): Promise<string> {
@@ -666,7 +678,9 @@ STYLE: Concise, direct, data-backed. Each recommendation should feel like a clea
 Return as numbered list (1. ... 2. ... etc.) with no other formatting.`;
 
   const text = await callClaude(prompt, "claude-opus-5", 1500);
-  return text; // Will be formatted in HTML builder
+  if (text.trim().length > 50) return text;
+  console.warn(`AI section returned near-empty for ${data.name}`);
+  return `This section will be populated during full report generation. Please regenerate if empty.`;
 }
 
 // ─── Deterministic Template Sections ─────────────────────────────────────────
