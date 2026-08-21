@@ -154,46 +154,28 @@ export default function Dashboard() {
           <KpiCard icon={Phone} label="GBP Calls" value={fmtN(data.gbp.total_calls)} sub={`${fmtN(data.gbp.total_searches)} searches`} color={RUST} />
         </div>
 
-        {/* ── Row 1: Revenue by Species (bar) + Species breakdown (pie) ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 24, marginBottom: 32 }}>
-
-          {/* Species bar chart */}
-          <div style={{ background: CREAM, borderRadius: 10, padding: 24, border: `1px solid ${MIST}` }}>
-            <SectionHeader title={`Revenue by Species (${data.currency})`} subtitle="Trailing 12 months — sorted by total revenue" />
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={data.species} margin={{ top: 0, right: 0, left: 0, bottom: 40 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e0dbd0" />
-                <XAxis dataKey="species" tick={{ fontSize: 11, fill: "#555" }} angle={-35} textAnchor="end" interval={0} />
-                <YAxis tickFormatter={v => fmt$(v, data.currency)} tick={{ fontSize: 11, fill: "#555" }} width={70} />
-                <Tooltip content={<ChartTooltip formatter={(v: number) => fmt$(v, data.currency)} />} />
-                <Bar dataKey="total_revenue" name="Revenue" radius={[4, 4, 0, 0]}>
-                  {data.species.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Species pie */}
-          <div style={{ background: CREAM, borderRadius: 10, padding: 24, border: `1px solid ${MIST}` }}>
-            <SectionHeader title="Revenue Mix" subtitle="Top 6 species by share" />
-            <ResponsiveContainer width="100%" height={180}>
+        {/* ── Species Revenue Breakdown (pie chart — Dave's preference) ── */}
+        <div style={{ background: CREAM, borderRadius: 10, padding: 24, border: `1px solid ${MIST}`, marginBottom: 32 }}>
+          <SectionHeader title={`Revenue by Species (${data.currency})`} subtitle="Top 6 species — trailing 12 months" />
+          <div style={{ display: "flex", alignItems: "center", gap: 40 }}>
+            <ResponsiveContainer width="50%" height={240}>
               <PieChart>
-                <Pie data={pieData} cx="50%" cy="50%" outerRadius={80} dataKey="value" nameKey="name">
+                <Pie data={pieData} cx="50%" cy="50%" outerRadius={100} dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={{ stroke: "#999" }}>
                   {pieData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                 </Pie>
                 <Tooltip content={<ChartTooltip formatter={fmt$} />} />
               </PieChart>
             </ResponsiveContainer>
-            <div style={{ marginTop: 8 }}>
+            <div style={{ flex: 1 }}>
               {pieData.map((d, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, fontSize: 12 }}>
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, fontSize: 13 }}>
                   <span style={{ width: 10, height: 10, borderRadius: 2, background: CHART_COLORS[i], flexShrink: 0 }} />
                   <span style={{ color: FOREST, flex: 1 }}>{d.name}</span>
                   <span style={{ color: "#666", fontWeight: 600 }}>{fmt$(d.value, data.currency)}</span>
                 </div>
               ))}
-            </div>
           </div>
+        </div>
         </div>
 
         {/* ── Territory vs network close rate ── */}

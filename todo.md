@@ -362,3 +362,4 @@
 - [x] Inspect and review GPT's recent repository additions — branch `codex/product-coherence-reporting` found; requires a small JSX fix before it can be merged
 - [x] Fix, validate, and merge the approved `codex/product-coherence-reporting` branch — repaired the GBP chart JSX, TypeScript clean, 73/73 tests passing
 - [x] Create and commit a comprehensive GPT collaboration brief for the Skedaddle portal
+- [x] Remove duplicate species bar chart from Dashboard — Dave prefers pie chart only (per Aug 17 meeting)

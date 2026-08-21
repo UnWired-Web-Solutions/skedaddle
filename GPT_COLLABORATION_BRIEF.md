@@ -15,7 +15,8 @@ The portal currently supports territory dashboards, data-backed strategy materia
 | GitHub remote | `user_github` → `aybello/skedaddle` |
 | Deployment model | Every successful checkpoint auto-publishes to production |
 | Main branch at handoff | `main` at checkpoint `e9aaf937` |
-| Current GPT branch | `codex/product-coherence-reporting` at `8413ba6` |
+| Current GPT branch | None active — `agent/gbp-image-workflow-repair` was merged selectively on Aug 20 |
+| Latest checkpoint | `7c312f9a` (Aug 20, 2026) |
 
 ## 2. Non-Negotiable Data Rules
 
@@ -241,3 +242,33 @@ The branch is a clean descendant of `main`, but it initially failed TypeScript v
 First, complete the validation and merge of the reporting-coherence branch once the repaired `Dashboard.tsx` passes TypeScript and tests. Second, add a transparent Sonar research progress state to the Suburb Page UI. Third, generate one real suburb page and one strategy report with **confirmed** campaign inputs, then have Ay/Dave review the output before scaling.
 
 Do not start GBP auto-posting, WordPress publishing, Salesforce data extraction, or broad live-data claims until the corresponding credentials, authorization, and review safeguards are in place.
+
+## 12. Branch Hygiene — CRITICAL
+
+**Do not delete or modify files you did not create.** When creating a branch from an older `main`, files added after your branch point will appear "missing" in a diff against current `main`. This is expected — it does not mean those files should be removed.
+
+The following files and directories are critical infrastructure that must never be deleted or modified without explicit approval:
+
+| File/Directory | Purpose |
+|---|---|
+| `server/googleSearchConsoleClient.ts` | Live GSC API client (service account auth) |
+| `server/googleSearchConsoleImporter.ts` | Territory-scoped GSC data importer |
+| `server/googleAnalyticsClient.ts` | Live GA4 Data API client (129 properties → 19 territories) |
+| `shared/gscTerritoryPaths.ts` | GSC territory scope registry (all 19 ready) |
+| `shared/ga4TerritoryProperties.ts` | GA4 property-to-territory mapping (129 properties) |
+| `server/analyticsRouter.ts` | Analytics tRPC router (GSC + GA4 + GBP procedures) |
+| `scripts/ingest-search-console.mjs` | Guarded GSC import script |
+| `GA4_ACCESS_STATUS.md` | GA4 connection documentation |
+| `GSC_PROPERTY_SCOPE.md` | GSC property inventory documentation |
+
+**Before merging any branch:** always rebase onto current `main` first. Never merge a stale branch directly — it will appear to delete files that were added after the branch point.
+
+## 13. Current Data Source Status (Aug 20, 2026)
+
+| Source | Status | Details |
+|---|---|---|
+| Google Search Console | ✅ LIVE | 19/19 territories ready, Apr 2025–Jul 2026 coverage |
+| Google Analytics 4 | ✅ LIVE | 129 properties, 19 territories, real-time via Data API |
+| Salesforce | ❌ BLOCKED | Awaiting Barry's Connected App credentials (Zoom call requested) |
+| GBP Data | ✅ STATIC | Monthly metrics in dashboardData.ts from manual exports |
+| Perplexity Sonar | ✅ AVAILABLE | Wired for suburb page research (feature halted per Dave) |
