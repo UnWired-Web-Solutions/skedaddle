@@ -412,6 +412,32 @@ export default function Analytics() {
     );
   }, [gbpTrend]);
 
+  // ─── GBP YoY line overlay data ──────────────────────────────────────────────
+  const gbpYoYLineData = useMemo(() => {
+    if (!gbpTrend || !Array.isArray(gbpTrend)) return [];
+
+    // Group by month, summing all metric types into a "Total Interactions" value per year
+    const byMonthYear: Record<string, Record<number, number>> = {};
+    for (const row of gbpTrend as any[]) {
+      if (row.metricType === "total") continue;
+      const monthKey = String(row.month);
+      if (!byMonthYear[monthKey]) byMonthYear[monthKey] = {};
+      byMonthYear[monthKey][row.year] = (byMonthYear[monthKey][row.year] || 0) + Number(row.value);
+    }
+
+    // Build chart data: one row per month, with columns for each year
+    return Array.from({ length: 12 }, (_, i) => {
+      const m = i + 1;
+      const monthData = byMonthYear[String(m)] || {};
+      return {
+        name: MONTHS[i],
+        month: m,
+        [`${selectedYear}`]: monthData[selectedYear] || 0,
+        [`${selectedYear - 1}`]: monthData[selectedYear - 1] || 0,
+      };
+    }).filter(d => (d[`${selectedYear}`] as number) > 0 || (d[`${selectedYear - 1}`] as number) > 0);
+  }, [gbpTrend, selectedYear]);
+
   // ─── YoY KPI calculations ──────────────────────────────────────────────────
   const yoyKPIs = useMemo(() => {
     if (!yoyData) return null;
@@ -821,12 +847,12 @@ export default function Analytics() {
         <div style={{ background: "#fff", borderRadius: 10, border: `1px solid ${MIST}`, padding: "24px 20px", marginBottom: 28 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
             <div>
-              <h2 style={{ fontSize: 15, fontWeight: 700, color: FOREST, marginBottom: 4, fontFamily: "'Playfair Display', serif" }}>
-                Google Business Profile
-              </h2>
-              <p style={{ fontSize: 12, color: "#888", marginBottom: 20 }}>
-                Monthly GBP interactions — {selectedTerritoryName} ({selectedYear - 1}–{selectedYear})
-              </p>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: FOREST, marginBottom: 4, fontFamily: "'Playfair Display', serif" }}>
+                Google Business Profile — Year-over-Year
+            </h2>
+             <p style={{ fontSize: 12, color: "#888", marginBottom: 20 }}>
+                Monthly GBP interactions overlay — {selectedYear} vs {selectedYear - 1} — {selectedTerritoryName}
+             </p>
             </div>
             <button
               onClick={handleExportGBP}
@@ -845,20 +871,19 @@ export default function Analytics() {
           </div>
           {gbpLoading ? (
             <div style={{ height: 280, display: "flex", alignItems: "center", justifyContent: "center", color: "#aaa" }}>Loading...</div>
-          ) : gbpChartData.length === 0 ? (
+          ) : gbpYoYLineData.length === 0 ? (
             <div style={{ height: 280, display: "flex", alignItems: "center", justifyContent: "center", color: "#aaa" }}>No data available for this territory</div>
           ) : (
             <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={gbpChartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+              <LineChart data={gbpYoYLineData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
                 <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#888" }} />
                 <YAxis tick={{ fontSize: 10, fill: "#888" }} />
-                <Tooltip content={<EnhancedTooltip chartType="gbp" />} />
+                <Tooltip />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="Calls" fill={SAGE} radius={[3, 3, 0, 0]} name="Calls" />
-                <Bar dataKey="Website Clicks" fill={GOLD} radius={[3, 3, 0, 0]} name="Website Clicks" />
-                <Bar dataKey="Directions" fill="#6b8f71" radius={[3, 3, 0, 0]} name="Directions" />
-              </BarChart>
+                <Line type="monotone" dataKey={`${selectedYear}`} stroke={SAGE} strokeWidth={2.5} dot={{ r: 4 }} name={`${selectedYear}`} />
+                <Line type="monotone" dataKey={`${selectedYear - 1}`} stroke={GOLD} strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3 }} name={`${selectedYear - 1}`} />
+              </LineChart>
             </ResponsiveContainer>
           )}
           <div style={{ marginTop: 12, padding: "10px 14px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 6, fontSize: 11, color: "#92400e", display: "flex", alignItems: "flex-start", gap: 8 }}>
