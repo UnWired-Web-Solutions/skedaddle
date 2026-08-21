@@ -66,6 +66,11 @@ describe("Strategy Report Router", () => {
     expect(data.ga4).toHaveProperty("completeMonths");
     expect(data.ga4).toHaveProperty("partialMonths");
     expect(data).toHaveProperty("analyticsSource");
+    expect(data.reportingPeriod).toEqual({
+      start: "2025-07-01",
+      end: "2026-06-30",
+      label: "2025-07 through 2026-06",
+    });
 
     // Derived fields
     expect(data.topSpeciesNames.length).toBeGreaterThan(0);

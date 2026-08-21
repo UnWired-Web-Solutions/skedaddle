@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { TERRITORY_GROUPS } from "./territoryMapping";
 import {
   classifyGA4PagePath,
+  dedicatedSuburbHubMatchesPage,
   normalizeGA4PagePath,
   suburbSlugMatchesPage,
 } from "./ga4PageClassifier";
@@ -52,5 +53,12 @@ describe("GA4 page classification", () => {
     expect(suburbSlugMatchesPage("https://example.com/location/hamilton/stoney-creek/", "Stoney Creek")).toBe(true);
     expect(suburbSlugMatchesPage("/location/hamilton/hamilton-mountain/", "Hamilton")).toBe(true);
     expect(suburbSlugMatchesPage("/location/hamilton/hamilton-mountain/", "Milton")).toBe(false);
+  });
+
+  it("confirms only a dedicated suburb hub, not a blog or species page", () => {
+    expect(dedicatedSuburbHubMatchesPage("/location/hamilton/stoney-creek/", "Stoney Creek")).toBe(true);
+    expect(dedicatedSuburbHubMatchesPage("/location/hamilton/stoney-creek/raccoon-removal/", "Stoney Creek")).toBe(false);
+    expect(dedicatedSuburbHubMatchesPage("/blog/stoney-creek-raccoon-tips/", "Stoney Creek")).toBe(false);
+    expect(dedicatedSuburbHubMatchesPage("/location/hamilton/hamilton-mountain/", "Hamilton")).toBe(false);
   });
 });

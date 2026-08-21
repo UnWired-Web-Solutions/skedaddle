@@ -129,7 +129,7 @@ describe("Proposal Generator", () => {
   });
 
   describe("Anthropic API Integration", () => {
-    it("should have ANTHROPIC_API_KEY configured", () => {
+    it.runIf(process.env.RUN_LIVE_API_TESTS === "1")("should have ANTHROPIC_API_KEY configured", () => {
       const key = process.env.ANTHROPIC_API_KEY;
       expect(key).toBeDefined();
       expect(key!.length).toBeGreaterThan(10);

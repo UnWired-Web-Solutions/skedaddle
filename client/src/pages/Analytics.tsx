@@ -1057,7 +1057,7 @@ function GA4CoverageNotice({ coverage }: {
 
 function GA4LiveTopPages({ territoryId, year }: { territoryId: string; year: number }) {
   const { data, isLoading } = trpc.analytics.getGA4TerritoryTopPages.useQuery(
-    { territoryId, startDate: `${year}-01-01`, endDate: `${year}-12-31`, limit: 15 },
+    { territoryId, startDate: `${year}-01-01`, endDate: `${year}-12-31`, limit: 25 },
     { enabled: !!territoryId },
   );
 

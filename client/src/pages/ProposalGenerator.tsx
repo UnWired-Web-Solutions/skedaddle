@@ -28,6 +28,7 @@ export default function ProposalGenerator() {
   const [selectedTerritory, setSelectedTerritory] = useState<string>("");
   const [generating, setGenerating] = useState(false);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [draftId, setDraftId] = useState<string | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [termsConfirmed, setTermsConfirmed] = useState(false);
@@ -43,18 +44,6 @@ export default function ProposalGenerator() {
   const { data: territories, isLoading: loadingTerritories } =
     trpc.proposal.getTerritories.useQuery();
 
-  const generateMutation = trpc.proposal.generate.useMutation({
-    onSuccess: (data) => {
-      setPdfUrl(data.url);
-      setPreviewHtml(data.html);
-      setGenerating(false);
-    },
-    onError: (err) => {
-      setError(err.message);
-      setGenerating(false);
-    },
-  });
-
   const exportMutation = trpc.proposal.exportPdf.useMutation({
     onSuccess: (data) => {
       setPdfUrl(data.url);
@@ -69,6 +58,7 @@ export default function ProposalGenerator() {
   const previewMutation = trpc.proposal.preview.useMutation({
     onSuccess: (data) => {
       setPreviewHtml(data.html);
+      setDraftId(data.draftId);
       setGenerating(false);
     },
     onError: (err) => {
@@ -83,19 +73,20 @@ export default function ProposalGenerator() {
     setError(null);
     setPdfUrl(null);
     setPreviewHtml(null);
+    setDraftId(null);
     previewMutation.mutate({ territoryId: selectedTerritory, config });
   };
 
   const handleGeneratePdf = () => {
     if (!selectedTerritory || !termsConfirmed) return;
+    if (!draftId) {
+      setError("Preview and review the proposal before exporting its saved draft.");
+      return;
+    }
     setGenerating(true);
     setError(null);
     setPdfUrl(null);
-    if (previewHtml) {
-      exportMutation.mutate({ territoryId: selectedTerritory, html: previewHtml });
-    } else {
-      generateMutation.mutate({ territoryId: selectedTerritory, config });
-    }
+    exportMutation.mutate({ draftId });
   };
 
   const selectedTerritoryData = territories?.find((t) => t.id === selectedTerritory);
@@ -103,6 +94,7 @@ export default function ProposalGenerator() {
     setConfig(previous => ({ ...previous, [key]: Math.max(0, Number(value) || 0) }));
     setTermsConfirmed(false);
     setPreviewHtml(null);
+    setDraftId(null);
     setPdfUrl(null);
   };
 
@@ -190,6 +182,7 @@ export default function ProposalGenerator() {
                     setSelectedTerritory(e.target.value);
                     setTermsConfirmed(false);
                     setPreviewHtml(null);
+                    setDraftId(null);
                     setPdfUrl(null);
                     setError(null);
                   }}
@@ -307,6 +300,7 @@ export default function ProposalGenerator() {
                     setConfig(previous => ({ ...previous, scopeNotes: event.target.value }));
                     setTermsConfirmed(false);
                     setPreviewHtml(null);
+                    setDraftId(null);
                     setPdfUrl(null);
                   }}
                   placeholder="Required: approved inclusions, exclusions, rollout limits, and franchise-specific terms."
@@ -326,7 +320,7 @@ export default function ProposalGenerator() {
           <div className="flex gap-3 mt-5">
             <button
               onClick={handlePreview}
-              disabled={!selectedTerritory || !termsConfirmed || generating}
+              disabled={!selectedTerritory || !termsConfirmed || !draftId || generating}
               className="flex items-center gap-2 px-4 py-2 rounded-sm text-sm font-semibold transition-all"
               style={{
                 background: selectedTerritory && termsConfirmed && !generating ? "oklch(0.97 0.012 80)" : "oklch(0.94 0.008 80)",
@@ -349,18 +343,18 @@ export default function ProposalGenerator() {
               disabled={!selectedTerritory || !termsConfirmed || generating}
               className="flex items-center gap-2 px-4 py-2 rounded-sm text-sm font-semibold transition-all"
               style={{
-                background: selectedTerritory && termsConfirmed && !generating ? "oklch(0.68 0.20 140)" : "oklch(0.65 0.010 80)",
+                background: selectedTerritory && termsConfirmed && draftId && !generating ? "oklch(0.68 0.20 140)" : "oklch(0.65 0.010 80)",
                 color: "white",
-                cursor: selectedTerritory && termsConfirmed && !generating ? "pointer" : "not-allowed",
+                cursor: selectedTerritory && termsConfirmed && draftId && !generating ? "pointer" : "not-allowed",
                 fontFamily: "Inter, sans-serif",
               }}
             >
-              {generating && (generateMutation.isPending || exportMutation.isPending) ? (
+              {generating && exportMutation.isPending ? (
                 <Loader2 size={14} className="animate-spin" />
               ) : (
                 <FileText size={14} />
               )}
-              Generate PDF
+              {draftId ? "Export Reviewed PDF" : "Preview First"}
             </button>
           </div>
 

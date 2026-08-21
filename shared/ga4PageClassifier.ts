@@ -51,3 +51,22 @@ export function suburbSlugMatchesPage(pagePath: string, suburbName: string): boo
   const segments = normalizeGA4PagePath(pagePath).toLowerCase().split("/").filter(Boolean);
   return segments.includes(suburbSlug);
 }
+
+/**
+ * A measured URL confirms a dedicated suburb hub only when it is a location
+ * page, contains no species token, and ends at the suburb slug. A blog post or
+ * species-by-suburb page can mention the same slug without proving the hub exists.
+ */
+export function dedicatedSuburbHubMatchesPage(pagePath: string, suburbName: string): boolean {
+  const suburbSlug = suburbName
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+  if (!suburbSlug) return false;
+  const normalized = normalizeGA4PagePath(pagePath).toLowerCase();
+  const segments = normalized.split("/").filter(Boolean);
+  return classifyGA4PagePath(normalized) === "location_page"
+    && !hasSpeciesTerm(normalized)
+    && segments.at(-1) === suburbSlug;
+}

@@ -229,7 +229,7 @@ export default function LocationDetail() {
                       className="text-xs flex items-center gap-1 font-semibold transition-opacity hover:opacity-70"
                       style={{ color: "oklch(0.52 0.016 80)", fontFamily: "Inter, sans-serif", textDecoration: "none" }}
                     >
-                      <ExternalLink size={12} /> Monthly Trigger Report
+                      <ExternalLink size={12} /> Monthly Trigger Brief
                     </a>
                   )}
                   <Link

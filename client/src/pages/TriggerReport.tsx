@@ -1,5 +1,5 @@
 /**
- * TriggerReport.tsx — Monthly Trigger Report
+ * TriggerReport.tsx — Monthly Trigger Brief
  * Exactly replicates the original HTML report design inside the portal.
  * Design: cream background, Georgia serif, dark forest green accents — matching the original.
  * Route: /trigger/:id
@@ -35,8 +35,9 @@ function generateActions(data: LocationDashboard, season: ReturnType<typeof getS
 
   const value = (rows: any[] | undefined, key: string, kind: "pageType" | "metricType") =>
     Number(rows?.find(row => row[kind] === key)?.sessions ?? rows?.find(row => row[kind] === key)?.value ?? 0);
-  const currentSessions = value(yoy?.ga4.current, "species_pages", "pageType") + value(yoy?.ga4.current, "location_page", "pageType");
-  const previousSessions = value(yoy?.ga4.previous, "species_pages", "pageType") + value(yoy?.ga4.previous, "location_page", "pageType");
+  const ga4Comparable = yoy?.ga4Coverage?.current?.complete && yoy?.ga4Coverage?.previous?.complete;
+  const currentSessions = ga4Comparable ? value(yoy?.ga4.current, "species_pages", "pageType") + value(yoy?.ga4.current, "location_page", "pageType") : 0;
+  const previousSessions = ga4Comparable ? value(yoy?.ga4.previous, "species_pages", "pageType") + value(yoy?.ga4.previous, "location_page", "pageType") : 0;
   const currentCalls = value(yoy?.gbp.current, "calls", "metricType");
   const previousCalls = value(yoy?.gbp.previous, "calls", "metricType");
 
@@ -222,7 +223,10 @@ export default function TriggerReport() {
   const params = useParams<{ id: string }>();
   const id = params.id?.toLowerCase() || "";
   const data = DASHBOARD_DATA[id];
-  const latestPeriodQuery = trpc.analytics.getLatestPeriod.useQuery();
+  const latestPeriodQuery = trpc.analytics.getLatestPeriod.useQuery(
+    { territoryId: id },
+    { enabled: Boolean(data) },
+  );
   const latestPeriod = latestPeriodQuery.data?.latest;
   const reportYear = latestPeriod?.year ?? new Date().getFullYear();
   const reportMonth = latestPeriod?.month ?? new Date().getMonth() + 1;
@@ -235,7 +239,7 @@ export default function TriggerReport() {
   const monthYear = new Date(reportYear, reportMonth - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
   useEffect(() => {
-    if (data) document.title = `Monthly Trigger Report — ${data.name} — ${monthYear}`;
+    if (data) document.title = `Monthly Trigger Brief — ${data.name} — ${monthYear}`;
     return () => { document.title = "Skedaddle Franchise Strategy Dashboards"; };
   }, [data, monthYear]);
 
@@ -295,7 +299,7 @@ export default function TriggerReport() {
           {/* Header */}
           <div style={{ borderBottom: "3px solid #1a4a2e", paddingBottom: 20, marginBottom: 32 }}>
             <div style={S.brand}>Skedaddle Franchise Intelligence</div>
-            <div style={S.reportTitle}>Monthly Trigger Report — {data.name}</div>
+            <div style={S.reportTitle}>Monthly Trigger Brief — {data.name}</div>
             <div style={S.reportMeta}>{monthYear} · Generated {today}</div>
           </div>
 
@@ -415,7 +419,7 @@ export default function TriggerReport() {
           {/* Footer */}
           <div style={S.footer}>
             <span>Skedaddle Franchise Portal · skedaddle.manus.space</span>
-            <span>{latestPeriod ? `Sources: Salesforce T12 demand snapshot · GA4/GBP YoY through ${monthYear}` : "Source: Salesforce T12 demand snapshot · Analytics comparison unavailable"}</span>
+            <span>{latestPeriod ? `Sources: Salesforce demand snapshot (Jul 2025–Jun 2026) · territory-specific complete GA4/GBP/GSC common period through ${monthYear}` : "Source: Salesforce demand snapshot (Jul 2025–Jun 2026) · common analytics comparison unavailable"}</span>
           </div>
 
         </div>
