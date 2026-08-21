@@ -367,3 +367,4 @@
 - [x] Build GBP YoY line overlay chart — two years on same chart for visual comparison (Dave's Aug 17 request)
 - [x] Fix empty Executive Summary in strategy reports — added retry logic + data-driven fallback
 - [x] Implement dual-path LLM: Opus 5 direct API primary → forge API (claude-opus-4-7) fallback for reliability
+- [x] Fix PDF pagination: prevent table splits, orphaned headings, add header row repetition on multi-page tables

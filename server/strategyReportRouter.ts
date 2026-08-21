@@ -1089,6 +1089,8 @@ function buildFullReportHtml(data: TerritoryDataObject, sections: SectionResult[
 
     .section {
       margin-bottom: 28px;
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
 
     h2 {
@@ -1098,6 +1100,8 @@ function buildFullReportHtml(data: TerritoryDataObject, sections: SectionResult[
       margin-bottom: 14px;
       padding-bottom: 6px;
       border-bottom: 2px solid #69BE28;
+      page-break-after: avoid;
+      break-after: avoid;
     }
 
     .section-num {
@@ -1115,6 +1119,8 @@ function buildFullReportHtml(data: TerritoryDataObject, sections: SectionResult[
       color: #2d2d2d;
       margin-top: 18px;
       margin-bottom: 8px;
+      page-break-after: avoid;
+      break-after: avoid;
     }
 
     p.narrative {
@@ -1129,6 +1135,7 @@ function buildFullReportHtml(data: TerritoryDataObject, sections: SectionResult[
       border-collapse: collapse;
       margin: 14px 0 18px 0;
       font-size: 9pt;
+      page-break-inside: auto;
     }
 
     .data-table th {
@@ -1140,6 +1147,15 @@ function buildFullReportHtml(data: TerritoryDataObject, sections: SectionResult[
       font-size: 8.5pt;
       text-transform: uppercase;
       letter-spacing: 0.3px;
+    }
+
+    .data-table thead {
+      display: table-header-group;
+    }
+
+    .data-table tr {
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
 
     .data-table td {
