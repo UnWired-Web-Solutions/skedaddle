@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { publicProcedure, router } from "./_core/trpc";
+import { invokeLLM } from "./_core/llm";
 import { ENV } from "./_core/env";
 import { storagePut } from "./storage";
 import puppeteer from "puppeteer";
@@ -319,36 +320,58 @@ export async function buildTerritoryData(
 // ─── Claude API helper ───────────────────────────────────────────────────────
 
 async function callClaude(prompt: string, model: string = "claude-opus-5", maxTokens: number = 4000): Promise<string> {
+  // Primary path: Direct Anthropic API (Claude Opus 5)
   const apiKey = ENV.anthropicApiKey;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured");
+  if (apiKey) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const resp = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            max_tokens: maxTokens,
+            messages: [{ role: "user", content: prompt }],
+          }),
+        });
 
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: maxTokens,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-
-    if (!resp.ok) {
-      const errText = await resp.text();
-      console.error(`Claude API error (${model}), attempt ${attempt + 1}:`, resp.status, errText);
-      if (attempt === 1) throw new Error(`Claude API error: ${resp.status}`);
-      continue;
+        if (resp.ok) {
+          const result = await resp.json() as { content: Array<{ text: string }> };
+          const text = result.content[0]?.text || "";
+          if (text.trim().length > 20) return text;
+          console.warn(`Claude direct API returned near-empty (${text.length} chars), attempt ${attempt + 1}`);
+        } else {
+          const errText = await resp.text();
+          console.error(`Claude direct API error (${model}), attempt ${attempt + 1}:`, resp.status, errText);
+        }
+      } catch (err) {
+        console.error(`Claude direct API fetch error, attempt ${attempt + 1}:`, err);
+      }
     }
-
-    const result = await resp.json() as { content: Array<{ text: string }> };
-    const text = result.content[0]?.text || "";
-    if (text.trim().length > 20) return text;
-    console.warn(`Claude returned near-empty response (${text.length} chars), attempt ${attempt + 1}`);
+    console.warn(`Direct Anthropic API failed after 2 attempts — falling back to built-in forge API`);
   }
+
+  // Fallback path: Built-in forge API (has retry/backoff built in)
+  try {
+    const forgeModel = "claude-opus-4-7"; // Best Claude model available on forge
+    console.log(`Using forge API fallback with ${forgeModel}`);
+    const result = await invokeLLM({
+      model: forgeModel,
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: maxTokens,
+    });
+    const content = result.choices[0]?.message?.content;
+    const text = typeof content === "string" ? content : Array.isArray(content) ? content.map((p: any) => p.type === "text" ? p.text : "").join("") : "";
+    if (text.trim().length > 20) return text;
+    console.warn(`Forge API also returned near-empty (${text.length} chars)`);
+  } catch (err) {
+    console.error(`Forge API fallback error:`, err);
+  }
+
   return "";
 }
 
