@@ -322,28 +322,34 @@ async function callClaude(prompt: string, model: string = "claude-opus-5", maxTo
   const apiKey = ENV.anthropicApiKey;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured");
 
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: maxTokens,
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
 
-  if (!resp.ok) {
-    const errText = await resp.text();
-    console.error(`Claude API error (${model}):`, resp.status, errText);
-    throw new Error(`Claude API error: ${resp.status}`);
+    if (!resp.ok) {
+      const errText = await resp.text();
+      console.error(`Claude API error (${model}), attempt ${attempt + 1}:`, resp.status, errText);
+      if (attempt === 1) throw new Error(`Claude API error: ${resp.status}`);
+      continue;
+    }
+
+    const result = await resp.json() as { content: Array<{ text: string }> };
+    const text = result.content[0]?.text || "";
+    if (text.trim().length > 20) return text;
+    console.warn(`Claude returned near-empty response (${text.length} chars), attempt ${attempt + 1}`);
   }
-
-  const result = await resp.json() as { content: Array<{ text: string }> };
-  return result.content[0]?.text || "";
+  return "";
 }
 
 // ─── Format helpers ──────────────────────────────────────────────────────────
@@ -399,7 +405,17 @@ Return ONLY the paragraph text (no headings, no HTML tags, no markdown). Use pla
 
   // Convert plain text paragraphs to HTML
   const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
-  return paragraphs.map(p => `<p class="narrative">${p.trim()}</p>`).join("\n");
+  if (paragraphs.length > 0) {
+    return paragraphs.map(p => `<p class="narrative">${p.trim()}</p>`).join("\n");
+  }
+
+  // Fallback: generate a data-driven executive summary if AI returned empty
+  console.warn(`Executive Summary AI returned empty for ${data.name} — using data-driven fallback`);
+  const topSpecies = data.topSpeciesNames.slice(0, 3).join(", ");
+  const topSuburbs = data.topSuburbNames.slice(0, 3).join(", ");
+  return `<p class="narrative">${data.name} is a ${data.totalRevenue > 1000000 ? "proven" : "developing"} Skedaddle market generating ${formatCurrency(data.totalRevenue, data.currencySymbol)} in trailing 12-month revenue across ${formatNumber(data.totalJobs)} closed jobs, with an average ticket of ${formatCurrency(data.avgJobValue, data.currencySymbol)}. The territory's top revenue species are ${topSpecies}.</p>
+<p class="narrative">The Google Business Profile generated ${formatNumber(data.gbp.totalCalls)} calls and ${formatNumber(data.gbp.totalClicks)} website clicks over the available tracking period. Geographically, the primary markets are ${topSuburbs}.</p>
+<p class="narrative">This report outlines a structured digital marketing program built around local SEO, hub-and-spoke content architecture, and species-specific suburb pages to grow organic visibility and lead volume across the territory.</p>`;
 }
 
 async function generateGapAnalysis(data: TerritoryDataObject, priorContext: string): Promise<string> {

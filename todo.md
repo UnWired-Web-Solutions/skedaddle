@@ -365,3 +365,4 @@
 - [x] Remove duplicate species bar chart from Dashboard — Dave prefers pie chart only (per Aug 17 meeting)
 - [ ] Build GBP YoY line overlay chart — two years on same chart for visual comparison (Dave's Aug 17 request)
 - [x] Build GBP YoY line overlay chart — two years on same chart for visual comparison (Dave's Aug 17 request)
+- [x] Fix empty Executive Summary in strategy reports — added retry logic + data-driven fallback
