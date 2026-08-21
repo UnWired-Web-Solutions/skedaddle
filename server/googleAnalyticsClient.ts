@@ -100,11 +100,11 @@ async function runAcrossTerritoryProperties<T>(
     }
   })));
   const failedProperties = settled
-    .filter((item): item is { propertyId: string; value: null; error: string } => item.error !== null)
-    .map(item => ({ propertyId: item.propertyId, error: item.error }));
+    .filter((item) => item.error !== null)
+    .map(item => ({ propertyId: item.propertyId, error: item.error! }));
   const results = settled
-    .filter((item): item is { propertyId: string; value: T; error: null } => item.value !== null)
-    .map(({ propertyId, value }) => ({ propertyId, value }));
+    .filter((item) => item.value !== null)
+    .map(({ propertyId, value }) => ({ propertyId, value: value! }));
   return {
     results,
     coverage: {

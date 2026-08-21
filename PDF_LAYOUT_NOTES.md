@@ -37,3 +37,25 @@
 3. Need `page-break-inside: avoid` on smaller tables
 4. Need `page-break-after: avoid` on section headings
 5. Need `thead { display: table-header-group }` for header repetition on multi-page tables
+
+## Post-Fix Verification — Regenerated Ottawa Report (`ottawa_v3.pdf`)
+
+### Pages 2-6 Review
+
+| Page | Result |
+|---|---|
+| 2 | Executive Summary sits cleanly on its own page with no overflow issues. |
+| 3 | Current Campaign table now fits on one page; no split. |
+| 4 | Species Analysis and Revenue by City headings are no longer orphaned; Section 04 starts properly at top of page. |
+| 5 | GBP Performance table fits fully on one page; no table continuation issue. |
+| 6 | Following narrative section begins cleanly after the GBP table. |
+
+### Verified Outcome
+
+The specific pagination issues seen in the earlier version were resolved in the regenerated PDF:
+
+1. No orphaned section headings in pages 2-6.
+2. No split tables in pages 2-6.
+3. Cleaner section starts with better page-level spacing.
+
+Further review may still be needed for later pages, but the exact layout problems previously identified on pages 2-5 are fixed.
