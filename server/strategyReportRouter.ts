@@ -4,6 +4,8 @@ import { invokeLLM } from "./_core/llm";
 import { ENV } from "./_core/env";
 import { storagePut } from "./storage";
 import puppeteer from "puppeteer";
+import { loadTerritoryReportingAnalytics } from "./territoryReportingData";
+import { suburbSlugMatchesPage } from "../shared/ga4PageClassifier";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -70,6 +72,32 @@ export interface TerritoryDataObject {
     monthly: Array<{ month: string; clicks: number; impressions: number; avg_position: number }>;
     totalClicks: number;
     totalImpressions: number;
+  };
+  ga4: {
+    monthly: Array<{
+      year: number;
+      month: number;
+      sessions: number;
+      activeUsers: number;
+      priorityPageSessions: number;
+      complete: boolean;
+    }>;
+    totalSessions: number;
+    totalPriorityPageSessions: number;
+    completeMonths: number;
+    partialMonths: number;
+    topPages: Array<{ pagePath: string; pageType: string; sessions: number; activeUsers: number }>;
+    latestImport: {
+      year: number;
+      month: number;
+      status: "complete" | "partial" | "failed";
+      propertiesExpected: number;
+      propertiesSucceeded: number;
+    } | null;
+  };
+  analyticsSource: {
+    ga4: "persisted_data_api" | "unavailable";
+    gsc: "persisted_search_console" | "historical_snapshot" | "unavailable";
   };
   seasonalTiming: string;
   topSpeciesNames: string[];
@@ -200,6 +228,7 @@ export async function buildTerritoryData(
 
   const dashData = DASHBOARD_DATA[territoryId];
   if (!dashData) throw new Error(`No dashboard data for: ${territoryId}`);
+  const reportingAnalytics = await loadTerritoryReportingAnalytics(territoryId);
 
   const totalRevenue = dashData.total_revenue;
   const totalJobs = dashData.total_jobs;
@@ -232,13 +261,17 @@ export async function buildTerritoryData(
   const suburbs = dashData.suburbs.map((s: any) => {
     // Check if we have validated page data for this suburb
     const pageStatus = knownPages[s.suburb];
+    const measuredPageExists = Boolean(
+      reportingAnalytics?.gsc.topPages.some(page => suburbSlugMatchesPage(page.pageUrl, s.suburb))
+      || reportingAnalytics?.ga4.topPages.some(page => suburbSlugMatchesPage(page.pagePath, s.suburb)),
+    );
     return {
       suburb: s.suburb,
       revenue: s.revenue,
       jobs: s.jobs,
       avgJobValue: s.jobs > 0 ? s.revenue / s.jobs : 0,
       pctRevenue: totalRevenue > 0 ? (s.revenue / totalRevenue) * 100 : 0,
-      hasPage: pageStatus !== undefined ? pageStatus : null, // null = unknown
+      hasPage: measuredPageExists ? true : pageStatus !== undefined ? pageStatus : null,
     };
   });
 
@@ -268,7 +301,10 @@ export async function buildTerritoryData(
     : "Not provided";
 
   // GSC data
-  const gscMonthly = dashData.gsc.monthly || [];
+  const hasPersistedGsc = Boolean(reportingAnalytics?.gsc.monthly.length);
+  const gscMonthly = hasPersistedGsc
+    ? reportingAnalytics!.gsc.monthly
+    : dashData.gsc.monthly || [];
   const totalGscClicks = gscMonthly.reduce((sum: number, m: any) => sum + m.clicks, 0);
   const totalImpressions = gscMonthly.reduce((sum: number, m: any) => sum + m.impressions, 0);
 
@@ -299,6 +335,29 @@ export async function buildTerritoryData(
       monthly: gscMonthly,
       totalClicks: totalGscClicks,
       totalImpressions,
+    },
+    ga4: {
+      monthly: reportingAnalytics?.ga4.monthly ?? [],
+      totalSessions: reportingAnalytics?.ga4.totalSessions ?? 0,
+      totalPriorityPageSessions: reportingAnalytics?.ga4.totalPriorityPageSessions ?? 0,
+      completeMonths: reportingAnalytics?.ga4.completeMonths ?? 0,
+      partialMonths: reportingAnalytics?.ga4.partialMonths ?? 0,
+      topPages: reportingAnalytics?.ga4.topPages ?? [],
+      latestImport: reportingAnalytics?.ga4.latestImport
+        ? {
+          year: reportingAnalytics.ga4.latestImport.year,
+          month: reportingAnalytics.ga4.latestImport.month,
+          status: reportingAnalytics.ga4.latestImport.status,
+          propertiesExpected: reportingAnalytics.ga4.latestImport.propertiesExpected,
+          propertiesSucceeded: reportingAnalytics.ga4.latestImport.propertiesSucceeded,
+        }
+        : null,
+    },
+    analyticsSource: {
+      ga4: reportingAnalytics?.ga4.monthly.length ? "persisted_data_api" : "unavailable",
+      gsc: hasPersistedGsc
+        ? "persisted_search_console"
+        : gscMonthly.length > 0 ? "historical_snapshot" : "unavailable",
     },
     seasonalTiming: SEASONAL_DATA[location.state] || SEASONAL_DATA["default"],
     topSpeciesNames: species.slice(0, 5).map((s: any) => s.species),
@@ -400,6 +459,14 @@ function escapeHtml(value: string): string {
 // ─── Section Generators ──────────────────────────────────────────────────────
 
 async function generateExecutiveSummary(data: TerritoryDataObject): Promise<string> {
+  const gscSourceLabel = data.analyticsSource.gsc === "persisted_search_console"
+    ? "persisted Search Console import"
+    : data.analyticsSource.gsc === "historical_snapshot"
+      ? "historical Search Console snapshot"
+      : "unavailable";
+  const ga4Evidence = data.ga4.monthly.length
+    ? `${formatNumber(data.ga4.totalPriorityPageSessions)} species/location-page sessions across ${data.ga4.monthly.length} imported months (${data.ga4.completeMonths} complete, ${data.ga4.partialMonths} partial)`
+    : "No persisted GA4 import available; do not claim GA4 performance";
   const prompt = `You are writing the Executive Summary section of a franchise digital marketing strategy document for Skedaddle Humane Wildlife Control — the "${data.name}" territory (${data.city}, ${data.state}, ${data.country}).
 
 TERRITORY DATA:
@@ -410,6 +477,8 @@ TERRITORY DATA:
 - Top suburbs/cities by revenue: ${data.topSuburbNames.slice(0, 6).join(", ")}
 - GBP total calls (available period): ${formatNumber(data.gbp.totalCalls)}
 - GBP total website clicks: ${formatNumber(data.gbp.totalClicks)}
+- Search Console evidence: ${data.gsc.monthly.length ? `${formatNumber(data.gsc.totalClicks)} organic clicks across ${data.gsc.monthly.length} months (${gscSourceLabel})` : "Unavailable; do not claim Search Console performance"}
+- GA4 priority-page evidence: ${ga4Evidence}
 - This territory's average job value: ${formatCurrency(data.avgJobValue, data.currencySymbol)}
 - Do not compare average job value across CAD and USD territories without an exchange-rate snapshot
 - Seasonal timing: ${data.seasonalTiming}
@@ -417,7 +486,7 @@ TERRITORY DATA:
 Write a compelling 3-4 paragraph executive summary that:
 1. Opens with the territory name and key revenue/jobs metrics
 2. Identifies the top 2-3 species driving revenue and the top suburbs generating demand
-3. Notes the GBP performance as a lead source (calls + clicks combined)
+3. Notes the available GBP, Search Console, and GA4 evidence without implying unavailable data
 4. Ends with a clear 2-sentence recommendation: structured local SEO + hub-and-spoke content model to grow organic visibility
 
 STYLE: Professional, data-backed, direct. Written like a senior digital strategist who has studied this territory's numbers. No fluff, no AI-sounding phrases like "leverage" or "harness." Every claim backed by a number from the data above.
@@ -437,7 +506,7 @@ Return ONLY the paragraph text (no headings, no HTML tags, no markdown). Use pla
   const topSpecies = data.topSpeciesNames.slice(0, 3).join(", ");
   const topSuburbs = data.topSuburbNames.slice(0, 3).join(", ");
   return `<p class="narrative">${data.name} is a ${data.totalRevenue > 1000000 ? "proven" : "developing"} Skedaddle market generating ${formatCurrency(data.totalRevenue, data.currencySymbol)} in trailing 12-month revenue across ${formatNumber(data.totalJobs)} closed jobs, with an average ticket of ${formatCurrency(data.avgJobValue, data.currencySymbol)}. The territory's top revenue species are ${topSpecies}.</p>
-<p class="narrative">The Google Business Profile generated ${formatNumber(data.gbp.totalCalls)} calls and ${formatNumber(data.gbp.totalClicks)} website clicks over the available tracking period. Geographically, the primary markets are ${topSuburbs}.</p>
+<p class="narrative">The Google Business Profile generated ${formatNumber(data.gbp.totalCalls)} calls and ${formatNumber(data.gbp.totalClicks)} website clicks over the available tracking period.${data.gsc.monthly.length ? ` The available ${data.analyticsSource.gsc === "persisted_search_console" ? "persisted Search Console import" : "historical Search Console snapshot"} recorded ${formatNumber(data.gsc.totalClicks)} organic clicks.` : " No Search Console history is available for this report."}${data.ga4.monthly.length ? ` Persisted GA4 imports recorded ${formatNumber(data.ga4.totalPriorityPageSessions)} species and location-page sessions.` : ""} Geographically, the primary markets are ${topSuburbs}.</p>
 <p class="narrative">This report outlines a structured digital marketing program built around local SEO, hub-and-spoke content architecture, and species-specific suburb pages to grow organic visibility and lead volume across the territory.</p>`;
 }
 
@@ -485,6 +554,12 @@ TERRITORY TOTALS:
 - Total revenue: ${formatCurrency(data.totalRevenue, data.currencySymbol)}
 - Total jobs: ${formatNumber(data.totalJobs)}
 - Top species: ${data.topSpeciesNames.join(", ")}
+
+MEASURED SEARCH EVIDENCE:
+- Search Console: ${data.gsc.monthly.length ? `${formatNumber(data.gsc.totalClicks)} clicks across ${data.gsc.monthly.length} months (${data.analyticsSource.gsc})` : "Unavailable — do not imply zero performance"}
+- GA4 top pages: ${data.ga4.topPages.slice(0, 8).map(page => page.pagePath).join(", ") || "No persisted GA4 page import"}
+- GA4 priority-page sessions: ${formatNumber(data.ga4.totalPriorityPageSessions)}
+- GA4 import coverage: ${data.ga4.latestImport ? `${data.ga4.latestImport.propertiesSucceeded}/${data.ga4.latestImport.propertiesExpected} properties (${data.ga4.latestImport.status})` : "Unavailable"}
 
 Write 3-4 paragraphs that:
 1. ${data.suburbPageStatus === "unknown" ? "Acknowledge that a content audit is needed, then frame the opportunity based on revenue concentration in specific suburbs" : "State the confirmed structural gap: specific suburbs generating revenue have no dedicated pages"}
@@ -895,6 +970,43 @@ function buildGbpDataHtml(data: TerritoryDataObject): string {
       </tbody>
     </table>
     <p class="narrative">Peak call month: <strong>${data.gbp.peakMonth}</strong> with ${data.gbp.peakCalls} calls. Average monthly combined activity (calls + website clicks): ${Math.round(data.gbp.avgMonthlyCalls + data.gbp.avgMonthlyClicks)}. GBP is functioning as a direct lead channel — combined calls and website clicks represent the primary inbound lead volume from local search.</p>`;
+}
+
+function buildOrganicAnalyticsHtml(data: TerritoryDataObject): string {
+  const ga4Period = data.ga4.monthly.length > 0
+    ? `${data.ga4.monthly[0].year}-${String(data.ga4.monthly[0].month).padStart(2, "0")} to ${data.ga4.monthly.at(-1)!.year}-${String(data.ga4.monthly.at(-1)!.month).padStart(2, "0")}`
+    : "not imported";
+  const gscPeriod = data.gsc.monthly.length > 0
+    ? `${data.gsc.monthly[0].month} to ${data.gsc.monthly.at(-1)!.month}`
+    : "not available";
+  const ga4Coverage = data.ga4.latestImport
+    ? `${data.ga4.completeMonths}/${data.ga4.monthly.length} imported months complete · latest successful import ${data.ga4.latestImport.propertiesSucceeded}/${data.ga4.latestImport.propertiesExpected} mapped properties`
+    : "No persisted GA4 import";
+  const topPageRows = data.ga4.topPages.slice(0, 8).map(page => `
+      <tr>
+        <td>${escapeHtml(page.pagePath)}</td>
+        <td>${escapeHtml(page.pageType.replaceAll("_", " "))}</td>
+        <td class="num">${formatNumber(page.sessions)}</td>
+      </tr>`).join("");
+  const gscRows = data.gsc.monthly.length > 0
+    ? `<tr><td>Organic clicks</td><td class="num">${formatNumber(data.gsc.totalClicks)}</td><td>${escapeHtml(data.analyticsSource.gsc.replaceAll("_", " "))} · ${gscPeriod}</td></tr>
+        <tr><td>Search impressions</td><td class="num">${formatNumber(data.gsc.totalImpressions)}</td><td>${escapeHtml(data.analyticsSource.gsc.replaceAll("_", " "))} · ${gscPeriod}</td></tr>`
+    : `<tr><td>Search Console</td><td class="num">Unavailable</td><td>No persisted import or historical snapshot</td></tr>`;
+  const ga4Rows = data.ga4.monthly.length > 0
+    ? `<tr><td>GA4 sessions</td><td class="num">${formatNumber(data.ga4.totalSessions)}</td><td>${ga4Period} · ${ga4Coverage}</td></tr>
+        <tr><td>Species + location-page sessions</td><td class="num">${formatNumber(data.ga4.totalPriorityPageSessions)}</td><td>${ga4Period} · ${ga4Coverage}</td></tr>`
+    : `<tr><td>Google Analytics 4</td><td class="num">Unavailable</td><td>No persisted GA4 import</td></tr>`;
+  return `
+    <h3>Organic Search and On-Site Performance</h3>
+    <table class="data-table">
+      <thead><tr><th>Metric</th><th>Value</th><th>Source / Coverage</th></tr></thead>
+      <tbody>
+        ${gscRows}
+        ${ga4Rows}
+      </tbody>
+    </table>
+    ${topPageRows ? `<h3>Top Imported GA4 Pages</h3><table class="data-table"><thead><tr><th>Page</th><th>Type</th><th>Sessions</th></tr></thead><tbody>${topPageRows}</tbody></table>` : `<p class="narrative">No persisted GA4 page import is available. GA4 claims are intentionally omitted until a completed month is imported.</p>`}
+    ${data.ga4.partialMonths > 0 ? `<p class="narrative"><strong>Coverage warning:</strong> ${data.ga4.partialMonths} imported GA4 month${data.ga4.partialMonths === 1 ? " is" : "s are"} partial and must not be treated as complete territory totals.</p>` : ""}`;
 }
 
 function buildScaleComparisonHtml(data: TerritoryDataObject): string {
@@ -1331,7 +1443,7 @@ function buildFullReportHtml(data: TerritoryDataObject, sections: SectionResult[
     <strong>Date:</strong> ${dateStr}<br>
     <strong>Territory Revenue (T12):</strong> ${formatCurrency(data.totalRevenue, data.currencySymbol)}<br>
     <strong>Closed Jobs (T12):</strong> ${formatNumber(data.totalJobs)}<br>
-    <strong>Data Sources:</strong> Salesforce CRM, Google Business Profile Insights${data.gsc.totalClicks > 0 ? ", Google Search Console" : ""}
+    <strong>Data Sources:</strong> Salesforce CRM, Google Business Profile Insights${data.gsc.monthly.length > 0 ? data.analyticsSource.gsc === "persisted_search_console" ? ", persisted Google Search Console import" : ", historical Google Search Console snapshot" : ""}${data.ga4.monthly.length > 0 ? ", persisted Google Analytics 4 Data API import" : ""}
   </div>
 </div>
 
@@ -1506,8 +1618,8 @@ export async function generateStrategyReport(
 
   // Step 6: GBP Performance Data (Template)
   onProgress?.("Building GBP Performance section...", 38);
-  const gbpHtml = buildGbpDataHtml(data);
-  sections.push({ id: "data_foundation", title: "Google Business Profile Performance", html: gbpHtml, isAiGenerated: false });
+  const performanceHtml = buildGbpDataHtml(data) + buildOrganicAnalyticsHtml(data);
+  sections.push({ id: "data_foundation", title: "Digital Performance — GBP, Search Console & GA4", html: performanceHtml, isAiGenerated: false });
   priorContext += `GBP: ${formatNumber(data.gbp.totalCalls)} calls, ${formatNumber(data.gbp.totalClicks)} clicks over ${data.gbp.monthly.length} months. Peak: ${data.gbp.peakMonth}. `;
 
   // Step 7: Gap Analysis (AI)

@@ -10,6 +10,7 @@ import { getDb } from "./db";
 import { suburbPages } from "../drizzle/schema";
 import { eq, desc } from "drizzle-orm";
 import { buildSuburbSchema, type SuburbSchemaParams } from "./templates/suburbPageSchema";
+import { findSuburbAnalyticsEvidence } from "./territoryReportingData";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -584,7 +585,18 @@ export async function generateSuburbPageContent(
 
   // ─── Step 0: Run Sonar research in parallel with data prep ─────────────────
   console.log(`[SuburbPage] Running Sonar research for ${suburbName}, ${state}...`);
-  const research = await researchSuburb(suburbName, state, country, territoryName);
+  const [research, measuredPageEvidence] = await Promise.all([
+    researchSuburb(suburbName, state, country, territoryName),
+    findSuburbAnalyticsEvidence(territoryId, suburbName),
+  ]);
+  const measuredPageUrl = measuredPageEvidence.gscPages[0]?.pageUrl
+    || measuredPageEvidence.ga4Pages[0]?.pagePath
+    || null;
+  if (measuredPageUrl) {
+    research.existingPageUrl = measuredPageUrl;
+    research.existingPageStatus = "Existing page confirmed by imported Search Console or GA4 data";
+    research.existingPageCitation = measuredPageEvidence.gscPages[0]?.pageUrl || measuredPageUrl;
+  }
   console.log(`[SuburbPage] Sonar research complete. Page status: ${research.existingPageStatus}`);
 
   // Explicit operator input wins. Research suggestions remain evidence to review,
@@ -676,6 +688,7 @@ export async function generateSuburbPageContent(
     { item: "H1 includes suburb name", status: "ready" as const },
     { item: "Species sections match territory revenue weighting and avoid suburb-level demand claims", status: "ready" as const },
     { item: "Internal links to species pages verified", status: "needs_review" as const },
+    { item: "Existing suburb page checked against imported GSC/GA4 evidence", status: measuredPageUrl ? "ready" as const : "needs_review" as const },
     { item: "Phone number verified against GBP", status: options?.phone ? "ready" as const : "pending" as const },
     { item: "NAP consistent with GBP listing", status: options?.phone ? "ready" as const : "pending" as const },
     { item: "Schema validates in Google Rich Results Test", status: "needs_review" as const },
@@ -692,7 +705,7 @@ export async function generateSuburbPageContent(
     { fact: `Seasonal timing: ${seasonalTiming}`, source: "Curated regional planning guidance — reviewer confirmation required", verified: false },
     { fact: `Franchise founded: ${yearsServing}`, source: options?.yearsServing ? "Google Business Profile" : "Needs franchisor confirmation", verified: !!options?.yearsServing },
     // Sonar-verified citations
-    { fact: `Existing Skedaddle page: ${research.existingPageStatus}`, source: research.existingPageCitation || "Perplexity Sonar research — reviewer confirmation required", verified: false },
+    { fact: `Existing Skedaddle page: ${research.existingPageStatus}`, source: research.existingPageCitation || "Perplexity Sonar research — reviewer confirmation required", verified: Boolean(measuredPageUrl) },
     ...(research.county ? [{ fact: `Research-suggested county: ${research.county}`, source: research.localFactsCitations[0] || "Perplexity Sonar research — reviewer confirmation required", verified: false }] : []),
     ...(research.verifiedNeighbourhoods.length > 0 ? [{ fact: `Research-suggested neighbourhoods: ${research.verifiedNeighbourhoods.join(", ")}`, source: research.localFactsCitations[0] || "Perplexity Sonar research — reviewer confirmation required", verified: false }] : []),
     ...(research.topCompetitors.length > 0 ? [{ fact: `Research-suggested competitors: ${research.topCompetitors.map(c => c.name).join(", ")}`, source: research.competitorCitations[0] || "Perplexity Sonar research — reviewer confirmation required", verified: false }] : []),

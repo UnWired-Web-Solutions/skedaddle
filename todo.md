@@ -12,24 +12,23 @@
 - [x] Create and save the complete owner-account inventory of authorised Skedaddle domain and URL-prefix properties — 72 owner-visible Skedaddle properties saved in `GSC_OWNER_PROPERTY_INVENTORY_2026-08-19.json`
 - [x] Create an explicit Search Console scope-decision registry for all 19 territories — `ready`, `partial`, and `review_required` states prevent unverified imports
 - [x] Reuse the existing territory/sub-market mapping with live Search Console page evidence to resolve eligible remaining path scopes — Durham, Ottawa, Milwaukee, Barrie/York Region, Orangeville, and Okanagan are now ready
-- [ ] Resolve and document canonical Search Console path(s) for territories that remain `partial` or `review_required`
 - [x] Resolve and document canonical Search Console path(s) for territories that remain `partial` or `review_required` — all 7 resolved using live GSC page evidence
 - [x] Confirm import boundaries for remaining overlapping or incomplete territories — Hamilton (304 pages), London (51), Denver (72), Coquitlam (206), Atlanta North (172), Baltimore (83), Windsor (21) all imported Jul 2026
 - [x] Import and backfill Search Console data for the newly verified ready territories — Durham, Ottawa, Milwaukee, Barrie/York Region, Orangeville, and Okanagan each have April 2025–July 2026 coverage
 
 ## Google Analytics 4 Connection (Aug 19, 2026)
 - [x] Enable the GA4 Data API in the UWS Google Cloud project
-- [x] Verify GA4 property access — check if UWS account has viewer access to the Skedaddle Wildlife GA4 property (p394014501) — CONFIRMED BLOCKED: "Missing permissions"
-- [x] Discover all GA4 properties — found 129 properties under account 39401450, mapped to 19 territories
+- [x] Diagnose the original GA4 `p394014501` permission error — that identifier was not the intended Data API property; account-level service-account access is now confirmed
+- [x] Discover all GA4 properties — found 129 properties under account 39401450; 103 unique sub-location properties are assigned to 19 portal territories, plus one control property
 - [x] Build the GA4 client (googleAnalyticsClient.ts) and territory-filtered reporting endpoint
 - [x] Create GA4 territory property mapping (shared/ga4TerritoryProperties.ts)
-- [ ] Add the service account as Viewer on the Skedaddle Wildlife GA4 account (account-level access grants access to all properties)
 - [x] Add the service account as Administrator on the Skedaddle Wildlife GA4 account — done via Analytics Admin API (accounts/39401450/accessBindings)
 - [x] Live GA4 Data API connection verified — Ottawa 1,887 sessions, Minneapolis 1,004 sessions (Jan-Jul 2026)
-- [x] Rewrote GA4 client to aggregate across territory sub-location properties (129 properties → 19 territories)
+- [x] Rewrote GA4 client to aggregate explicitly assigned territory sub-location properties (103 unique properties → 19 territories) with bounded concurrency and visible coverage
 - [x] Added live GA4 territory procedures: getGA4TerritoryMonthly, getGA4TerritoryTopPages, getGA4TerritoryTopCities, getGA4TerritoryChannelBreakdown, getGA4ReadyTerritories
 - [x] Added live GA4 panels to Analytics page: Top Pages table, Top Cities list, Channel Breakdown bars
-- [ ] Import and persist GA4 metrics for verified territories (for historical comparison)
+- [x] Build durable GA4 monthly/page importer, audit trail, registered migration, mapping validation, and coverage-aware dashboard refresh
+- [ ] Apply migrations `0004` and `0005`, then backfill completed GA4 months for all 19 territories before treating YoY coverage as complete
 
 ## DashThis Replacement — GSC Enhancements (Aug 19, 2026)
 - [x] Add getSearchConsoleYTD procedure — YTD clicks/impressions with same-period-last-year comparison
@@ -132,27 +131,27 @@
 ## PRIORITY 1 — Territory Reports (IMMEDIATE — Dave booking calls NOW)
 - [x] Finish remaining 15 territory strategy reports
 - [ ] Email Kira for raw Salesforce CSV exports (not through Looker Studio)
-- [ ] Fix page validation — use GSC/GA to confirm pages exist before saying "no page found"
-- [ ] Add network close ratio by species as benchmark comparison in reports
-- [ ] Clarify USD vs CAD in revenue rankings (top 15 markets)
-- [ ] Get Ottawa GA4 data connected
-- [ ] Apply Skedaddle branding (logo + colors) to reports and dashboard
-- [ ] Stop framing total sessions as the KPI — focus on species-specific and suburb/hub page sessions
-- [ ] Acknowledge Hamilton covers multiple sub-markets (Kitchener, Guelph, Cambridge, Niagara, Oakville)
+- [x] Fix page validation — imported GSC/GA4 page evidence is checked before saying a suburb page exists or is missing
+- [x] Add network close ratio by species as benchmark comparison in reports
+- [x] Clarify USD vs CAD in revenue rankings (top 15 markets)
+- [x] Get Ottawa GA4 access connected; durable historical backfill remains pending
+- [x] Apply Skedaddle branding (logo + colors) to reports and dashboard
+- [x] Stop framing total sessions as the KPI — focus on species-specific and suburb/hub page sessions
+- [x] Acknowledge Hamilton covers multiple sub-markets (Kitchener, Guelph, Cambridge, Niagara, Oakville)
 
 ## PRIORITY 2 — Content Generation from Analysis
-- [ ] Take analysis output → generate suburb page content (SEO-optimized)
-- [ ] Build content into a checklist/approval workflow
+- [x] Take analysis output → generate suburb page content (SEO-optimized)
+- [x] Build content into a checklist/approval workflow
 - [ ] Content assigned to dev for WordPress page build
 - [ ] Integrate AEO/GDO optimization research into content generation instructions
 - [ ] Content plan specifies which GBP posts link back to which suburb/species pages
 
 ## PRIORITY 3 — Replicate DashThis Analytics in Dashboard
 - [ ] Google Analytics page performance (sessions, engagement, key events)
-- [ ] Google Search Console data (clicks, impressions, avg position, top queries)
-- [ ] Google Business Profile data (website clicks, phone calls by month)
-- [ ] Month/year filter + year-over-year comparison (last June vs this June)
-- [ ] Territory switching (view any location from one interface)
+- [x] Google Search Console data (clicks, impressions, avg position, top queries)
+- [x] Google Business Profile data (website clicks, phone calls by month; currently manual/static imports)
+- [x] Month/year filter + year-over-year comparison (last June vs this June)
+- [x] Territory switching (view any location from one interface)
 - [ ] Google Ads overview (spend, top cities, Local Service Ads) — future
 - [ ] Meta/Facebook Ads performance — future
 
@@ -231,7 +230,7 @@
 - [x] Fix top 15 markets ranking: stable, consistent, with currency flags (Network page)
 - [x] Add network close rate benchmark by species to analytics dashboard (Dashboard.tsx close rate table)
 - [x] Fix sessions display: focus on species-specific + suburb/city pages only (Analytics.tsx)
-- [ ] Fix page validation in reports: use GA4 data to confirm pages exist
+- [x] Fix page validation in reports: use imported GA4 and GSC data to confirm page evidence
 - [ ] Fix Ottawa missing from GA4 session rankings
 - [ ] Fix Denver (Colorado) missing from session rankings
 - [x] Flag GBP data as incomplete for multi-GBP territories (GBP disclaimer note added to Analytics.tsx)
@@ -326,7 +325,7 @@
 - [x] Add sub-market context from territoryMapping.ts (Hamilton covers 7 sub-locations, etc.)
 - [x] Show sub-market list and GBP listing count in Current Campaign section
 - [x] Update tests to reflect new data structure (60/60 passing)
-- [ ] Filter sessions to species-specific and suburb pages only (not total sessions) — requires GA4 page-level data not yet ingested
+- [x] Filter sessions to species-specific and suburb pages only (not total sessions) when direct GA4 page imports are present; migration/backfill still required
 
 ## Suburb Page Content Generator (Aug 5, 2026)
 - [x] Save Prior Lake template as schema reference in project

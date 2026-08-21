@@ -156,8 +156,8 @@ The project has direct access to Anthropic, OpenAI, Perplexity, and built-in For
 | OpenAI API | Active | Use latest appropriate direct model when needed |
 | Forge image service | Active | GPT Image 2 used for GBP images |
 | Salesforce OAuth | Code complete; not connected | Requires Connected App credentials and Barry’s authorization |
-| GA4 | Account accessible, target property blocked | Ares/IME must grant `uws@unwiredwebsolutions.com` access to property `p394014501` |
-| GSC API | Not configured | Requires a Google Cloud service account and property permissions |
+| GA4 | Active | 129 account properties discovered; 103 unique sub-location properties assigned to 19 portal territories, plus one control property |
+| GSC API | Active | 19/19 territory scopes ready with Apr 2025–Jul 2026 imported coverage |
 | GBP API | Not configured | Required for post automation and verified GBP records |
 | WordPress REST API | Not configured | Required before any auto-publishing workflow |
 
@@ -194,9 +194,9 @@ The work should proceed in this order unless Dave or Ay changes it.
 
 | Priority | Workstream | Current next action |
 |---:|---|---|
-| 1 | Report reliability | Incorporate the reporting-coherence branch after validation; test a real territory report with confirmed campaign inputs |
+| 1 | Report reliability | Apply and backfill the coverage-aware GA4 import, then test one real territory report against persisted GA4/GSC evidence and confirmed campaign inputs |
 | 2 | Suburb page delivery | End-to-end test a real page, beginning with a known territory/suburb; review research, local facts, schema, citations, and export |
-| 3 | Search and analytics data | Obtain GSC service-account access and GA4 property access for genuine page-level validation |
+| 3 | Search and analytics data | Apply the registered GA4 migrations and backfill completed months so coverage-aware GA4 page evidence can replace the legacy spreadsheet fallback |
 | 4 | GBP automation | Build a review-first content calendar and approval queue; do not auto-post until GBP API OAuth and safeguards are complete |
 | 5 | Salesforce direct data | Complete Barry’s Connected App authorization, then inspect schema and build only verified extraction queries |
 | 6 | WordPress publishing | Add only after an approved review state and confirmed WordPress REST API scope/permissions |
@@ -204,25 +204,26 @@ The work should proceed in this order unless Dave or Ay changes it.
 ### Work explicitly waiting on people or access
 
 * **Barry:** Salesforce Connected App credentials and authorization.
-* **Ares / IME:** GA4 Viewer/Analyst access for the Skedaddle Wildlife property.
-* **Dave / Ryan:** GSC service-account permission; Google Business Profile API direction; WordPress API details.
+* **Dave / Ryan:** Google Business Profile API direction and WordPress API details.
 * **Kira:** Any further verified Salesforce exports, including missing Barrie North data.
 
-## 9. Active GPT Branch: Product Coherence and Reporting
+## 9. Active GPT Branch: Analytics and Report Integration
 
-GPT has prepared `codex/product-coherence-reporting`. Its intended improvements are valuable and mostly align with the data rules in this brief:
+The active repair branch is `agent/analytics-report-integration`, created from current `origin/main`. It preserves the Search Console, GA4, and GBP image workflow files already on main.
 
-* Replaces inferred GBP publishing volume and generic blog volume with explicit confirmed inputs or **Not provided**.
-* Makes proposed GBP, blog, and page-build volumes operator-entered campaign values rather than invented recommendations presented as commitments.
-* Removes CAD/USD average-job-value comparisons without an exchange-rate methodology.
-* Reframes assumptions as delivery dependencies and data gaps rather than unsupported negative performance claims.
-* Uses more cautious treatment of Sonar-derived local facts, competitors, and page status.
-* Improves proposal export so the PDF uses the reviewed HTML rather than triggering a second, potentially different AI call.
-* Removes a fabricated page-image URL from JSON-LD and requires more explicit suburb-page inputs.
+Its scope is intentionally narrow:
+
+* Correct the GA4 mapping claim: 129 account properties discovered, 103 uniquely assigned to the 19 portal territories, one control property, and 25 outside the current territory map.
+* Remove the duplicate Pasadena property assignment that could double-count a territory aggregate.
+* Persist direct GA4 monthly and page-level imports with complete/partial/failed audit records.
+* Show property coverage for direct GA4 panels instead of silently presenting partial totals as complete.
+* Feed persisted GA4/GSC evidence into analytics, strategy reports, proposals, and suburb-page validation.
+* Restore the existing admin-only Suburb Page Generator route and navigation.
+* Register the previously unjournaled GBP workflow migration before the GA4 migration.
 
 ### Merge status at handoff
 
-The branch is a clean descendant of `main`, but it initially failed TypeScript validation because `client/src/pages/Dashboard.tsx` was missing a closing `</BarChart>` tag. That defect has been repaired in an isolated review worktree. It still needs a full type-check and test run before a merge to `main`.
+Do not merge until TypeScript, Vitest, and build checks pass in an environment with dependencies installed. Apply migrations `0004` and `0005`, then run an explicit GA4 backfill before calling the YoY dashboard complete.
 
 ## 10. Collaboration Protocol
 
@@ -239,7 +240,7 @@ The branch is a clean descendant of `main`, but it initially failed TypeScript v
 
 ## 11. Suggested First Actions for a Collaborating GPT
 
-First, complete the validation and merge of the reporting-coherence branch once the repaired `Dashboard.tsx` passes TypeScript and tests. Second, add a transparent Sonar research progress state to the Suburb Page UI. Third, generate one real suburb page and one strategy report with **confirmed** campaign inputs, then have Ay/Dave review the output before scaling.
+First, validate the active analytics branch with TypeScript, Vitest, and a production build. Second, apply migrations `0004` and `0005` and backfill a complete GA4 comparison window. Third, generate one real suburb page, proposal, and strategy report with confirmed campaign inputs and compare every analytics claim to the persisted source data before Ay/Dave reviews it.
 
 Do not start GBP auto-posting, WordPress publishing, Salesforce data extraction, or broad live-data claims until the corresponding credentials, authorization, and review safeguards are in place.
 
@@ -253,9 +254,9 @@ The following files and directories are critical infrastructure that must never 
 |---|---|
 | `server/googleSearchConsoleClient.ts` | Live GSC API client (service account auth) |
 | `server/googleSearchConsoleImporter.ts` | Territory-scoped GSC data importer |
-| `server/googleAnalyticsClient.ts` | Live GA4 Data API client (129 properties → 19 territories) |
+| `server/googleAnalyticsClient.ts` | Live GA4 Data API client (103 assigned properties → 19 territories, with coverage reporting) |
 | `shared/gscTerritoryPaths.ts` | GSC territory scope registry (all 19 ready) |
-| `shared/ga4TerritoryProperties.ts` | GA4 property-to-territory mapping (129 properties) |
+| `shared/ga4TerritoryProperties.ts` | GA4 property-to-territory mapping (103 unique assigned properties; 129 account properties discovered) |
 | `server/analyticsRouter.ts` | Analytics tRPC router (GSC + GA4 + GBP procedures) |
 | `scripts/ingest-search-console.mjs` | Guarded GSC import script |
 | `GA4_ACCESS_STATUS.md` | GA4 connection documentation |
@@ -268,7 +269,7 @@ The following files and directories are critical infrastructure that must never 
 | Source | Status | Details |
 |---|---|---|
 | Google Search Console | ✅ LIVE | 19/19 territories ready, Apr 2025–Jul 2026 coverage |
-| Google Analytics 4 | ✅ LIVE | 129 properties, 19 territories, real-time via Data API |
+| Google Analytics 4 | ✅ LIVE / BACKFILL PENDING | 129 account properties discovered; 103 uniquely assigned to 19 territories; durable coverage-aware importer implemented |
 | Salesforce | ❌ BLOCKED | Awaiting Barry's Connected App credentials (Zoom call requested) |
 | GBP Data | ✅ STATIC | Monthly metrics in dashboardData.ts from manual exports |
 | Perplexity Sonar | ✅ AVAILABLE | Wired for suburb page research (feature halted per Dave) |

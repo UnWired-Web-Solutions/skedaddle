@@ -1,4 +1,4 @@
-CREATE TABLE `gbp_image_jobs` (
+CREATE TABLE IF NOT EXISTS `gbp_image_jobs` (
 	`id` varchar(64) NOT NULL,
 	`status` enum('pending','running','completed','partial','failed','interrupted') NOT NULL DEFAULT 'pending',
 	`total` int NOT NULL DEFAULT 0,
@@ -12,7 +12,7 @@ CREATE TABLE `gbp_image_jobs` (
 	KEY `gbp_jobs_status_updated_idx` (`status`,`updatedAt`)
 );
 --> statement-breakpoint
-CREATE TABLE `gbp_image_assets` (
+CREATE TABLE IF NOT EXISTS `gbp_image_assets` (
 	`id` int AUTO_INCREMENT NOT NULL,
 	`generationJobId` varchar(64),
 	`sourceHash` varchar(64) NOT NULL,

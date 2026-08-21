@@ -1,4 +1,4 @@
-import { index, int, json, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { index, int, json, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -42,6 +42,87 @@ export const ga4Sessions = mysqlTable("ga4_sessions", {
 
 export type GA4Session = typeof ga4Sessions.$inferSelect;
 export type InsertGA4Session = typeof ga4Sessions.$inferInsert;
+
+/**
+ * Canonical monthly GA4 totals imported directly from the Data API.
+ * Coverage fields make partial property aggregation visible instead of silently
+ * presenting an incomplete territory total as authoritative.
+ */
+export const ga4TerritoryMonthly = mysqlTable("ga4_territory_monthly", {
+  id: int("id").autoincrement().primaryKey(),
+  territoryId: varchar("territoryId", { length: 64 }).notNull(),
+  year: int("year").notNull(),
+  month: int("month").notNull(),
+  sessions: int("sessions").notNull().default(0),
+  activeUsers: int("activeUsers").notNull().default(0),
+  priorityPageSessions: int("priorityPageSessions").notNull().default(0),
+  propertiesExpected: int("propertiesExpected").notNull().default(0),
+  propertiesSucceeded: int("propertiesSucceeded").notNull().default(0),
+  importedAt: timestamp("importedAt").defaultNow().notNull(),
+}, (table) => ({
+  territoryPeriodIdx: uniqueIndex("ga4_territory_monthly_period_idx").on(
+    table.territoryId,
+    table.year,
+    table.month,
+  ),
+}));
+
+export type GA4TerritoryMonthly = typeof ga4TerritoryMonthly.$inferSelect;
+export type InsertGA4TerritoryMonthly = typeof ga4TerritoryMonthly.$inferInsert;
+
+/** Page-level rows from the same direct GA4 monthly import. */
+export const ga4TerritoryPages = mysqlTable("ga4_territory_pages", {
+  id: int("id").autoincrement().primaryKey(),
+  territoryId: varchar("territoryId", { length: 64 }).notNull(),
+  year: int("year").notNull(),
+  month: int("month").notNull(),
+  pagePath: text("pagePath").notNull(),
+  pagePathHash: varchar("pagePathHash", { length: 64 }).notNull(),
+  pageType: varchar("pageType", { length: 32 }).notNull(),
+  sessions: int("sessions").notNull().default(0),
+  activeUsers: int("activeUsers").notNull().default(0),
+  importedAt: timestamp("importedAt").defaultNow().notNull(),
+}, (table) => ({
+  territoryPeriodTypeIdx: index("ga4_territory_pages_period_type_idx").on(
+    table.territoryId,
+    table.year,
+    table.month,
+    table.pageType,
+  ),
+  territoryPeriodPathIdx: uniqueIndex("ga4_territory_pages_period_path_idx").on(
+    table.territoryId,
+    table.year,
+    table.month,
+    table.pagePathHash,
+  ),
+}));
+
+export type GA4TerritoryPage = typeof ga4TerritoryPages.$inferSelect;
+export type InsertGA4TerritoryPage = typeof ga4TerritoryPages.$inferInsert;
+
+/** Audit trail for every direct GA4 import attempt. */
+export const ga4ImportRuns = mysqlTable("ga4_import_runs", {
+  id: int("id").autoincrement().primaryKey(),
+  territoryId: varchar("territoryId", { length: 64 }).notNull(),
+  year: int("year").notNull(),
+  month: int("month").notNull(),
+  status: mysqlEnum("status", ["complete", "partial", "failed"]).notNull(),
+  propertiesExpected: int("propertiesExpected").notNull().default(0),
+  propertiesSucceeded: int("propertiesSucceeded").notNull().default(0),
+  failedPropertiesJson: text("failedPropertiesJson"),
+  errorMessage: text("errorMessage"),
+  importedAt: timestamp("importedAt").defaultNow().notNull(),
+}, (table) => ({
+  territoryPeriodIdx: index("ga4_import_runs_territory_period_idx").on(
+    table.territoryId,
+    table.year,
+    table.month,
+    table.importedAt,
+  ),
+}));
+
+export type GA4ImportRun = typeof ga4ImportRuns.$inferSelect;
+export type InsertGA4ImportRun = typeof ga4ImportRuns.$inferInsert;
 
 /**
  * GBP metrics by territory, metric type, year, and month.

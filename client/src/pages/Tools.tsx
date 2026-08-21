@@ -9,6 +9,7 @@ const TOOLS = [
   { name: "GBP Images", description: "Generate branded illustrative images for individual or bulk GBP posts.", href: "/gbp-images", icon: ImageIcon, adminOnly: false },
   { name: "Proposal Generator", description: "Confirm commercial terms, review one proposal draft, and export that exact draft.", href: "/proposals", icon: FileText, adminOnly: true },
   { name: "Initial Sales Strategy Report", description: "Build the pre-sale territory report from sourced data and explicitly confirmed campaign scope.", href: "/strategy-report", icon: FileBarChart, adminOnly: true },
+  { name: "Suburb Page Generator", description: "Research, draft, review, and approve suburb content using territory revenue plus imported GSC/GA4 page evidence.", href: "/suburb-pages", icon: MapPin, adminOnly: true },
 ];
 
 export default function Tools() {

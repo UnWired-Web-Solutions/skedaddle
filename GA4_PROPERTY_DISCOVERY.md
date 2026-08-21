@@ -1,60 +1,44 @@
-# GA4 Property Discovery — Aug 19, 2026
+# GA4 Property Discovery — Aug 19–21, 2026
 
-## Key Finding
-The Skedaddle Wildlife GA4 account (39401450) uses SEPARATE properties per territory.
-The UWS account HAS full access to this account (not blocked as previously thought).
-The wrong property ID (p394014501) was causing the "Missing permissions" error.
+## Final Finding
 
-## Confirmed Properties (from property picker):
-| Property ID | Full Name (from header) | Territory |
+The Skedaddle Wildlife GA4 account (`39401450`) uses separate properties for many sub-locations. The earlier `p394014501` identifier was not a valid reporting property ID for the intended Data API queries, which caused the original permission diagnosis to be wrong.
+
+The Analytics Admin API discovery found **129 account properties**. That number is an account inventory count, not the number assigned to the portal's 19 reporting territories.
+
+## Audited Portal Scope
+
+| Scope | Count |
+|---|---:|
+| Account properties discovered | 129 |
+| Unique sub-location properties assigned to the 19 portal territories | 103 |
+| Corporate/network control property | 1 |
+| Properties outside the current territory map | 25 |
+| Duplicate territory assignments | 0 |
+
+The canonical, testable mapping is `shared/ga4TerritoryProperties.ts`. `getGA4MappingSummary()` verifies these counts and reports duplicate property ownership.
+
+## Examples
+
+| Property ID | Property | Canonical portal territory |
 |---|---|---|
-| 386412751 | Skedaddle Wildlife Pickering - GA4 | Durham (Pickering) |
-| 475791585 | Skedaddle Wildlife Pickerington - GA4 | Columbus (Pickerington, OH) |
-| 487034337 | TBD | TBD |
-| 426814229 | TBD | TBD |
-| 386492593 | TBD | TBD |
-| (more) | TBD | TBD |
+| `386412751` | Pickering | `durham` |
+| `475791585` | Pickerington | `oh-columbus` |
+| `487034337` | Pittsburgh | `pa-pittsburgh` |
+| `426814229` | Prince George's County | `maryland-central` |
+| `387167599` | Sudbury | Outside the current 19-territory portal map |
+| `475791279` | Sunbury | `oh-columbus` |
+| `409157507` | Thornhill | `barrie-north` |
 
-## How to identify remaining properties:
-- Open property picker → click each one → check the header name
-- Or use GA4 Admin API to list all properties under account 39401450
+Property `455082263` (Pasadena) is assigned only to `maryland-central`. Its former duplicate assignment to `md-baltimore` was removed to prevent double-counting.
 
-## Next Steps:
-1. Use the GA4 Admin API (analytics admin v1alpha) to list ALL properties under account 39401450
-2. Map each property to its territory
-3. Add service account as viewer on each property
-4. Update googleAnalyticsClient.ts to use per-territory property IDs
+## Reporting Rules
 
-## Properties Discovered from Picker (scrolling through):
+1. Aggregate only properties explicitly assigned to the selected canonical territory.
+2. Never describe all 129 account properties as territory-mapped.
+3. Return expected, succeeded, and failed property coverage for live queries.
+4. Persist completed-month totals and page rows with a complete/partial/failed audit record.
+5. Do not treat a partial import as a complete territory result.
+6. Apply migrations `0004` and `0005` before the first durable GA4 import.
 
-### First batch (from previous page extract):
-- 386412751 — Skedaddle Wildlife Pickering - GA4
-- 475791585 — Skedaddle Wildlife Pickerington - GA4
-- 487034337 — Skedaddle Wildlife Pittsburgh - GA4
-- 426814229 — Skedaddle Wildlife Prince George's County - GA4
-- 386492593 — Skedaddle Wildlife R... (truncated — need to scroll more)
-- 475753023 — Skedaddle Wildlife ... (truncated)
-
-### Second batch (after scrolling):
-- 387167599 — Skedaddle Wildlife Sudbury - GA4
-- 475791279 — Skedaddle Wildlife Sunbury - GA4
-- 409157507 — Skedaddle Wildlife Thornhill - GA4
-- ????????? — Skedaddle Wildlife Thornton - G... (truncated)
-- 391929833 — Skedaddle Wildlife ... (truncated)
-- 365729... — Skedaddle Wildlife ... (truncated)
-
-### Territory Mapping (confirmed so far):
-| Property ID | Property Name | Our Territory ID |
-|---|---|---|
-| 386412751 | Skedaddle Wildlife Pickering - GA4 | durham |
-| 475791585 | Skedaddle Wildlife Pickerington - GA4 | columbus |
-| 487034337 | Skedaddle Wildlife Pittsburgh - GA4 | pittsburgh |
-| 426814229 | Skedaddle Wildlife Prince George's County - GA4 | maryland-central |
-| 387167599 | Skedaddle Wildlife Sudbury - GA4 | (not in our 19 territories) |
-| 475791279 | Skedaddle Wildlife Sunbury - GA4 | (not in our 19 territories) |
-| 409157507 | Skedaddle Wildlife Thornhill - GA4 | barrie-york-region |
-
-## Strategy:
-Rather than manually clicking through 30+ properties, use the GA4 Admin API
-(analyticsadmin v1alpha) to programmatically list ALL properties under account 39401450.
-This will give us the complete mapping in one API call.
+Implementation details and run commands are documented in `GA4_ACCESS_STATUS.md`.

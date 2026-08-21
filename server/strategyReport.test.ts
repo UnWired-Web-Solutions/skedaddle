@@ -59,6 +59,14 @@ describe("Strategy Report Router", () => {
     expect(data.gsc).toHaveProperty("totalClicks");
     expect(data.gsc).toHaveProperty("totalImpressions");
 
+    // Persisted analytics data is preferred when available and explicit when absent.
+    expect(data.ga4).toHaveProperty("monthly");
+    expect(data.ga4).toHaveProperty("totalSessions");
+    expect(data.ga4).toHaveProperty("totalPriorityPageSessions");
+    expect(data.ga4).toHaveProperty("completeMonths");
+    expect(data.ga4).toHaveProperty("partialMonths");
+    expect(data).toHaveProperty("analyticsSource");
+
     // Derived fields
     expect(data.topSpeciesNames.length).toBeGreaterThan(0);
     expect(data.topSuburbNames.length).toBeGreaterThan(0);

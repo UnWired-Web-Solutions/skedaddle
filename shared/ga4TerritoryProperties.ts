@@ -6,7 +6,10 @@
  *
  * Territory IDs match shared/territoryMapping.ts (the canonical source).
  * Account: Skedaddle Wildlife (39401450)
- * Total properties discovered: 129
+ * Account properties discovered: 129. The portal currently assigns 103
+ * unique sub-location properties to the 19 canonical reporting territories.
+ * The remainder are the control property or locations outside this portal's
+ * current territory set; they must not be implied to be territory-mapped.
  * Generated: Aug 19, 2026
  */
 
@@ -74,8 +77,8 @@ export const GA4_TERRITORY_PROPERTIES: GA4TerritoryMapping[] = [
   },
   {
     territoryId: "md-baltimore",
-    propertyIds: ["455121039", "455174211", "455120736", "455111143", "455173388", "455159446", "487050874", "455082263"],
-    notes: "Sub-locations: Baltimore, Bethesda, Montgomery County, Rockville, Silver Springs, Wheaton, Washington, Pasadena",
+    propertyIds: ["455121039", "455174211", "455120736", "455111143", "455173388", "455159446", "487050874"],
+    notes: "Sub-locations: Baltimore, Bethesda, Montgomery County, Rockville, Silver Springs, Wheaton, Washington",
   },
   {
     territoryId: "milwaukee",
@@ -122,4 +125,30 @@ export const GA4_TERRITORY_PROPERTIES: GA4TerritoryMapping[] = [
 export function getGA4PropertiesForTerritory(territoryId: string): string[] {
   const mapping = GA4_TERRITORY_PROPERTIES.find(t => t.territoryId === territoryId);
   return mapping?.propertyIds ?? [];
+}
+
+export const GA4_ACCOUNT_PROPERTY_COUNT = 129;
+
+export function getGA4MappingSummary() {
+  const assigned = GA4_TERRITORY_PROPERTIES.flatMap(mapping =>
+    mapping.propertyIds.map(propertyId => ({ propertyId, territoryId: mapping.territoryId })),
+  );
+  const owners = new Map<string, string[]>();
+  for (const item of assigned) {
+    owners.set(item.propertyId, [...(owners.get(item.propertyId) ?? []), item.territoryId]);
+  }
+  const duplicates = Array.from(owners.entries())
+    .filter(([, territoryIds]) => territoryIds.length > 1)
+    .map(([propertyId, territoryIds]) => ({ propertyId, territoryIds }));
+
+  return {
+    accountPropertiesDiscovered: GA4_ACCOUNT_PROPERTY_COUNT,
+    territoryCount: GA4_TERRITORY_PROPERTIES.length,
+    assignedReferences: assigned.length,
+    uniqueAssignedProperties: owners.size,
+    duplicates,
+    controlProperty: SKEDADDLE_GA4_CONTROL_PROPERTY,
+    accountPropertiesOutsideCurrentTerritoryMap:
+      GA4_ACCOUNT_PROPERTY_COUNT - owners.size - (owners.has(SKEDADDLE_GA4_CONTROL_PROPERTY) ? 0 : 1),
+  };
 }

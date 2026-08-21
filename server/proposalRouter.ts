@@ -3,6 +3,10 @@ import { publicProcedure, router } from "./_core/trpc";
 import { ENV } from "./_core/env";
 import { storagePut } from "./storage";
 import puppeteer from "puppeteer";
+import {
+  loadTerritoryReportingAnalytics,
+  type ReportingAnalyticsSnapshot,
+} from "./territoryReportingData";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -17,6 +21,47 @@ interface ProposalData {
   topSuburbs: string[];
   topSpecies: string[];
   seasonalTiming: string;
+  analytics: {
+    available: boolean;
+    hasGsc: boolean;
+    hasGa4: boolean;
+    organicClicks: number;
+    searchImpressions: number;
+    priorityPageSessions: number;
+    gscMonths: number;
+    ga4Months: number;
+    gscPeriod: string;
+    ga4Period: string;
+    ga4Coverage: string;
+  };
+}
+
+function buildProposalAnalytics(
+  reportingAnalytics: ReportingAnalyticsSnapshot | null,
+): ProposalData["analytics"] {
+  const ga4Months = reportingAnalytics?.ga4.monthly ?? [];
+  const gscMonths = reportingAnalytics?.gsc.monthly ?? [];
+  const ga4Period = ga4Months.length > 0
+    ? `${ga4Months[0].year}-${String(ga4Months[0].month).padStart(2, "0")} to ${ga4Months.at(-1)!.year}-${String(ga4Months.at(-1)!.month).padStart(2, "0")}`
+    : "not imported";
+  const gscPeriod = gscMonths.length > 0
+    ? `${gscMonths[0].month} to ${gscMonths.at(-1)!.month}`
+    : "not imported";
+  return {
+    available: Boolean(gscMonths.length || ga4Months.length),
+    hasGsc: gscMonths.length > 0,
+    hasGa4: ga4Months.length > 0,
+    organicClicks: reportingAnalytics?.gsc.totalClicks ?? 0,
+    searchImpressions: reportingAnalytics?.gsc.totalImpressions ?? 0,
+    priorityPageSessions: reportingAnalytics?.ga4.totalPriorityPageSessions ?? 0,
+    gscMonths: gscMonths.length,
+    ga4Months: ga4Months.length,
+    gscPeriod,
+    ga4Period,
+    ga4Coverage: reportingAnalytics?.ga4.latestImport
+      ? `${reportingAnalytics.ga4.completeMonths}/${ga4Months.length} months complete; latest successful import ${reportingAnalytics.ga4.latestImport.propertiesSucceeded}/${reportingAnalytics.ga4.latestImport.propertiesExpected} properties`
+      : "not yet imported",
+  };
 }
 
 const proposalConfigSchema = z.object({
@@ -94,10 +139,12 @@ Key data points:
 - Top suburbs by revenue: ${suburbList}
 - Top species by revenue: ${speciesList}
 - Seasonal wildlife timing: ${data.seasonalTiming}
+- Search evidence: ${data.analytics.hasGsc ? `${data.analytics.organicClicks.toLocaleString("en-US")} Search Console clicks and ${data.analytics.searchImpressions.toLocaleString("en-US")} impressions across ${data.analytics.gscMonths} imported months (${data.analytics.gscPeriod})` : "No persisted Search Console import is available"}
+- GA4 evidence: ${data.analytics.hasGa4 ? `${data.analytics.priorityPageSessions.toLocaleString("en-US")} species/location-page sessions across ${data.analytics.ga4Months} imported months (${data.analytics.ga4Period}; ${data.analytics.ga4Coverage})` : "No persisted GA4 import is available"}
 
 Write a compelling 3-4 sentence opening paragraph that:
 1. Names the territory and frames the opportunity (high-intent local searches, growing market)
-2. References the revenue figure as proof of demand
+2. References the revenue figure as proof of demand and uses measured search data only when it is available
 3. Mentions 2-3 specific suburbs that drive the highest value
 4. Positions the proposal as a structured program to grow organic visibility and convert more traffic into closed revenue
 
@@ -389,6 +436,7 @@ function buildProposalHtml(data: ProposalData, narrative: string, config: Propos
   <h2>The Opportunity</h2>
   <p class="narrative">${narrative}</p>
   <p class="narrative">This proposal outlines a comprehensive digital marketing program designed to grow your franchise's organic visibility across the ${data.territoryName} territory, increase inbound call and inspection volume, and convert more of that traffic into closed revenue — built around the species your customers are actually calling about (${data.topSpecies.slice(0, 4).join(", ").toLowerCase()}) and the communities that already drive your highest job value.</p>
+  <div class="includes-box"><strong>Measured digital baseline:</strong> ${data.analytics.available ? `${data.analytics.hasGsc ? `${data.analytics.organicClicks.toLocaleString("en-US")} Search Console clicks and ${data.analytics.searchImpressions.toLocaleString("en-US")} impressions across ${data.analytics.gscMonths} imported months (${data.analytics.gscPeriod}).` : "No persisted Search Console import."} ${data.analytics.hasGa4 ? `${data.analytics.priorityPageSessions.toLocaleString("en-US")} GA4 species/location-page sessions across ${data.analytics.ga4Months} imported months (${data.analytics.ga4Period}); coverage: ${data.analytics.ga4Coverage}.` : "No persisted GA4 import."}` : "No persisted GA4 or Search Console import is available for this proposal. Performance claims are intentionally omitted."}</div>
   
   <h2>What We Will Build</h2>
   <p>Every program begins with a structured build-out across four areas:</p>
@@ -600,6 +648,7 @@ export const proposalRouter = router({
 
       const dashData = DASHBOARD_DATA[input.territoryId];
       if (!dashData) throw new Error(`No dashboard data for: ${input.territoryId}`);
+      const reportingAnalytics = await loadTerritoryReportingAnalytics(input.territoryId);
 
       // Build proposal data
       const proposalData: ProposalData = {
@@ -613,6 +662,7 @@ export const proposalRouter = router({
         topSuburbs: dashData.suburbs.slice(0, 8).map((s) => s.suburb),
         topSpecies: dashData.species.slice(0, 5).map((s) => s.species),
         seasonalTiming: getSeasonalTiming(location.state),
+        analytics: buildProposalAnalytics(reportingAnalytics),
       };
 
       // Generate narrative with Claude Opus 5
@@ -648,6 +698,7 @@ export const proposalRouter = router({
 
       const dashData = DASHBOARD_DATA[input.territoryId];
       if (!dashData) throw new Error(`No dashboard data for: ${input.territoryId}`);
+      const reportingAnalytics = await loadTerritoryReportingAnalytics(input.territoryId);
 
       const proposalData: ProposalData = {
         territoryId: input.territoryId,
@@ -660,6 +711,7 @@ export const proposalRouter = router({
         topSuburbs: dashData.suburbs.slice(0, 8).map((s) => s.suburb),
         topSpecies: dashData.species.slice(0, 5).map((s) => s.species),
         seasonalTiming: getSeasonalTiming(location.state),
+        analytics: buildProposalAnalytics(reportingAnalytics),
       };
 
       const narrative = await generateProposalNarrative(proposalData);

@@ -330,9 +330,36 @@ export default function Analytics() {
     },
     onError: (error) => setSearchConsoleSyncMessage(error.message),
   });
+  const { data: ga4ImportStatus } = trpc.analytics.getGA4ImportStatus.useQuery({
+    territoryId: selectedTerritory,
+  });
+  const [ga4SyncMessage, setGA4SyncMessage] = useState<string | null>(null);
+  const ga4Sync = trpc.analytics.syncGA4TerritoryMonth.useMutation({
+    onSuccess: async result => {
+      const coverage = `${result.coverage.propertiesSucceeded}/${result.coverage.propertiesExpected} properties`;
+      setGA4SyncMessage(
+        `${result.coverage.complete ? "Import complete" : "Partial import"}: ${coverage}, ${result.pageCount.toLocaleString()} pages.`,
+      );
+      await Promise.all([
+        trpcUtils.analytics.getMonthlyTrend.invalidate(),
+        trpcUtils.analytics.getYoYComparison.invalidate(),
+        trpcUtils.analytics.getSummaryKPIs.invalidate(),
+        trpcUtils.analytics.getInsights.invalidate(),
+        trpcUtils.analytics.getGA4ImportStatus.invalidate({ territoryId: selectedTerritory }),
+        trpcUtils.analytics.getDateRange.invalidate(),
+        trpcUtils.analytics.getLatestPeriod.invalidate(),
+      ]);
+    },
+    onError: error => setGA4SyncMessage(error.message),
+  });
   const currentUtcPeriod = new Date().getUTCFullYear() * 100 + new Date().getUTCMonth() + 1;
-  const selectedSearchConsolePeriod = selectedYear * 100 + comparisonMonth;
-  const isCompletedSearchConsolePeriod = selectedSearchConsolePeriod < currentUtcPeriod;
+  const selectedReportingPeriod = selectedYear * 100 + comparisonMonth;
+  const isCompletedReportingPeriod = selectedReportingPeriod < currentUtcPeriod;
+
+  useEffect(() => {
+    setSearchConsoleSyncMessage(null);
+    setGA4SyncMessage(null);
+  }, [selectedTerritory, selectedYear, comparisonMonth]);
 
   // ─── Transform GSC monthly trend for chart ─────────────────────────────────
   const gscChartData = useMemo(() => {
@@ -375,8 +402,15 @@ export default function Analytics() {
       if (!INCLUDED_PAGE_TYPES.has(row.pageType)) continue;
       const key = `${row.year}-${String(row.month).padStart(2, "0")}`;
       if (!grouped[key]) {
-        grouped[key] = { name: `${MONTHS[row.month - 1]} '${String(row.year).slice(2)}`, year: row.year, month: row.month };
+        grouped[key] = {
+          name: `${MONTHS[row.month - 1]} '${String(row.year).slice(2)}`,
+          year: row.year,
+          month: row.month,
+          complete: row.complete !== false,
+          source: row.source || "legacy_spreadsheet",
+        };
       }
+      if (row.complete === false) grouped[key].complete = false;
       const pt = row.pageType === "species_pages" ? "Species Pages" :
         row.pageType === "location_page" ? "Location Pages" : row.pageType;
       grouped[key][pt] = (grouped[key][pt] || 0) + Number(row.sessions);
@@ -386,6 +420,15 @@ export default function Analytics() {
       a.year !== b.year ? a.year - b.year : a.month - b.month
     );
   }, [ga4Trend]);
+
+  const partialGA4Periods = useMemo(
+    () => ga4ChartData.filter((row: any) => row.complete === false).map((row: any) => row.name),
+    [ga4ChartData],
+  );
+  const legacyGA4Periods = useMemo(
+    () => ga4ChartData.filter((row: any) => row.source === "legacy_spreadsheet").map((row: any) => row.name),
+    [ga4ChartData],
+  );
 
   // ─── Transform GBP data for chart ──────────────────────────────────────────
   const gbpChartData = useMemo(() => {
@@ -490,11 +533,13 @@ export default function Analytics() {
 
   const handleExportGA4 = useCallback(() => {
     if (!ga4ChartData.length) return;
-    const headers = ["Month", "Species Pages", "Location Pages"];
+    const headers = ["Month", "Species Pages", "Location Pages", "Source", "Coverage"];
     const rows = ga4ChartData.map((d: any) => [
       d.name,
       String(d["Species Pages"] || 0),
       String(d["Location Pages"] || 0),
+      d.source === "persisted_data_api" ? "Persisted GA4 Data API import" : "Legacy spreadsheet",
+      d.source === "persisted_data_api" ? (d.complete ? "Complete" : "Partial") : "Not available in legacy source",
     ]);
     downloadCSV(`ga4_sessions_${selectedTerritoryName}_${selectedYear - 1}-${selectedYear}.csv`, headers, rows);
   }, [ga4ChartData, selectedTerritoryName, selectedYear]);
@@ -597,9 +642,9 @@ export default function Analytics() {
                     setSearchConsoleSyncMessage(null);
                     searchConsoleSync.mutate({ territoryId: selectedTerritory, year: selectedYear, month: comparisonMonth });
                   }}
-                  disabled={!isCompletedSearchConsolePeriod || searchConsoleSync.isPending}
-                  title={isCompletedSearchConsolePeriod ? "Refresh the selected completed month from Google Search Console" : "Only completed calendar months can be imported"}
-                  style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 6, border: "1px solid #69BE28", background: "#69BE28", fontSize: 11, fontWeight: 700, color: "#fff", cursor: "pointer", opacity: !isCompletedSearchConsolePeriod || searchConsoleSync.isPending ? 0.55 : 1 }}
+                  disabled={!isCompletedReportingPeriod || searchConsoleSync.isPending}
+                  title={isCompletedReportingPeriod ? "Refresh the selected completed month from Google Search Console" : "Only completed calendar months can be imported"}
+                  style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 6, border: "1px solid #69BE28", background: "#69BE28", fontSize: 11, fontWeight: 700, color: "#fff", cursor: "pointer", opacity: !isCompletedReportingPeriod || searchConsoleSync.isPending ? 0.55 : 1 }}
                 >
                   <RefreshCw size={12} className={searchConsoleSync.isPending ? "animate-spin" : ""} />
                   {searchConsoleSync.isPending ? "Refreshing…" : "Refresh live data"}
@@ -757,6 +802,11 @@ export default function Analytics() {
             {FULL_MONTHS[comparisonMonth - 1]} {selectedYear} vs {FULL_MONTHS[comparisonMonth - 1]} {selectedYear - 1}
             <span style={{ fontSize: 11, fontWeight: 400, color: "#888", marginLeft: 4 }}>({selectedTerritoryName})</span>
           </h2>
+          {(yoyData?.ga4Coverage.current?.complete === false || yoyData?.ga4Coverage.previous?.complete === false) && (
+            <div style={{ marginBottom: 12, padding: "9px 12px", borderRadius: 7, background: "#fff0ee", border: "1px solid #efb7b0", color: "#9d3024", fontSize: 12 }}>
+              GA4 property coverage is partial for one or both comparison months. Treat the session comparison as directional until those months are re-imported completely.
+            </div>
+          )}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
             <KpiCard
               icon={Activity}
@@ -800,21 +850,55 @@ export default function Analytics() {
                 GA4 sessions for species and location pages — {selectedTerritoryName} ({selectedYear - 1}–{selectedYear})
               </p>
             </div>
-            <button
-              onClick={handleExportGA4}
-              disabled={ga4ChartData.length === 0}
-              style={{
-                display: "flex", alignItems: "center", gap: 5, padding: "6px 12px",
-                borderRadius: 6, border: `1px solid ${MIST}`, background: CREAM,
-                fontSize: 11, fontWeight: 600, color: SAGE, cursor: "pointer",
-                opacity: ga4ChartData.length === 0 ? 0.5 : 1,
-                transition: "opacity 0.15s",
-              }}
-              title="Export GA4 data as CSV"
-            >
-              <Download size={12} /> Export CSV
-            </button>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+              <button
+                onClick={() => {
+                  setGA4SyncMessage(null);
+                  ga4Sync.mutate({ territoryId: selectedTerritory, year: selectedYear, month: comparisonMonth });
+                }}
+                disabled={!isCompletedReportingPeriod || ga4Sync.isPending}
+                style={{
+                  display: "flex", alignItems: "center", gap: 5, padding: "6px 12px",
+                  borderRadius: 6, border: "1px solid #69BE28", background: "#69BE28",
+                  fontSize: 11, fontWeight: 700, color: "#fff", cursor: "pointer",
+                  opacity: !isCompletedReportingPeriod || ga4Sync.isPending ? 0.55 : 1,
+                }}
+                title={isCompletedReportingPeriod ? "Import and persist the selected completed GA4 month" : "Only completed calendar months can be imported"}
+              >
+                <RefreshCw size={12} className={ga4Sync.isPending ? "animate-spin" : ""} />
+                {ga4Sync.isPending ? "Importing…" : "Import GA4 month"}
+              </button>
+              <button
+                onClick={handleExportGA4}
+                disabled={ga4ChartData.length === 0}
+                style={{
+                  display: "flex", alignItems: "center", gap: 5, padding: "6px 12px",
+                  borderRadius: 6, border: `1px solid ${MIST}`, background: CREAM,
+                  fontSize: 11, fontWeight: 600, color: SAGE, cursor: "pointer",
+                  opacity: ga4ChartData.length === 0 ? 0.5 : 1,
+                  transition: "opacity 0.15s",
+                }}
+                title="Export GA4 data as CSV"
+              >
+                <Download size={12} /> Export CSV
+              </button>
+            </div>
           </div>
+          {(ga4SyncMessage || ga4ImportStatus) && (
+            <div style={{ marginBottom: 14, padding: "10px 12px", borderRadius: 7, background: ga4Sync.isError ? "#fff0ee" : "#eef8e8", border: `1px solid ${ga4Sync.isError ? "#efb7b0" : "#b8df9e"}`, color: ga4Sync.isError ? "#9d3024" : "#316e18", fontSize: 12 }}>
+              {ga4SyncMessage || `Latest persisted import: ${FULL_MONTHS[(ga4ImportStatus?.month || 1) - 1]} ${ga4ImportStatus?.year} · ${ga4ImportStatus?.propertiesSucceeded}/${ga4ImportStatus?.propertiesExpected} properties · ${ga4ImportStatus?.status}`}
+            </div>
+          )}
+          {partialGA4Periods.length > 0 && (
+            <div style={{ marginBottom: 14, padding: "10px 12px", borderRadius: 7, background: "#fff0ee", border: "1px solid #efb7b0", color: "#9d3024", fontSize: 12 }}>
+              Partial GA4 property coverage: {partialGA4Periods.join(", ")}. These points are not complete territory totals.
+            </div>
+          )}
+          {legacyGA4Periods.length > 0 && (
+            <div style={{ marginBottom: 14, padding: "10px 12px", borderRadius: 7, background: "#fffbeb", border: "1px solid #fde68a", color: "#92400e", fontSize: 12 }}>
+              Legacy spreadsheet fallback is still supplying {legacyGA4Periods.length} month{legacyGA4Periods.length === 1 ? "" : "s"} in this chart. Direct Data API imports replace each month as the backfill completes.
+            </div>
+          )}
           {ga4Loading ? (
             <div style={{ height: 280, display: "flex", alignItems: "center", justifyContent: "center", color: "#aaa" }}>Loading...</div>
           ) : ga4ChartData.length === 0 ? (
@@ -959,6 +1043,18 @@ export default function Analytics() {
 
 // ─── Live GA4 Sub-Components (use territory-aggregated API) ─────────────────
 
+function GA4CoverageNotice({ coverage }: {
+  coverage?: { propertiesExpected: number; propertiesSucceeded: number; complete: boolean };
+}) {
+  if (!coverage) return null;
+  return (
+    <div style={{ marginBottom: 12, fontSize: 11, color: coverage.complete ? "#4b6b42" : "#9d3024" }}>
+      Property coverage: {coverage.propertiesSucceeded}/{coverage.propertiesExpected}
+      {!coverage.complete && " — totals are partial and should not be used as a complete territory result."}
+    </div>
+  );
+}
+
 function GA4LiveTopPages({ territoryId, year }: { territoryId: string; year: number }) {
   const { data, isLoading } = trpc.analytics.getGA4TerritoryTopPages.useQuery(
     { territoryId, startDate: `${year}-01-01`, endDate: `${year}-12-31`, limit: 15 },
@@ -971,9 +1067,10 @@ function GA4LiveTopPages({ territoryId, year }: { territoryId: string; year: num
         <Globe size={16} color={SAGE} /> Live GA4: Top Pages by Sessions
       </h2>
       <p style={{ fontSize: 12, color: "#888", marginBottom: 16 }}>Real-time data from Google Analytics 4 — {year} YTD</p>
+      <GA4CoverageNotice coverage={data?.coverage} />
       {isLoading ? (
         <div style={{ height: 120, display: "flex", alignItems: "center", justifyContent: "center", color: "#aaa" }}>Loading live GA4 data...</div>
-      ) : !data || data.length === 0 ? (
+      ) : !data || data.rows.length === 0 ? (
         <div style={{ height: 80, display: "flex", alignItems: "center", justifyContent: "center", color: "#aaa" }}>No GA4 data available for this territory</div>
       ) : (
         <div style={{ overflowX: "auto" }}>
@@ -987,7 +1084,7 @@ function GA4LiveTopPages({ territoryId, year }: { territoryId: string; year: num
               </tr>
             </thead>
             <tbody>
-              {data.map((row, i) => (
+              {data.rows.map((row, i) => (
                 <tr key={row.pagePath} style={{ borderBottom: `1px solid ${MIST}`, background: i % 2 === 0 ? "#fff" : CREAM }}>
                   <td style={{ padding: "6px 10px", color: "#888" }}>{i + 1}</td>
                   <td style={{ padding: "6px 10px", color: FOREST, fontFamily: "monospace", fontSize: 11, maxWidth: 350, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.pagePath}</td>
@@ -1014,13 +1111,14 @@ function GA4LiveTopCities({ territoryId, year }: { territoryId: string; year: nu
       <h3 style={{ fontSize: 13, fontWeight: 700, color: FOREST, marginBottom: 14, display: "flex", alignItems: "center", gap: 6 }}>
         <MapPin size={14} color={SAGE} /> Top Cities
       </h3>
+      <GA4CoverageNotice coverage={data?.coverage} />
       {isLoading ? (
         <div style={{ height: 80, display: "flex", alignItems: "center", justifyContent: "center", color: "#aaa", fontSize: 12 }}>Loading...</div>
-      ) : !data || data.length === 0 ? (
+      ) : !data || data.rows.length === 0 ? (
         <div style={{ height: 60, display: "flex", alignItems: "center", justifyContent: "center", color: "#aaa", fontSize: 12 }}>No data</div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {data.slice(0, 10).map((row, i) => (
+          {data.rows.slice(0, 10).map((row, i) => (
             <div key={row.city} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: i < 9 ? `1px solid ${MIST}` : "none" }}>
               <span style={{ fontSize: 12, color: FOREST }}>{row.city}</span>
               <span style={{ fontSize: 12, fontWeight: 600, color: SAGE }}>{row.sessions.toLocaleString()}</span>
@@ -1038,20 +1136,21 @@ function GA4LiveChannelBreakdown({ territoryId, year }: { territoryId: string; y
     { enabled: !!territoryId },
   );
 
-  const total = useMemo(() => data?.reduce((sum, r) => sum + r.sessions, 0) || 0, [data]);
+  const total = useMemo(() => data?.rows.reduce((sum, r) => sum + r.sessions, 0) || 0, [data]);
 
   return (
     <div style={{ background: "#fff", borderRadius: 10, border: `1px solid ${MIST}`, padding: "20px 18px" }}>
       <h3 style={{ fontSize: 13, fontWeight: 700, color: FOREST, marginBottom: 14, display: "flex", alignItems: "center", gap: 6 }}>
         <BarChart3 size={14} color={SAGE} /> Traffic Channels
       </h3>
+      <GA4CoverageNotice coverage={data?.coverage} />
       {isLoading ? (
         <div style={{ height: 80, display: "flex", alignItems: "center", justifyContent: "center", color: "#aaa", fontSize: 12 }}>Loading...</div>
-      ) : !data || data.length === 0 ? (
+      ) : !data || data.rows.length === 0 ? (
         <div style={{ height: 60, display: "flex", alignItems: "center", justifyContent: "center", color: "#aaa", fontSize: 12 }}>No data</div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {data.slice(0, 8).map((row) => {
+          {data.rows.slice(0, 8).map((row) => {
             const pct = total > 0 ? (row.sessions / total) * 100 : 0;
             return (
               <div key={row.channel}>

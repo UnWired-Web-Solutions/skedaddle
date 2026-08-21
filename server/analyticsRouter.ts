@@ -9,19 +9,24 @@ import { publicProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
 import {
   ga4Sessions,
+  ga4ImportRuns,
+  ga4TerritoryMonthly,
+  ga4TerritoryPages,
   gbpMetrics,
   gscPageMetrics,
   gscQueryMetrics,
   salesforcePerformanceSnapshots,
 } from "../drizzle/schema";
-import { eq, and, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import { TERRITORY_GROUPS, UNMAPPED_GA4, UNMAPPED_GBP, getSubLocations } from "../shared/territoryMapping";
 import { verifySearchConsoleAccess } from "./googleSearchConsoleClient";
 import { verifyGA4Access } from "./googleAnalyticsClient";
 import { fetchGA4TerritorySessionsMonthly, fetchGA4TerritoryTopPages, fetchGA4TerritoryTopCities, fetchGA4TerritoryChannelBreakdown, getGA4ReadyTerritories } from "./googleAnalyticsClient";
+import { importGA4TerritoryMonth } from "./googleAnalyticsImporter";
 import { importSearchConsoleTerritoryMonth } from "./googleSearchConsoleImporter";
 import { getGscTerritoryScope } from "../shared/gscTerritoryPaths";
 import { GSC_TERRITORY_SCOPES } from "../shared/gscTerritoryPaths";
+import { getGA4MappingSummary } from "../shared/ga4TerritoryProperties";
 
 // ─── Procedures ──────────────────────────────────────────────────────────────
 
@@ -94,6 +99,40 @@ export const analyticsRouter = router({
 
   /** List all territories that have GA4 properties mapped and ready for data pull. */
   getGA4ReadyTerritories: publicProcedure.query(() => getGA4ReadyTerritories()),
+
+  /** Auditable mapping counts; account discovery and territory assignment are not conflated. */
+  getGA4MappingStatus: publicProcedure.query(() => getGA4MappingSummary()),
+
+  /** Import one completed GA4 month into the durable territory reporting tables. */
+  syncGA4TerritoryMonth: publicProcedure
+    .input(z.object({
+      territoryId: z.string(),
+      year: z.number().int(),
+      month: z.number().int().min(1).max(12),
+    }))
+    .mutation(({ input }) => importGA4TerritoryMonth(input.territoryId, input.year, input.month)),
+
+  /** Latest import coverage for the selected territory. */
+  getGA4ImportStatus: publicProcedure
+    .input(z.object({ territoryId: z.string() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return null;
+      const [latest] = await db.select().from(ga4ImportRuns)
+        .where(eq(ga4ImportRuns.territoryId, input.territoryId))
+        .orderBy(desc(ga4ImportRuns.importedAt))
+        .limit(1);
+      if (!latest) return null;
+      let failedProperties: Array<{ propertyId: string; error: string }> = [];
+      try {
+        failedProperties = latest.failedPropertiesJson
+          ? JSON.parse(latest.failedPropertiesJson)
+          : [];
+      } catch {
+        failedProperties = [];
+      }
+      return { ...latest, failedProperties };
+    }),
 
   /**
    * Pull a completed calendar month from the live parent-domain property.
@@ -269,12 +308,18 @@ export const analyticsRouter = router({
       gsc: { minYear: 2026, maxYear: 2026 },
     };
 
-    const [ga4Range] = await db
+    const [legacyGa4Range] = await db
       .select({
         minYear: sql<number>`MIN(year)`,
         maxYear: sql<number>`MAX(year)`,
       })
       .from(ga4Sessions);
+    const [liveGa4Range] = await db
+      .select({
+        minYear: sql<number>`MIN(${ga4TerritoryMonthly.year})`,
+        maxYear: sql<number>`MAX(${ga4TerritoryMonthly.year})`,
+      })
+      .from(ga4TerritoryMonthly);
 
     const [gbpRange] = await db
       .select({
@@ -291,7 +336,10 @@ export const analyticsRouter = router({
       .from(gscPageMetrics);
 
     return {
-      ga4: { minYear: ga4Range.minYear, maxYear: ga4Range.maxYear },
+      ga4: {
+        minYear: liveGa4Range?.minYear ?? legacyGa4Range?.minYear,
+        maxYear: liveGa4Range?.maxYear ?? legacyGa4Range?.maxYear,
+      },
       gbp: { minYear: gbpRange.minYear, maxYear: gbpRange.maxYear },
       gsc: { minYear: gscRange.minYear, maxYear: gscRange.maxYear },
     };
@@ -302,9 +350,12 @@ export const analyticsRouter = router({
     const db = await getDb();
     if (!db) return null;
 
-    const [ga4Latest] = await db
+    const [legacyGa4Latest] = await db
       .select({ period: sql<number>`MAX(${ga4Sessions.year} * 100 + ${ga4Sessions.month})` })
       .from(ga4Sessions);
+    const [liveGa4Latest] = await db
+      .select({ period: sql<number>`MAX(${ga4TerritoryMonthly.year} * 100 + ${ga4TerritoryMonthly.month})` })
+      .from(ga4TerritoryMonthly);
     const [gbpLatest] = await db
       .select({ period: sql<number>`MAX(${gbpMetrics.year} * 100 + ${gbpMetrics.month})` })
       .from(gbpMetrics);
@@ -315,7 +366,7 @@ export const analyticsRouter = router({
     const decode = (period: number | null | undefined) => period
       ? { year: Math.floor(Number(period) / 100), month: Number(period) % 100 }
       : null;
-    const ga4 = decode(ga4Latest?.period);
+    const ga4 = decode(liveGa4Latest?.period) ?? decode(legacyGa4Latest?.period);
     const gbp = decode(gbpLatest?.period);
     const gsc = decode(gscLatest?.period);
     // Use the latest period covered by both feeds (the earlier feed boundary)
@@ -345,7 +396,35 @@ export const analyticsRouter = router({
       if (subLocations.length === 0) return [];
 
       if (input.dataSource === "ga4") {
-        const results = await db
+        const [liveResults, coverageRows] = await Promise.all([
+          db.select({
+              year: ga4TerritoryPages.year,
+              month: ga4TerritoryPages.month,
+              pageType: ga4TerritoryPages.pageType,
+              sessions: sql<number>`SUM(${ga4TerritoryPages.sessions})`,
+            })
+            .from(ga4TerritoryPages)
+            .where(and(
+              eq(ga4TerritoryPages.territoryId, input.territoryId),
+              sql`${ga4TerritoryPages.year} >= ${input.startYear}`,
+              sql`${ga4TerritoryPages.year} <= ${input.endYear}`,
+            ))
+            .groupBy(ga4TerritoryPages.year, ga4TerritoryPages.month, ga4TerritoryPages.pageType)
+            .orderBy(ga4TerritoryPages.year, ga4TerritoryPages.month),
+          db.select({
+              year: ga4TerritoryMonthly.year,
+              month: ga4TerritoryMonthly.month,
+              propertiesExpected: ga4TerritoryMonthly.propertiesExpected,
+              propertiesSucceeded: ga4TerritoryMonthly.propertiesSucceeded,
+            })
+            .from(ga4TerritoryMonthly)
+            .where(and(
+              eq(ga4TerritoryMonthly.territoryId, input.territoryId),
+              sql`${ga4TerritoryMonthly.year} >= ${input.startYear}`,
+              sql`${ga4TerritoryMonthly.year} <= ${input.endYear}`,
+            )),
+        ]);
+        const legacyResults = await db
           .select({
             year: ga4Sessions.year,
             month: ga4Sessions.month,
@@ -361,7 +440,36 @@ export const analyticsRouter = router({
           .groupBy(ga4Sessions.year, ga4Sessions.month, ga4Sessions.pageType)
           .orderBy(ga4Sessions.year, ga4Sessions.month);
 
-        return results;
+        if (coverageRows.length > 0) {
+          const coverageByPeriod = new Map(coverageRows.map(row => [`${row.year}-${row.month}`, row]));
+          const livePeriods = new Set(coverageRows.map(row => `${row.year}-${row.month}`));
+          const priorityRows = [...liveResults];
+          for (const coverage of coverageRows) {
+            for (const pageType of ["species_pages", "location_page"] as const) {
+              if (!priorityRows.some(row => row.year === coverage.year && row.month === coverage.month && row.pageType === pageType)) {
+                priorityRows.push({ year: coverage.year, month: coverage.month, pageType, sessions: 0 });
+              }
+            }
+          }
+          const coveredLiveResults = priorityRows.map(row => {
+            const coverage = coverageByPeriod.get(`${row.year}-${row.month}`);
+            return {
+              ...row,
+              source: "persisted_data_api" as const,
+              propertiesExpected: coverage?.propertiesExpected ?? 0,
+              propertiesSucceeded: coverage?.propertiesSucceeded ?? 0,
+              complete: Boolean(coverage && coverage.propertiesExpected === coverage.propertiesSucceeded),
+            };
+          });
+          const uncoveredLegacyResults = legacyResults
+            .filter(row => !livePeriods.has(`${row.year}-${row.month}`))
+            .map(row => ({ ...row, source: "legacy_spreadsheet" as const }));
+          return [...uncoveredLegacyResults, ...coveredLiveResults]
+            .sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month);
+        }
+
+        return legacyResults.map(row => ({ ...row, source: "legacy_spreadsheet" as const }));
+
       } else {
         const results = await db
           .select({
@@ -403,7 +511,19 @@ export const analyticsRouter = router({
       const gbpSubs = getSubLocations(territoryId, "gbp");
 
       // GA4 sessions comparison (aggregated across sub-locations)
-      const currentGA4 = ga4Subs.length > 0 ? await db
+      const liveCurrentGA4 = await db
+        .select({
+          pageType: ga4TerritoryPages.pageType,
+          sessions: sql<number>`SUM(${ga4TerritoryPages.sessions})`,
+        })
+        .from(ga4TerritoryPages)
+        .where(and(
+          eq(ga4TerritoryPages.territoryId, territoryId),
+          eq(ga4TerritoryPages.year, year),
+          eq(ga4TerritoryPages.month, month),
+        ))
+        .groupBy(ga4TerritoryPages.pageType);
+      const currentGA4 = liveCurrentGA4.length > 0 ? liveCurrentGA4 : ga4Subs.length > 0 ? await db
         .select({
           pageType: ga4Sessions.pageType,
           sessions: sql<number>`SUM(sessions)`,
@@ -416,7 +536,19 @@ export const analyticsRouter = router({
         ))
         .groupBy(ga4Sessions.pageType) : [];
 
-      const prevGA4 = ga4Subs.length > 0 ? await db
+      const livePrevGA4 = await db
+        .select({
+          pageType: ga4TerritoryPages.pageType,
+          sessions: sql<number>`SUM(${ga4TerritoryPages.sessions})`,
+        })
+        .from(ga4TerritoryPages)
+        .where(and(
+          eq(ga4TerritoryPages.territoryId, territoryId),
+          eq(ga4TerritoryPages.year, prevYear),
+          eq(ga4TerritoryPages.month, month),
+        ))
+        .groupBy(ga4TerritoryPages.pageType);
+      const prevGA4 = livePrevGA4.length > 0 ? livePrevGA4 : ga4Subs.length > 0 ? await db
         .select({
           pageType: ga4Sessions.pageType,
           sessions: sql<number>`SUM(sessions)`,
@@ -428,6 +560,27 @@ export const analyticsRouter = router({
           eq(ga4Sessions.month, month),
         ))
         .groupBy(ga4Sessions.pageType) : [];
+
+      const [currentGA4Coverage] = await db.select({
+          propertiesExpected: ga4TerritoryMonthly.propertiesExpected,
+          propertiesSucceeded: ga4TerritoryMonthly.propertiesSucceeded,
+        })
+        .from(ga4TerritoryMonthly)
+        .where(and(
+          eq(ga4TerritoryMonthly.territoryId, territoryId),
+          eq(ga4TerritoryMonthly.year, year),
+          eq(ga4TerritoryMonthly.month, month),
+        ));
+      const [prevGA4Coverage] = await db.select({
+          propertiesExpected: ga4TerritoryMonthly.propertiesExpected,
+          propertiesSucceeded: ga4TerritoryMonthly.propertiesSucceeded,
+        })
+        .from(ga4TerritoryMonthly)
+        .where(and(
+          eq(ga4TerritoryMonthly.territoryId, territoryId),
+          eq(ga4TerritoryMonthly.year, prevYear),
+          eq(ga4TerritoryMonthly.month, month),
+        ));
 
       // GBP metrics comparison (aggregated across sub-locations)
       const currentGBP = gbpSubs.length > 0 ? await db
@@ -458,6 +611,16 @@ export const analyticsRouter = router({
 
       return {
         ga4: { current: currentGA4, previous: prevGA4 },
+        ga4Coverage: {
+          current: currentGA4Coverage ? {
+            ...currentGA4Coverage,
+            complete: currentGA4Coverage.propertiesExpected === currentGA4Coverage.propertiesSucceeded,
+          } : null,
+          previous: prevGA4Coverage ? {
+            ...prevGA4Coverage,
+            complete: prevGA4Coverage.propertiesExpected === prevGA4Coverage.propertiesSucceeded,
+          } : null,
+        },
         gbp: { current: currentGBP, previous: prevGBP },
         year,
         prevYear,
@@ -495,7 +658,21 @@ export const analyticsRouter = router({
       ];
       if (month) gbpConditions.push(eq(gbpMetrics.month, month));
 
-      const [ga4Summary] = await db
+      const liveGa4Conditions = [
+        eq(ga4TerritoryMonthly.territoryId, territoryId),
+        eq(ga4TerritoryMonthly.year, year),
+      ];
+      if (month) liveGa4Conditions.push(eq(ga4TerritoryMonthly.month, month));
+
+      const [liveGa4Summary] = await db
+        .select({
+          total: sql<number>`COALESCE(SUM(${ga4TerritoryMonthly.priorityPageSessions}), 0)`,
+          rowCount: sql<number>`COUNT(*)`,
+          completeMonths: sql<number>`COALESCE(SUM(CASE WHEN ${ga4TerritoryMonthly.propertiesExpected} = ${ga4TerritoryMonthly.propertiesSucceeded} THEN 1 ELSE 0 END), 0)`,
+        })
+        .from(ga4TerritoryMonthly)
+        .where(and(...liveGa4Conditions));
+      const [legacyGa4Summary] = await db
         .select({ total: sql<number>`SUM(sessions)` })
         .from(ga4Sessions)
         .where(and(...ga4Conditions, inArray(ga4Sessions.pageType, ["species_pages", "location_page"])));
@@ -510,7 +687,13 @@ export const analyticsRouter = router({
         .groupBy(gbpMetrics.metricType);
 
       return {
-        totalSessions: ga4Summary?.total || 0,
+        totalSessions: Number(liveGa4Summary?.rowCount || 0) > 0
+          ? liveGa4Summary?.total ?? 0
+          : legacyGa4Summary?.total || 0,
+        ga4Coverage: Number(liveGa4Summary?.rowCount || 0) > 0 ? {
+          importedMonths: Number(liveGa4Summary?.rowCount),
+          completeMonths: Number(liveGa4Summary?.completeMonths),
+        } : null,
         gbp: Object.fromEntries(gbpSummary.map(r => [r.metricType, r.total])),
       };
     }),
@@ -652,7 +835,20 @@ export const analyticsRouter = router({
       for (const group of groupsToCheck) {
         // GA4 sessions YoY
         if (group.ga4Territories.length > 0) {
-          const [currentRow] = await db
+          const [liveCurrentRow] = await db
+            .select({
+              sessions: sql<number>`SUM(${ga4TerritoryMonthly.priorityPageSessions})`,
+              rowCount: sql<number>`COUNT(*)`,
+              propertiesExpected: sql<number>`MAX(${ga4TerritoryMonthly.propertiesExpected})`,
+              propertiesSucceeded: sql<number>`MAX(${ga4TerritoryMonthly.propertiesSucceeded})`,
+            })
+            .from(ga4TerritoryMonthly)
+            .where(and(
+              eq(ga4TerritoryMonthly.territoryId, group.id),
+              eq(ga4TerritoryMonthly.year, year),
+              eq(ga4TerritoryMonthly.month, month),
+            ));
+          const [legacyCurrentRow] = await db
             .select({ sessions: sql<number>`SUM(sessions)` })
             .from(ga4Sessions)
             .where(and(
@@ -662,7 +858,20 @@ export const analyticsRouter = router({
               inArray(ga4Sessions.pageType, ["species_pages", "location_page"]),
             ));
 
-          const [prevRow] = await db
+          const [livePrevRow] = await db
+            .select({
+              sessions: sql<number>`SUM(${ga4TerritoryMonthly.priorityPageSessions})`,
+              rowCount: sql<number>`COUNT(*)`,
+              propertiesExpected: sql<number>`MAX(${ga4TerritoryMonthly.propertiesExpected})`,
+              propertiesSucceeded: sql<number>`MAX(${ga4TerritoryMonthly.propertiesSucceeded})`,
+            })
+            .from(ga4TerritoryMonthly)
+            .where(and(
+              eq(ga4TerritoryMonthly.territoryId, group.id),
+              eq(ga4TerritoryMonthly.year, prevYear),
+              eq(ga4TerritoryMonthly.month, month),
+            ));
+          const [legacyPrevRow] = await db
             .select({ sessions: sql<number>`SUM(sessions)` })
             .from(ga4Sessions)
             .where(and(
@@ -672,8 +881,15 @@ export const analyticsRouter = router({
               inArray(ga4Sessions.pageType, ["species_pages", "location_page"]),
             ));
 
-          const current = Number(currentRow?.sessions || 0);
-          const prev = Number(prevRow?.sessions || 0);
+          const currentDirectExists = Number(liveCurrentRow?.rowCount || 0) > 0;
+          const previousDirectExists = Number(livePrevRow?.rowCount || 0) > 0;
+          const currentDirectComplete = !currentDirectExists
+            || Number(liveCurrentRow?.propertiesExpected) === Number(liveCurrentRow?.propertiesSucceeded);
+          const previousDirectComplete = !previousDirectExists
+            || Number(livePrevRow?.propertiesExpected) === Number(livePrevRow?.propertiesSucceeded);
+          if (!currentDirectComplete || !previousDirectComplete) continue;
+          const current = Number(currentDirectExists ? liveCurrentRow?.sessions : legacyCurrentRow?.sessions ?? 0);
+          const prev = Number(previousDirectExists ? livePrevRow?.sessions : legacyPrevRow?.sessions ?? 0);
 
           // Lower thresholds for territory-specific view to show more granular insights
           const minPrev = territoryId ? 50 : 100;
