@@ -25,6 +25,12 @@ export interface FranchiseLocation {
     topSpecies: string;
     gbpRating: number | null;
     sessionsTrend: "up" | "down" | "flat";
+    /** Human-readable source used for the overview activity trend. */
+    activityMetric?: "Organic clicks" | "GBP interactions";
+    /** Percent change for the displayed comparison, when enough data exists. */
+    activityChangePercent?: number | null;
+    /** Explicit period used for the displayed comparison. */
+    activityComparison?: string;
     networkRank: number | null;
     networkTotal: number;
   };
@@ -53,17 +59,108 @@ const LOCATION_METADATA: FranchiseLocation[] = [
   { id: "barrie-north", name: "Skedaddle Barrie North", city: "Barrie", state: "ON", country: "CA", region: "Ontario", driveUrl: "", fullReportUrl: "/manus-storage/barrie-north_strategy_dashboard_81f140c8.html", status: "pending", lastUpdated: "2026-07-28", kpis: { totalRevenue: 0, totalJobs: 0, avgJobValue: 0, topSpecies: "Unknown", gbpRating: null, sessionsTrend: "up", networkRank: 19, networkTotal: 19 }, tags: ["awaiting-data"] },
 ];
 
-function deriveActivityTrend(data?: LocationDashboard): "up" | "down" | "flat" {
-  const series = data?.gsc.monthly.length ? data.gsc.monthly.map(month => month.clicks) :
-    data?.gbp.monthly.length ? data.gbp.monthly.map(month => month.calls + month.website_clicks) : [];
-  if (series.length < 2) return "flat";
-  const current = series[series.length - 1];
-  const previous = series[series.length - 2];
-  if (!previous) return current > 0 ? "up" : "flat";
-  const change = (current - previous) / previous;
-  if (change >= 0.05) return "up";
-  if (change <= -0.05) return "down";
+type ActivityTrend = "up" | "down" | "flat";
+
+interface ActivityPoint {
+  year: number;
+  month: number;
+  label: string;
+  value: number;
+}
+
+export interface ActivityTrendSummary {
+  trend: ActivityTrend;
+  metric: "Organic clicks" | "GBP interactions";
+  changePercent: number | null;
+  comparison: string;
+}
+
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function parseMonthLabel(value: string): { year: number; month: number; label: string } | null {
+  const isoMatch = /^(\d{4})-(\d{1,2})$/.exec(value.trim());
+  if (isoMatch) {
+    const year = Number(isoMatch[1]);
+    const month = Number(isoMatch[2]);
+    if (month >= 1 && month <= 12) return { year, month, label: `${MONTH_NAMES[month - 1]} ${year}` };
+  }
+
+  const namedMatch = /^([A-Za-z]{3,9})\s+(\d{4})$/.exec(value.trim());
+  if (namedMatch) {
+    const monthIndex = MONTH_NAMES.findIndex(month => month.toLowerCase() === namedMatch[1].slice(0, 3).toLowerCase());
+    const year = Number(namedMatch[2]);
+    if (monthIndex >= 0) return { year, month: monthIndex + 1, label: `${MONTH_NAMES[monthIndex]} ${year}` };
+  }
+
+  return null;
+}
+
+function classifyActivityChange(changePercent: number | null): ActivityTrend {
+  if (changePercent === null) return "flat";
+  if (changePercent >= 5) return "up";
+  if (changePercent <= -5) return "down";
   return "flat";
+}
+
+function average(points: ActivityPoint[]): number {
+  return points.reduce((sum, point) => sum + point.value, 0) / points.length;
+}
+
+/**
+ * Produce an overview trend that is explainable and resistant to seasonality.
+ * Prefer matched-month YoY; only fall back to three-month averages when a
+ * same-month prior-year comparison is not available. The old implementation
+ * compared the final two months, which made an ordinary seasonal dip look like
+ * a durable decline across the entire network.
+ */
+export function deriveActivityTrend(data?: LocationDashboard): ActivityTrendSummary {
+  const hasOrganicData = Boolean(data?.gsc.monthly.length);
+  const metric = hasOrganicData ? "Organic clicks" : "GBP interactions";
+  const rawSeries = hasOrganicData
+    ? (data?.gsc.monthly ?? []).map(month => ({ label: month.month, value: month.clicks }))
+    : (data?.gbp.monthly ?? []).map(month => ({ label: month.month, value: month.calls + month.website_clicks }));
+  const points = rawSeries
+    .map(point => {
+      const parsed = parseMonthLabel(point.label);
+      return parsed ? { ...parsed, value: point.value } : null;
+    })
+    .filter((point): point is ActivityPoint => point !== null)
+    .sort((a, b) => a.year * 12 + a.month - (b.year * 12 + b.month));
+
+  if (points.length < 2) {
+    return { trend: "flat", metric, changePercent: null, comparison: "Insufficient monthly data" };
+  }
+
+  const latest = points[points.length - 1];
+  const priorYear = points.find(point => point.year === latest.year - 1 && point.month === latest.month);
+
+  let currentValue: number;
+  let previousValue: number;
+  let comparison: string;
+
+  if (priorYear) {
+    currentValue = latest.value;
+    previousValue = priorYear.value;
+    comparison = `${latest.label} vs ${priorYear.label} · YoY`;
+  } else if (points.length >= 6) {
+    const currentWindow = points.slice(-3);
+    const previousWindow = points.slice(-6, -3);
+    currentValue = average(currentWindow);
+    previousValue = average(previousWindow);
+    comparison = `${currentWindow[0].label}–${currentWindow[2].label} vs prior 3 months`;
+  } else {
+    currentValue = latest.value;
+    previousValue = points[points.length - 2].value;
+    comparison = `${latest.label} vs ${points[points.length - 2].label} · MoM`;
+  }
+
+  const changePercent = previousValue > 0 ? ((currentValue - previousValue) / previousValue) * 100 : null;
+  return {
+    trend: classifyActivityChange(changePercent),
+    metric,
+    changePercent,
+    comparison,
+  };
 }
 
 /**
@@ -75,6 +172,8 @@ export const FRANCHISE_LOCATIONS: FranchiseLocation[] = LOCATION_METADATA.map(lo
   const data = DASHBOARD_DATA[location.id];
   if (!data) return location;
 
+  const activity = deriveActivityTrend(data);
+
   return {
     ...location,
     kpis: {
@@ -83,7 +182,10 @@ export const FRANCHISE_LOCATIONS: FranchiseLocation[] = LOCATION_METADATA.map(lo
       totalJobs: data.total_jobs,
       avgJobValue: data.total_jobs > 0 ? Math.round(data.total_revenue / data.total_jobs) : 0,
       topSpecies: data.species[0]?.species || "Unknown",
-      sessionsTrend: deriveActivityTrend(data),
+      sessionsTrend: activity.trend,
+      activityMetric: activity.metric,
+      activityChangePercent: activity.changePercent,
+      activityComparison: activity.comparison,
     },
   };
 });

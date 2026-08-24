@@ -24,6 +24,14 @@ const IMPACT_COLORS: Record<ActionItem["impact"], string> = {
   Low:    "oklch(0.65 0.010 80)",
 };
 
+function activityLabel(loc: NonNullable<ReturnType<typeof getLocationById>>): string {
+  const { sessionsTrend, activityChangePercent } = loc.kpis;
+  if (activityChangePercent === null || activityChangePercent === undefined) return "Insufficient data";
+  if (sessionsTrend === "up") return `↑ ${Math.abs(activityChangePercent).toFixed(0)}%`;
+  if (sessionsTrend === "down") return `↓ ${Math.abs(activityChangePercent).toFixed(0)}%`;
+  return "→ Stable";
+}
+
 
 
 export default function LocationDetail() {
@@ -181,9 +189,12 @@ export default function LocationDetail() {
                       <div className="text-sm font-semibold" style={{ color: "oklch(0.18 0.015 65)", fontFamily: "Inter, sans-serif" }}>{loc.kpis.topSpecies}</div>
                     </div>
                     <div>
-                      <div className="text-xs" style={{ color: "oklch(0.65 0.010 80)", fontFamily: "Inter, sans-serif" }}>Sessions Trend</div>
+                      <div className="text-xs" style={{ color: "oklch(0.65 0.010 80)", fontFamily: "Inter, sans-serif" }}>{loc.kpis.activityMetric ?? "Digital activity"}</div>
                       <div className="text-sm font-semibold" style={{ color: loc.kpis.sessionsTrend === "up" ? "oklch(0.75 0.18 140)" : loc.kpis.sessionsTrend === "down" ? "oklch(0.45 0.18 27)" : "oklch(0.52 0.016 80)", fontFamily: "Inter, sans-serif" }}>
-                        {loc.kpis.sessionsTrend === "up" ? "↑ Growing" : loc.kpis.sessionsTrend === "down" ? "↓ Declining" : "→ Stable"}
+                        {activityLabel(loc)}
+                      </div>
+                      <div className="text-[10px] mt-0.5" style={{ color: "oklch(0.58 0.012 80)", fontFamily: "Inter, sans-serif" }}>
+                        {loc.kpis.activityComparison ?? "No comparison available"}
                       </div>
                     </div>
                     <div>

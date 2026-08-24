@@ -30,6 +30,14 @@ function TrendIcon({ trend }: { trend: FranchiseLocation["kpis"]["sessionsTrend"
   return <span style={{ color: "oklch(0.65 0.010 80)", fontSize: "12px" }}>→</span>;
 }
 
+function activityLabel(loc: FranchiseLocation): string {
+  const { sessionsTrend, activityChangePercent } = loc.kpis;
+  if (activityChangePercent === null || activityChangePercent === undefined) return "Insufficient data";
+  if (sessionsTrend === "up") return `↑ ${Math.abs(activityChangePercent).toFixed(0)}%`;
+  if (sessionsTrend === "down") return `↓ ${Math.abs(activityChangePercent).toFixed(0)}%`;
+  return "→ Stable";
+}
+
 function LocationCard({ loc }: { loc: FranchiseLocation }) {
   const isReady = loc.status === "active";
 
@@ -114,22 +122,32 @@ function LocationCard({ loc }: { loc: FranchiseLocation }) {
                 {loc.kpis.topSpecies}
               </div>
             </div>
-            {/* Sessions */}
+            {/* Digital activity */}
             <div>
               <div
                 className="text-xs uppercase tracking-wider mb-0.5"
                 style={{ color: "oklch(0.65 0.010 80)", fontFamily: "Inter, sans-serif" }}
               >
-                Sessions
+                {loc.kpis.activityMetric ?? "Digital activity"}
               </div>
-              <div className="flex items-center gap-1">
+              <div
+                className="flex items-center gap-1"
+                title={loc.kpis.activityComparison ?? "No comparison available"}
+              >
                 <TrendIcon trend={loc.kpis.sessionsTrend} />
                 <span
                   className="text-sm font-semibold"
                   style={{ color: "oklch(0.18 0.015 65)", fontFamily: "Inter, sans-serif" }}
                 >
-                  {loc.kpis.sessionsTrend === "up" ? "Growing" : loc.kpis.sessionsTrend === "down" ? "Declining" : "Stable"}
+                  {activityLabel(loc)}
                 </span>
+              </div>
+              <div
+                className="text-[10px] mt-0.5 truncate"
+                style={{ color: "oklch(0.58 0.012 80)", fontFamily: "Inter, sans-serif" }}
+                title={loc.kpis.activityComparison ?? "No comparison available"}
+              >
+                {loc.kpis.activityComparison ?? "No comparison available"}
               </div>
             </div>
           </div>
