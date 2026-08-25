@@ -373,4 +373,4 @@
 - [x] Verify the branch base and compare its actual commits against current main — branch based on the latest reviewed report-integration work, not stale history
 - [x] Review data accuracy safeguards, authentication compatibility, migrations, and preservation of GSC/GA4/report functionality — fixed the introduced Manus OAuth regression and retained report-period/data-availability safeguards
 - [x] Run TypeScript, full Vitest suite, production build, targeted endpoint tests, and visual checks before approval — 99 passed, 10 skipped; build passed; real preview/export and 19-page PDF verified
-- [x] Merge and publish only if verification passes; document findings and update session memory — merge and documentation complete; checkpoint follows
+- [x] Merge and publish only if verification passes; document findings and update session memory — published as checkpoint `8de308da`
