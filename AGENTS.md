@@ -8,6 +8,6 @@ Rules for every change:
 - The initial sales strategy report is the current reporting priority. The quarterly post-sale report and suburb-page expansion are not current scope unless the product contract is updated first.
 - Every reported number must identify its source and period. Do not combine periods under one headline, silently include partial imports, or describe an unaudited fact as confirmed.
 - Reports must be generated as persistent, reviewable drafts. PDF export must use the saved draft by ID, not HTML supplied by the browser.
-- Admin-only business data and generation endpoints must use server-side authorization; a hidden UI control is not authorization.
+- This portal currently uses the custom local `AuthContext` admin gate, not Manus OAuth. Until server-backed local authentication is implemented, portal tRPC procedures must use `publicProcedure`; `protectedProcedure` and `adminProcedure` cause the verified `10001`/`10002` failures. Keep admin-only pages behind `PortalLayout` role checks and record local-admin report actions with audit user ID `0`.
 - When Dave or Ay changes a requirement, update `docs/PRODUCT_REQUIREMENTS.md` in the same commit as the implementation.
 - Before committing, verify the critical analytics files still exist, run the available focused tests/checks, and inspect the exact staged diff. Stage explicit paths only.

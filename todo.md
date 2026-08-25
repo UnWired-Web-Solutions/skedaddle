@@ -4,7 +4,7 @@
 - [x] Inspect and assess newly available repository updates before integration — `codex/meeting-report-priorities` validated (76 passed, 1 skipped); needs one GSC query-scope safeguard before merge
 - [x] Publish and verify the merged `codex/meeting-report-priorities` update — safeguard, merge, database migration, TypeScript, and 76 passing tests complete
 - [x] Generate and review a live Strategy Report Generator output after the Claude model repair — Hamilton completed all 13 sections with no Claude API error or missing-data placeholder
-- [ ] Verify the dashboard-header overlap after the portal-layout merge — anonymous preview cannot access the authenticated dashboard route
+- [x] Verify the dashboard-header overlap after the portal-layout merge — authenticated Home, Ottawa Location Detail, Strategy Report, and Proposal pages reviewed with no overlap regression
 - [x] Refine portal brand treatment: official Skedaddle logo with selective brand-green accents — neutral login surface, charcoal navigation, official colour logo, green reserved for actions and active states
 - [x] Verify authorised Google Search Console access and document the portal connection path — `uws@unwiredwebsolutions.com` is a verified owner of `sc-domain:skedaddlewildlife.com`; production API credential setup remains next
 - [x] Create, authorise, and verify the least-privilege Google Search Console service-account connection — Search Console API enabled, dedicated service account granted Full property access, JSON key stored securely, and live API property test passed
@@ -369,8 +369,8 @@
 - [x] Fix PDF pagination: prevent table splits, orphaned headings, add header row repetition on multi-page tables
 
 ## Codex Update Review — Aug 24, 2026
-- [ ] Fetch and identify the newly available Codex/GPT branch or pull request
-- [ ] Verify the branch base and compare its actual commits against current main
-- [ ] Review data accuracy safeguards, authentication compatibility, migrations, and preservation of GSC/GA4/report functionality
-- [ ] Run TypeScript, full Vitest suite, production build, targeted endpoint tests, and visual checks before approval
-- [ ] Merge and publish only if verification passes; document findings and update session memory
+- [x] Fetch and identify the newly available Codex/GPT branch or pull request — reviewed the two new `agent/analytics-report-integration` commits beyond the previously integrated base
+- [x] Verify the branch base and compare its actual commits against current main — branch based on the latest reviewed report-integration work, not stale history
+- [x] Review data accuracy safeguards, authentication compatibility, migrations, and preservation of GSC/GA4/report functionality — fixed the introduced Manus OAuth regression and retained report-period/data-availability safeguards
+- [x] Run TypeScript, full Vitest suite, production build, targeted endpoint tests, and visual checks before approval — 99 passed, 10 skipped; build passed; real preview/export and 19-page PDF verified
+- [x] Merge and publish only if verification passes; document findings and update session memory — merge and documentation complete; checkpoint follows

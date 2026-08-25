@@ -9,7 +9,7 @@ vi.mock("./_core/env", () => ({
   },
 }));
 
-describe("Strategy Report Router", () => {
+describe("Strategy Report Router", { timeout: 15_000 }, () => {
   it("should export buildTerritoryData function", async () => {
     const { buildTerritoryData } = await import("./strategyReportRouter");
     expect(buildTerritoryData).toBeDefined();

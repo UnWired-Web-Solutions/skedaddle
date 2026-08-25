@@ -33,9 +33,10 @@ function TrendIcon({ trend }: { trend: FranchiseLocation["kpis"]["sessionsTrend"
 function activityLabel(loc: FranchiseLocation): string {
   const { sessionsTrend, activityChangePercent } = loc.kpis;
   if (activityChangePercent === null || activityChangePercent === undefined) return "Insufficient data";
-  if (sessionsTrend === "up") return `↑ ${Math.abs(activityChangePercent).toFixed(0)}%`;
-  if (sessionsTrend === "down") return `↓ ${Math.abs(activityChangePercent).toFixed(0)}%`;
-  return "→ Stable";
+  if (sessionsTrend === "up" || sessionsTrend === "down") {
+    return `${Math.abs(activityChangePercent).toFixed(0)}%`;
+  }
+  return "Stable";
 }
 
 function LocationCard({ loc }: { loc: FranchiseLocation }) {

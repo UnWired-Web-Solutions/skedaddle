@@ -14,7 +14,7 @@ export async function createReportDraft(input: {
   dataSnapshot: unknown;
   sections?: unknown;
   html: string;
-  createdByUserId: number;
+  createdByUserId?: number;
 }) {
   if (!input.html.trim() || /will be populated|please regenerate/i.test(input.html)) {
     throw new Error("Report generation produced incomplete placeholder content; draft was not saved.");
@@ -34,7 +34,9 @@ export async function createReportDraft(input: {
     dataSnapshotJson: input.dataSnapshot,
     sectionsJson: input.sections ?? null,
     html: input.html,
-    createdByUserId: input.createdByUserId,
+    // The portal uses one custom local admin rather than Manus OAuth.
+    // ID 0 is the explicit audit sentinel for that local administrator.
+    createdByUserId: input.createdByUserId ?? 0,
   });
   return id;
 }
@@ -52,7 +54,7 @@ export async function getReportDraft(id: string, reportType: ReportDraftType) {
   return draft;
 }
 
-export async function markReportDraftExported(id: string, pdfUrl: string, userId: number) {
+export async function markReportDraftExported(id: string, pdfUrl: string, userId = 0) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable. Report export could not be audited.");
   await db.update(reportDrafts).set({

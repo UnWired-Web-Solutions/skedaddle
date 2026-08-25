@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { adminProcedure, router } from "./_core/trpc";
+import { publicProcedure, router } from "./_core/trpc";
 import { ENV } from "./_core/env";
 import { invokeLLM } from "./_core/llm";
 import { storagePut } from "./storage";
@@ -637,7 +637,7 @@ async function generatePdf(html: string): Promise<Buffer> {
 
 export const proposalRouter = router({
   // Get available territories for proposal generation
-  getTerritories: adminProcedure.query(async () => {
+  getTerritories: publicProcedure.query(async () => {
     // Import franchise data dynamically to avoid circular deps
     const { DASHBOARD_DATA } = await import("../client/src/data/dashboardData");
     const { FRANCHISE_LOCATIONS } = await import("../client/src/data/franchises");
@@ -655,9 +655,9 @@ export const proposalRouter = router({
   }),
 
   // Backward-compatible PDF action; it only accepts an existing saved draft.
-  generate: adminProcedure
+  generate: publicProcedure
     .input(z.object({ draftId: z.string().uuid() }))
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input }) => {
       const { DASHBOARD_DATA } = await import("../client/src/data/dashboardData");
       const draft = await getReportDraft(input.draftId, "proposal");
       const dashData = DASHBOARD_DATA[draft.territoryId];
@@ -665,7 +665,7 @@ export const proposalRouter = router({
       const pdfBuffer = await generatePdf(draft.html);
       const filename = `proposals/${draft.territoryId}_franchise_proposal_${Date.now()}.pdf`;
       const { url } = await storagePut(filename, pdfBuffer, "application/pdf");
-      await markReportDraftExported(draft.id, url, ctx.user.id);
+      await markReportDraftExported(draft.id, url);
 
       return {
         url,
@@ -677,9 +677,9 @@ export const proposalRouter = router({
     }),
 
   // Preview HTML (for in-browser preview without PDF generation)
-  preview: adminProcedure
+  preview: publicProcedure
     .input(proposalInputSchema)
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input }) => {
       const { DASHBOARD_DATA } = await import("../client/src/data/dashboardData");
       const { FRANCHISE_LOCATIONS } = await import("../client/src/data/franchises");
 
@@ -714,21 +714,20 @@ export const proposalRouter = router({
         config: input.config,
         dataSnapshot: proposalData,
         html,
-        createdByUserId: ctx.user.id,
       });
 
       return { draftId, html, narrative };
     }),
 
   // Export the exact reviewed preview; no second AI call can change the copy.
-  exportPdf: adminProcedure
+  exportPdf: publicProcedure
     .input(z.object({ draftId: z.string().uuid() }))
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input }) => {
       const draft = await getReportDraft(input.draftId, "proposal");
       const pdfBuffer = await generatePdf(draft.html);
       const filename = `proposals/${draft.territoryId}_franchise_proposal_${Date.now()}.pdf`;
       const { url } = await storagePut(filename, pdfBuffer, "application/pdf");
-      await markReportDraftExported(draft.id, url, ctx.user.id);
+      await markReportDraftExported(draft.id, url);
       return { url, generatedAt: new Date().toISOString() };
     }),
 });

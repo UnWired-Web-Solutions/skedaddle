@@ -5,7 +5,7 @@
  */
 
 import { z } from "zod";
-import { adminProcedure, protectedProcedure, router } from "./_core/trpc";
+import { publicProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
 import {
   ga4Sessions,
@@ -32,7 +32,7 @@ import { getGA4MappingSummary } from "../shared/ga4TerritoryProperties";
 
 export const analyticsRouter = router({
   /** Confirm the server-side read-only GSC connection without returning credential material. */
-  getSearchConsoleConnectionStatus: protectedProcedure.query(async () => {
+  getSearchConsoleConnectionStatus: publicProcedure.query(async () => {
     try {
       return await verifySearchConsoleAccess();
     } catch (error) {
@@ -46,7 +46,7 @@ export const analyticsRouter = router({
   }),
 
   /** Confirm the server-side GA4 Data API connection status. */
-  getGA4ConnectionStatus: protectedProcedure.query(async () => {
+  getGA4ConnectionStatus: publicProcedure.query(async () => {
     try {
       return await verifyGA4Access();
     } catch (error) {
@@ -60,7 +60,7 @@ export const analyticsRouter = router({
   }),
 
   /** Get GA4 monthly sessions for a territory (aggregated across all sub-location properties). */
-  getGA4TerritoryMonthly: protectedProcedure
+  getGA4TerritoryMonthly: publicProcedure
     .input(z.object({
       territoryId: z.string(),
       startDate: z.string(),
@@ -69,7 +69,7 @@ export const analyticsRouter = router({
     .query(async ({ input }) => fetchGA4TerritorySessionsMonthly(input.territoryId, input.startDate, input.endDate)),
 
   /** Get GA4 top pages for a territory (aggregated across all sub-location properties). */
-  getGA4TerritoryTopPages: protectedProcedure
+  getGA4TerritoryTopPages: publicProcedure
     .input(z.object({
       territoryId: z.string(),
       startDate: z.string(),
@@ -79,7 +79,7 @@ export const analyticsRouter = router({
     .query(async ({ input }) => fetchGA4TerritoryTopPages(input.territoryId, input.startDate, input.endDate, input.limit)),
 
   /** Get GA4 top cities for a territory (aggregated across all sub-location properties). */
-  getGA4TerritoryTopCities: protectedProcedure
+  getGA4TerritoryTopCities: publicProcedure
     .input(z.object({
       territoryId: z.string(),
       startDate: z.string(),
@@ -89,7 +89,7 @@ export const analyticsRouter = router({
     .query(async ({ input }) => fetchGA4TerritoryTopCities(input.territoryId, input.startDate, input.endDate, input.limit)),
 
   /** Get GA4 channel breakdown for a territory (aggregated across all sub-location properties). */
-  getGA4TerritoryChannelBreakdown: protectedProcedure
+  getGA4TerritoryChannelBreakdown: publicProcedure
     .input(z.object({
       territoryId: z.string(),
       startDate: z.string(),
@@ -98,13 +98,13 @@ export const analyticsRouter = router({
     .query(async ({ input }) => fetchGA4TerritoryChannelBreakdown(input.territoryId, input.startDate, input.endDate)),
 
   /** List all territories that have GA4 properties mapped and ready for data pull. */
-  getGA4ReadyTerritories: protectedProcedure.query(() => getGA4ReadyTerritories()),
+  getGA4ReadyTerritories: publicProcedure.query(() => getGA4ReadyTerritories()),
 
   /** Auditable mapping counts; account discovery and territory assignment are not conflated. */
-  getGA4MappingStatus: protectedProcedure.query(() => getGA4MappingSummary()),
+  getGA4MappingStatus: publicProcedure.query(() => getGA4MappingSummary()),
 
   /** Import one completed GA4 month into the durable territory reporting tables. */
-  syncGA4TerritoryMonth: adminProcedure
+  syncGA4TerritoryMonth: publicProcedure
     .input(z.object({
       territoryId: z.string(),
       year: z.number().int(),
@@ -113,7 +113,7 @@ export const analyticsRouter = router({
     .mutation(({ input }) => importGA4TerritoryMonth(input.territoryId, input.year, input.month)),
 
   /** Latest import coverage for the selected territory. */
-  getGA4ImportStatus: protectedProcedure
+  getGA4ImportStatus: publicProcedure
     .input(z.object({ territoryId: z.string() }))
     .query(async ({ input }) => {
       const db = await getDb();
@@ -139,7 +139,7 @@ export const analyticsRouter = router({
    * The importer rejects partial, overlapping, or otherwise unverified
    * territory scopes before it requests or persists Google data.
    */
-  syncSearchConsoleTerritory: adminProcedure
+  syncSearchConsoleTerritory: publicProcedure
     .input(z.object({
       territoryId: z.string(),
       year: z.number().int(),
@@ -152,7 +152,7 @@ export const analyticsRouter = router({
     )),
 
   /** Surface the import decision without exposing credentials or mutable scope configuration. */
-  getSearchConsoleScope: protectedProcedure
+  getSearchConsoleScope: publicProcedure
     .input(z.object({ territoryId: z.string() }))
     .query(({ input }) => getGscTerritoryScope(input.territoryId) ?? null),
 
@@ -161,7 +161,7 @@ export const analyticsRouter = router({
    * selected year and compares to the same months in the previous year.
    * This powers the "YTD Organic Clicks" KPI card in the DashThis replacement.
    */
-  getSearchConsoleYTD: protectedProcedure
+  getSearchConsoleYTD: publicProcedure
     .input(z.object({
       territoryId: z.string(),
       year: z.number().int(),
@@ -234,7 +234,7 @@ export const analyticsRouter = router({
    * GSC monthly trend — clicks and impressions by month for a territory.
    * Powers the organic search trend line chart in the DashThis replacement.
    */
-  getSearchConsoleMonthlyTrend: protectedProcedure
+  getSearchConsoleMonthlyTrend: publicProcedure
     .input(z.object({
       territoryId: z.string(),
       startYear: z.number().int(),
@@ -273,7 +273,7 @@ export const analyticsRouter = router({
    * List all territories that have GSC data available (ready status).
    * Used by the dashboard to show which territories have organic search data.
    */
-  getSearchConsoleReadyTerritories: protectedProcedure.query(() => {
+  getSearchConsoleReadyTerritories: publicProcedure.query(() => {
     return GSC_TERRITORY_SCOPES
       .filter(t => t.status === "ready")
       .map(t => ({ id: t.territoryId, paths: t.registeredPaths, notes: t.notes }));
@@ -283,7 +283,7 @@ export const analyticsRouter = router({
    * Get the 19 parent territories for the dropdowns.
    * Also includes an "All Network" option and any unmapped territories as "Other".
    */
-  getTerritories: protectedProcedure.query(async () => {
+  getTerritories: publicProcedure.query(async () => {
     const territories = TERRITORY_GROUPS.map(g => ({
       id: g.id,
       name: g.name,
@@ -300,7 +300,7 @@ export const analyticsRouter = router({
   /**
    * Get available date range for data.
    */
-  getDateRange: protectedProcedure.query(async () => {
+  getDateRange: publicProcedure.query(async () => {
     const db = await getDb();
     if (!db) return {
       ga4: { minYear: 2022, maxYear: 2026 },
@@ -346,7 +346,7 @@ export const analyticsRouter = router({
   }),
 
   /** Latest imported period, used by dashboards instead of hard-coded dates. */
-  getLatestPeriod: protectedProcedure
+  getLatestPeriod: publicProcedure
     .input(z.object({ territoryId: z.string().optional() }).optional())
     .query(async ({ input }) => {
     const db = await getDb();
@@ -395,7 +395,7 @@ export const analyticsRouter = router({
   /**
    * Get monthly trend data for charts — aggregates all sub-locations under a parent territory.
    */
-  getMonthlyTrend: protectedProcedure
+  getMonthlyTrend: publicProcedure
     .input(z.object({
       territoryId: z.string(),
       startYear: z.number(),
@@ -509,7 +509,7 @@ export const analyticsRouter = router({
    * Get YoY comparison for a specific month — compares current year to previous year.
    * Aggregates all sub-locations under the parent territory.
    */
-  getYoYComparison: protectedProcedure
+  getYoYComparison: publicProcedure
     .input(z.object({
       territoryId: z.string(),
       year: z.number(),
@@ -646,7 +646,7 @@ export const analyticsRouter = router({
    * Get summary KPIs for a territory — total sessions and GBP metrics for a given period.
    * Aggregates all sub-locations under the parent territory.
    */
-  getSummaryKPIs: protectedProcedure
+  getSummaryKPIs: publicProcedure
     .input(z.object({
       territoryId: z.string(),
       year: z.number(),
@@ -716,7 +716,7 @@ export const analyticsRouter = router({
    * DashThis replacement: domain-property Search Console totals, top 25 pages,
    * and top 25 queries for an explicitly territory-filtered monthly import.
    */
-  getSearchConsoleOverview: protectedProcedure
+  getSearchConsoleOverview: publicProcedure
     .input(z.object({
       territoryId: z.string(),
       year: z.number().int(),
@@ -776,7 +776,7 @@ export const analyticsRouter = router({
     }),
 
   /** Latest verified Salesforce inspection-to-sale snapshot for a territory. */
-  getTerritoryCloseRate: protectedProcedure
+  getTerritoryCloseRate: publicProcedure
     .input(z.object({ territoryId: z.string() }))
     .query(async ({ input }) => {
       const db = await getDb();
@@ -818,7 +818,7 @@ export const analyticsRouter = router({
    * Get automated insights — detects significant anomalies across all 19 parent territories.
    * Aggregates sub-locations before comparing YoY.
    */
-  getInsights: protectedProcedure
+  getInsights: publicProcedure
     .input(z.object({
       year: z.number(),
       month: z.number().min(1).max(12),

@@ -59,3 +59,52 @@ The specific pagination issues seen in the earlier version were resolved in the 
 3. Cleaner section starts with better page-level spacing.
 
 Further review may still be needed for later pages, but the exact layout problems previously identified on pages 2-5 are fixed.
+
+## Post-Codex Audit Workflow Verification — `ottawa_audited_update.pdf`
+
+The report was generated through `strategyReport.preview`, saved as draft `bd11728b-ab78-4bb8-bf37-5528e451e1dc`, and exported through `strategyReport.exportPdf`. Pages 1–5 were visually inspected after the report-integrity merge and custom-auth repair.
+
+| Page | Verified result |
+|---|---|
+| 1 | Cover displays the fixed initial-sales window `2025-07-01 through 2026-06-30` and separately identifies the available data sources. |
+| 2 | Executive Summary is populated with four paragraphs; the prior blank-section failure is absent. |
+| 3 | Current Campaign section and table fit cleanly on one page. |
+| 4 | Sales & Species Analysis table and narrative fit cleanly on one page. |
+| 5 | Revenue by City table and narrative fit cleanly on one page. |
+
+No orphaned headings, split tables, or blank sections were observed in pages 1–5. The remaining pages must still be inspected before the complete PDF is declared visually verified.
+
+## Mid-report visual review — `ottawa_audited_update.pdf` pages 6–10
+
+| Page | Verified result |
+|---|---|
+| 6 | GBP / Search Console / GA4 evidence section renders cleanly; the table remains intact on one page and explicitly states GA4 is unavailable for the matched initial-sales window. |
+| 7 | Top 25 Search Console Pages continues on a dedicated page without header/orphan issues. |
+| 8 | Search Console Pages completes cleanly and Top 25 Search Terms begins cleanly on the same page. |
+| 9 | Search Terms table finishes cleanly and Section 06 begins with full narrative content; no broken pagination observed. |
+| 10 | Section 07 Proposed Program renders as a full narrative page with no truncation or overlap. |
+
+The verified pages 6–10 remain content-complete and visually stable. One content nuance to remember: the report honestly marks GA4 as unavailable for the initial-sales matched window, which is correct because persisted GA4 coverage does not yet fill that historical period.
+
+## Late-middle visual review — `ottawa_audited_update.pdf` pages 11–15
+
+| Page | Verified result |
+|---|---|
+| 11 | Scale Comparison table renders clearly and does not split, though it leaves substantial white space because the section is intentionally short. |
+| 12 | Website Content Architecture starts cleanly with no orphaned heading or overlap. |
+| 13 | Content Architecture continues over a full text page with stable line spacing and no clipped text. |
+| 14 | Content Architecture finishes cleanly and does not cut off at the page boundary. |
+| 15 | Google Business Profile Strategy starts on a fresh page with intact paragraph flow and no overflow. |
+
+Pages 11–15 remain visually stable. The main remaining check is the report tail (90-day plan, risks, recommendations, and final pagination) on the last four pages.
+
+## Final visual review — `ottawa_audited_update.pdf` pages 16–19
+
+| Page | Verified result |
+|---|---|
+| 16 | GBP Strategy narrative continues cleanly to the page end with no cut-off text, overlap, or widowed heading. |
+| 17 | 90-Day Action Plan begins on a fresh page and the month-by-month bullets remain readable with intact spacing. |
+| 18 | Delivery Dependencies and Mitigations table renders on one page with a repeated header row and no row splitting. |
+| 19 | Summary of Recommendations closes the report cleanly on a single page with footer intact and no pagination defects. |
+
+Full audited-report verification is complete. Across pages 1–19, no blank sections, orphaned headings, cut-off paragraphs, or split tables were observed in the regenerated draft-export workflow output.

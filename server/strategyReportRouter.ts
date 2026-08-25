@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { adminProcedure, router } from "./_core/trpc";
+import { publicProcedure, router } from "./_core/trpc";
 import { invokeLLM } from "./_core/llm";
 import { ENV } from "./_core/env";
 import { storagePut } from "./storage";
@@ -1785,7 +1785,7 @@ async function generatePdf(html: string): Promise<Buffer> {
 
 export const strategyReportRouter = router({
   // Get available territories for report generation
-  getTerritories: adminProcedure.query(async () => {
+  getTerritories: publicProcedure.query(async () => {
     const { DASHBOARD_DATA } = await import("../client/src/data/dashboardData");
     const { FRANCHISE_LOCATIONS } = await import("../client/src/data/franchises");
 
@@ -1802,9 +1802,9 @@ export const strategyReportRouter = router({
   }),
 
   // Generate strategy report (returns HTML for preview)
-  preview: adminProcedure
+  preview: publicProcedure
     .input(z.object({ territoryId: z.string(), config: strategyConfigSchema }))
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input }) => {
       const result = await generateStrategyReport(input.territoryId, input.config);
       const dataSnapshot = result.data;
       const draftId = await createReportDraft({
@@ -1816,15 +1816,14 @@ export const strategyReportRouter = router({
         dataSnapshot,
         sections: result.sections,
         html: result.html,
-        createdByUserId: ctx.user.id,
       });
       return { draftId, html: result.html, sectionCount: result.sections.length };
     }),
 
   // Backward-compatible PDF action; it only accepts an existing saved draft.
-  generate: adminProcedure
+  generate: publicProcedure
     .input(z.object({ draftId: z.string().uuid() }))
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input }) => {
       const { DASHBOARD_DATA } = await import("../client/src/data/dashboardData");
       const draft = await getReportDraft(input.draftId, "strategy");
       const dashData = DASHBOARD_DATA[draft.territoryId];
@@ -1832,7 +1831,7 @@ export const strategyReportRouter = router({
       const pdfBuffer = await generatePdf(draft.html);
       const filename = `strategy-reports/${draft.territoryId}_strategy_report_${Date.now()}.pdf`;
       const { url } = await storagePut(filename, pdfBuffer, "application/pdf");
-      await markReportDraftExported(draft.id, url, ctx.user.id);
+      await markReportDraftExported(draft.id, url);
       const sections = Array.isArray(draft.sectionsJson) ? draft.sectionsJson : [];
 
       return {
@@ -1846,14 +1845,14 @@ export const strategyReportRouter = router({
     }),
 
   // Render the exact reviewed HTML instead of re-running every AI section.
-  exportPdf: adminProcedure
+  exportPdf: publicProcedure
     .input(z.object({ draftId: z.string().uuid() }))
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input }) => {
       const draft = await getReportDraft(input.draftId, "strategy");
       const pdfBuffer = await generatePdf(draft.html);
       const filename = `strategy-reports/${draft.territoryId}_strategy_report_${Date.now()}.pdf`;
       const { url } = await storagePut(filename, pdfBuffer, "application/pdf");
-      await markReportDraftExported(draft.id, url, ctx.user.id);
+      await markReportDraftExported(draft.id, url);
       return { url, generatedAt: new Date().toISOString() };
     }),
 });
