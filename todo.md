@@ -367,3 +367,10 @@
 - [x] Fix empty Executive Summary in strategy reports — added retry logic + data-driven fallback
 - [x] Implement dual-path LLM: Opus 5 direct API primary → forge API (claude-opus-4-7) fallback for reliability
 - [x] Fix PDF pagination: prevent table splits, orphaned headings, add header row repetition on multi-page tables
+
+## Codex Update Review — Aug 24, 2026
+- [ ] Fetch and identify the newly available Codex/GPT branch or pull request
+- [ ] Verify the branch base and compare its actual commits against current main
+- [ ] Review data accuracy safeguards, authentication compatibility, migrations, and preservation of GSC/GA4/report functionality
+- [ ] Run TypeScript, full Vitest suite, production build, targeted endpoint tests, and visual checks before approval
+- [ ] Merge and publish only if verification passes; document findings and update session memory
