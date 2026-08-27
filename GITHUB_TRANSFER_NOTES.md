@@ -121,8 +121,8 @@ Using the renewed UWS repository administration permission, `aybello` was explic
 
 ## Final Synchronization and Production Verification
 
-- Final migration checkpoint: `c61eecc9`
-- Local `main` and `uws-dev/skedaddle` `main`: `c61eecc9e690af4acffeafb584516c27a243a0a7`
+- Verified migration checkpoint before the final records update: `c61eecc9`
+- Local `main` and `uws-dev/skedaddle` `main` were verified synchronized at `c61eecc9e690af4acffeafb584516c27a243a0a7`; the later documentation-only checkpoint was also pushed and verified separately.
 - GitHub push to the transferred repository completed successfully.
 - All five branches remain present.
 - Pull requests #1 and #2 remain merged; PR #3 remains open.

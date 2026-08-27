@@ -385,5 +385,5 @@
 - [x] Transfer the populated repository from `aybello` to `uws-dev` — canonical repository is now `uws-dev/skedaddle`; all five branches and PRs #1–#3 preserved
 - [x] Reconnect the Manus project to the transferred repository — GitHub App re-authorized, remote credential refreshed, and push dry run succeeds against `uws-dev/skedaddle`
 - [x] Restore `aybello` from retained write access to Admin access on `uws-dev/skedaddle` — verified from Ay's authenticated account
-- [x] Verify checkpoint push, all five branches, PRs #1–#3, auto-publish, and production site health after GitHub App authorization — local and UWS `main` synchronized at `c61eecc9`; production returned HTTP 200
+- [x] Verify checkpoint push, all five branches, PRs #1–#3, auto-publish, and production site health after GitHub App authorization — local and UWS `main` synchronized; production returned HTTP 200
 - [x] Update project documentation and session memory with the new canonical GitHub repository URL — `https://github.com/uws-dev/skedaddle`
