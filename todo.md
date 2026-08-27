@@ -377,9 +377,13 @@
 
 ## GitHub Ownership Transfer — Aug 26, 2026
 - [x] Confirm the current `aybello/skedaddle` repository ownership and the exact UWS GitHub destination username or organization — authenticated UWS account is `uws-dev`
-- [ ] Verify the UWS destination can accept the repository name and that Ay has sufficient transfer permissions
-- [ ] Resolve the existing empty `uws-dev/skedaddle` repository name conflict without losing the populated source repository
-- [ ] Create a pre-transfer checkpoint and document branches, pull requests, default branch, and remote URLs
-- [ ] Transfer the repository only after explicit confirmation of the destination and ownership change
-- [ ] Reconnect the Manus project to the transferred repository and verify pull/push, branches, pull requests, auto-publish, and production site health
+- [x] Verify the UWS destination can accept the repository name and that Ay has sufficient transfer permissions — Ay is source admin; authenticated `uws-dev` session controls the empty destination; name becomes available after deletion
+- [x] Resolve the existing empty `uws-dev/skedaddle` repository name conflict without losing the populated source repository — GitHub confirmed the empty placeholder was deleted; source and mirror backup remain intact
+- [x] Create a pre-transfer checkpoint and document branches, pull requests, default branch, and remote URLs — checkpoint `0400ee85`; validated mirror backup created at `/home/ubuntu/backups/skedaddle-pretransfer.git`
+- [x] Obtain explicit confirmation for permanently deleting the empty placeholder and transferring repository ownership to `uws-dev`
+- [x] Complete the ownership transfer through an authenticated `aybello` browser session because the project GitHub integration returned `403 Resource not accessible by integration` for repository administration — GitHub confirmed the transfer request to `uws-dev`
+- [x] Transfer the populated repository from `aybello` to `uws-dev` — canonical repository is now `uws-dev/skedaddle`; all five branches and PRs #1–#3 preserved
+- [x] Reconnect the Manus project to the transferred repository — GitHub App re-authorized, remote credential refreshed, and push dry run succeeds against `uws-dev/skedaddle`
+- [x] Restore `aybello` from retained write access to Admin access on `uws-dev/skedaddle` — verified from Ay's authenticated account
+- [ ] Verify checkpoint push, all five branches, PRs #1–#3, auto-publish, and production site health after GitHub App authorization
 - [ ] Update project documentation and session memory with the new canonical GitHub repository URL
