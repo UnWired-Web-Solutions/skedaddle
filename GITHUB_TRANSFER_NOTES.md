@@ -129,6 +129,14 @@ Using the renewed UWS repository administration permission, `aybello` was explic
 - TypeScript passed; 99 tests passed with 10 intentional skips; production build passed.
 - `https://skedaddle.manus.space/` returned HTTP 200 after auto-publishing.
 
+## Manus Settings Panel Finding
+
+The GitHub panel shown in Manus is an **export/create-new-repository** workflow. Its action is `Create repository`; it does not provide a selector for attaching an existing repository. The project’s local WebDev metadata stores the internal Manus Git backend separately from the `user_github` remote, so manually synchronizing `uws-dev/skedaddle` does not change that panel into a connected-repository display.
+
+The existing `uws-dev/skedaddle` repository is already synchronized and operational through the re-authorized GitHub integration and canonical `user_github` remote. Clicking `Create repository` with owner `uws-dev` and name `skedaddle` would encounter a name conflict because that repository already exists. Recreating it solely for the panel would undermine the preserved pull-request history that motivated the ownership transfer.
+
+**Decision:** The user chose to leave the verified existing setup unchanged. `uws-dev/skedaddle` remains the single canonical repository. No duplicate Manus-created repository will be created, and the export-only Settings panel may continue to display `Create repository`.
+
 ## Recovery Backup
 
 A complete mirror clone was created at `/home/ubuntu/backups/skedaddle-pretransfer.git`. `git fsck --full` completed successfully across 1,181 objects. The mirror contains all five branches and pull-request refs for PRs #1–#3. Local `main`, GitHub `main`, and the mirror's `main` all resolve to `0400ee857c92f924e736b61c6b39955e607ae22e`.

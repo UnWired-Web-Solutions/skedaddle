@@ -387,3 +387,10 @@
 - [x] Restore `aybello` from retained write access to Admin access on `uws-dev/skedaddle` — verified from Ay's authenticated account
 - [x] Verify checkpoint push, all five branches, PRs #1–#3, auto-publish, and production site health after GitHub App authorization — local and UWS `main` synchronized; production returned HTTP 200
 - [x] Update project documentation and session memory with the new canonical GitHub repository URL — `https://github.com/uws-dev/skedaddle`
+
+## Manus GitHub Settings Synchronization — Aug 27, 2026
+- [x] Inspect the project’s stored GitHub metadata and determine why Settings still offers “Create repository” for the existing `uws-dev/skedaddle` repository — the panel tracks Manus’s create/export workflow separately from the verified `user_github` remote
+- [x] Confirm whether the Management UI supports attaching an existing repository or only creating a new one — this panel only creates a new repository and does not expose an existing-repository attach option
+- [x] Resolve the metadata choice without deleting, recreating, or duplicating the repository — user chose to keep the verified existing `uws-dev/skedaddle` setup; the export-only panel will remain untouched
+- [x] Verify checkpoint synchronization, repository history, branches, pull requests, and production health after preserving the current setup — push access succeeds, five branches and PRs #1–#3 remain present, Ay is Admin, and production returns HTTP 200
+- [x] Update session memory with the final Management UI synchronization status — existing UWS repository preserved; export-only panel intentionally left unchanged
