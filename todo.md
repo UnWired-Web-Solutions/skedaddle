@@ -374,3 +374,12 @@
 - [x] Review data accuracy safeguards, authentication compatibility, migrations, and preservation of GSC/GA4/report functionality — fixed the introduced Manus OAuth regression and retained report-period/data-availability safeguards
 - [x] Run TypeScript, full Vitest suite, production build, targeted endpoint tests, and visual checks before approval — 99 passed, 10 skipped; build passed; real preview/export and 19-page PDF verified
 - [x] Merge and publish only if verification passes; document findings and update session memory — published as checkpoint `8de308da`
+
+## GitHub Ownership Transfer — Aug 26, 2026
+- [x] Confirm the current `aybello/skedaddle` repository ownership and the exact UWS GitHub destination username or organization — authenticated UWS account is `uws-dev`
+- [ ] Verify the UWS destination can accept the repository name and that Ay has sufficient transfer permissions
+- [ ] Resolve the existing empty `uws-dev/skedaddle` repository name conflict without losing the populated source repository
+- [ ] Create a pre-transfer checkpoint and document branches, pull requests, default branch, and remote URLs
+- [ ] Transfer the repository only after explicit confirmation of the destination and ownership change
+- [ ] Reconnect the Manus project to the transferred repository and verify pull/push, branches, pull requests, auto-publish, and production site health
+- [ ] Update project documentation and session memory with the new canonical GitHub repository URL
