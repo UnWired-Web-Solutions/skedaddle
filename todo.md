@@ -394,3 +394,10 @@
 - [x] Resolve the metadata choice without deleting, recreating, or duplicating the repository — user chose to keep the verified existing `uws-dev/skedaddle` setup; the export-only panel will remain untouched
 - [x] Verify checkpoint synchronization, repository history, branches, pull requests, and production health after preserving the current setup — push access succeeds, five branches and PRs #1–#3 remain present, Ay is Admin, and production returns HTTP 200
 - [x] Update session memory with the final Management UI synchronization status — existing UWS repository preserved; export-only panel intentionally left unchanged
+
+## Salesforce Data Sync Drive Review — Aug 31, 2026
+- [x] Inventory the shared Drive folder and confirm access to all files — six files, no subfolders
+- [x] Read the five smaller Sheets/Docs and export their complete contents for review
+- [x] Read the oversized Salesforce master sheet through the Sheets API in six ranges and validate all 269,890 current rows
+- [x] Cross-check exact workbook totals, periods, status values, species, city, and territory structures without estimating missing data
+- [x] Document the Salesforce status-mapping, mixed-currency, snapshot-timing, and sensitive-data caveats for future portal integration
