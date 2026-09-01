@@ -15,3 +15,7 @@ The Network page’s previous static `dashboardData` revenue leaderboard was ret
 | Regression and build | Strict TypeScript, workbook-router regression, full suite (168 passed; 11 intentional skips), and clean production build passed. |
 
 The remaining non-ranked territory has no accepted active-workbook aggregate and is not substituted with a zero. Production interface verification remains pending checkpoint rollout.
+
+## Initial production rollout check
+
+After checkpoint `70d43482`, the authenticated production Network page still displayed the former static **Market Rankings by Currency — T12 Revenue** table and its Salesforce T12 claim. This is a stale deployment artifact, not a verification pass. The new active-workbook network contract was not yet present in the rendered production page, so no production source, currency, or partial-state claim is made at this stage.
