@@ -335,6 +335,7 @@ export default function Analytics() {
   const { data: ga4ImportStatus } = trpc.analytics.getGA4ImportStatus.useQuery({
     territoryId: selectedTerritory,
   });
+  const activeGA4Snapshot = ga4ImportStatus?.activeSnapshot ?? ga4ImportStatus?.latestAttempt;
   const [ga4SyncMessage, setGA4SyncMessage] = useState<string | null>(null);
   const ga4Sync = trpc.analytics.syncGA4TerritoryMonth.useMutation({
     onSuccess: async result => {
@@ -941,9 +942,14 @@ export default function Analytics() {
               </button>
             </div>
           </div>
-          {(ga4SyncMessage || ga4ImportStatus) && (
+          {(ga4SyncMessage || activeGA4Snapshot) && (
             <div style={{ marginBottom: 14, padding: "10px 12px", borderRadius: 7, background: ga4Sync.isError ? "#fff0ee" : "#eef8e8", border: `1px solid ${ga4Sync.isError ? "#efb7b0" : "#b8df9e"}`, color: ga4Sync.isError ? "#9d3024" : "#316e18", fontSize: 12 }}>
-              {ga4SyncMessage || `Latest persisted import: ${FULL_MONTHS[(ga4ImportStatus?.month || 1) - 1]} ${ga4ImportStatus?.year} · ${ga4ImportStatus?.propertiesSucceeded}/${ga4ImportStatus?.propertiesExpected} properties · ${ga4ImportStatus?.status}`}
+              {ga4SyncMessage || `Active persisted import: ${FULL_MONTHS[(activeGA4Snapshot?.month || 1) - 1]} ${activeGA4Snapshot?.year} · ${activeGA4Snapshot?.propertiesSucceeded}/${activeGA4Snapshot?.propertiesExpected} properties · ${activeGA4Snapshot?.status}`}
+            </div>
+          )}
+          {ga4ImportStatus?.latestAttempt && activeGA4Snapshot && ga4ImportStatus.latestAttempt.id !== activeGA4Snapshot.id && (
+            <div style={{ marginBottom: 14, padding: "10px 12px", borderRadius: 7, background: "#fff8e1", border: "1px solid #f0d79a", color: "#735711", fontSize: 12 }}>
+              The latest GA4 import attempt did not replace the active complete snapshot. Its coverage remains visible in the import audit.
             </div>
           )}
           {partialGA4Periods.length > 0 && (

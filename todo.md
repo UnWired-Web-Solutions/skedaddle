@@ -28,7 +28,13 @@
 - [x] Added live GA4 territory procedures: getGA4TerritoryMonthly, getGA4TerritoryTopPages, getGA4TerritoryTopCities, getGA4TerritoryChannelBreakdown, getGA4ReadyTerritories
 - [x] Added live GA4 panels to Analytics page: Top Pages table, Top Cities list, Channel Breakdown bars
 - [x] Build durable GA4 monthly/page importer, audit trail, registered migration, mapping validation, and coverage-aware dashboard refresh
-- [ ] Apply migrations `0004` and `0005`, then backfill completed GA4 months for all 19 territories before treating YoY coverage as complete
+- [x] Apply migrations `0004` and `0005`, then backfill completed GA4 months for all 19 territories before treating YoY coverage as complete — the durable GA4 tables were present and the direct 2023-07 to 2026-08 backfill completed for every property-supported territory-month; unsupported pre-creation periods remain unavailable
+- [x] Audit the existing GA4 migration, importer, source coverage, and completed-month boundaries before executing any durable historical backfill — schema, mapping, direct-source access, lifecycle coverage, and a Hamilton August 2026 pilot were verified before the range run
+- [x] Preserve an existing complete GA4 monthly snapshot when a later property fetch is partial, and paginate page-level Data API results before backfill — paged reads use deterministic 25,000-row offsets; a partial retry is audited without replacing an active complete snapshot
+- [x] Fetch and persist read-only GA4 property creation metadata so each historical month counts only properties that existed during that month — 103 mapped properties were reconciled through the Admin API with no deletions reported
+- [x] Create a bounded, redacted GA4 completed-month range backfill runner that skips pre-creation months as unavailable and exits cleanly — sequential runner completed the direct historical coverage window with aggregate-only output
+- [x] Correct GA4 import-status ordering and distinguish the active durable snapshot from a later non-applied partial attempt in Analytics — status now orders by reporting period and separates the latest attempt from the active persisted snapshot
+- [ ] Checkpoint and deploy the GA4 import-status interface update, then verify published Analytics shows the active August 2026 snapshot and preserves retained-snapshot messaging without client errors
 
 ## DashThis Replacement — GSC Enhancements (Aug 19, 2026)
 - [x] Add getSearchConsoleYTD procedure — YTD clicks/impressions with same-period-last-year comparison

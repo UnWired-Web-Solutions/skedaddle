@@ -39,12 +39,24 @@ const territories = allTerritories
   : [territoryId as string];
 const failures: Array<{ territoryId: string; error: string }> = [];
 const partialTerritories: string[] = [];
-
+let retainedExistingCompleteSnapshots = 0;
 for (const id of territories) {
   try {
     const result = await importGA4TerritoryMonth(id, year, month);
-    console.log(JSON.stringify(result));
+    console.log(JSON.stringify({
+      territoryId: result.territoryId,
+      period: result.period,
+      pageCount: result.pageCount,
+      coverage: {
+        propertiesExpected: result.coverage.propertiesExpected,
+        propertiesSucceeded: result.coverage.propertiesSucceeded,
+        complete: result.coverage.complete,
+      },
+      snapshotApplied: result.snapshotApplied,
+      retainedExistingCompleteSnapshot: result.retainedExistingCompleteSnapshot,
+    }));
     if (!result.coverage.complete) partialTerritories.push(id);
+    if (result.retainedExistingCompleteSnapshot) retainedExistingCompleteSnapshots += 1;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     failures.push({ territoryId: id, error: message });
@@ -60,3 +72,7 @@ if (partialTerritories.length > 0) {
     `${partialTerritories.length}/${territories.length} GA4 territory imports were partial: ${partialTerritories.join(", ")}.`,
   );
 }
+if (retainedExistingCompleteSnapshots > 0) {
+  console.log(JSON.stringify({ retainedExistingCompleteSnapshots }));
+}
+process.exit(0);

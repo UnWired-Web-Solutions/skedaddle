@@ -65,6 +65,15 @@ export function getGA4Client() {
   return google.analyticsdata({ version: "v1beta", auth });
 }
 
+/** Read-only GA4 Admin API client for property lifecycle metadata only. */
+export function getGA4AdminClient() {
+  const auth = new google.auth.GoogleAuth({
+    credentials: getCredential(),
+    scopes: ["https://www.googleapis.com/auth/analytics.readonly"],
+  });
+  return google.analyticsadmin({ version: "v1beta", auth });
+}
+
 export type GA4Coverage = {
   propertiesExpected: number;
   propertiesSucceeded: number;
@@ -78,9 +87,67 @@ export type GA4CoveredResult<T> = {
 };
 
 const GA4_PROPERTY_CONCURRENCY = 4;
+const GA4_PAGE_BATCH_SIZE = 25_000;
+
+type GA4PageRow = {
+  dimensionValues?: Array<{ value?: string | null }> | null;
+  metricValues?: Array<{ value?: string | null }> | null;
+};
+
+type GA4PageReader = {
+  properties: {
+    runReport(request: {
+      property: string;
+      requestBody: {
+        dateRanges: Array<{ startDate: string; endDate: string }>;
+        dimensions: Array<{ name: string }>;
+        metrics: Array<{ name: string }>;
+        limit: string;
+        offset: string;
+      };
+    }): Promise<{ data: { rows?: GA4PageRow[] | null; rowCount?: string | number | null } }>;
+  };
+};
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Read every page-path row for one property/month. The GA4 Data API returns a
+ * bounded number of rows per response, so a one-shot request must never be
+ * assumed exhaustive for a high-cardinality page-path dimension.
+ */
+export async function fetchGA4PropertyMonthPages(
+  client: GA4PageReader,
+  propertyId: string,
+  startDate: string,
+  endDate: string,
+): Promise<GA4PageRow[]> {
+  const rows: GA4PageRow[] = [];
+  let offset = 0;
+
+  while (true) {
+    const response = await client.properties.runReport({
+      property: `properties/${propertyId}`,
+      requestBody: {
+        dateRanges: [{ startDate, endDate }],
+        dimensions: [{ name: "pagePath" }],
+        metrics: [{ name: "sessions" }, { name: "activeUsers" }],
+        limit: String(GA4_PAGE_BATCH_SIZE),
+        offset: String(offset),
+      },
+    });
+    const batch = response.data.rows ?? [];
+    rows.push(...batch);
+    const declaredRowCount = Number.parseInt(String(response.data.rowCount ?? ""), 10);
+    offset += batch.length;
+
+    if (batch.length === 0 || batch.length < GA4_PAGE_BATCH_SIZE) break;
+    if (Number.isFinite(declaredRowCount) && offset >= declaredRowCount) break;
+  }
+
+  return rows;
 }
 
 async function runAcrossTerritoryProperties<T>(
@@ -90,6 +157,38 @@ async function runAcrossTerritoryProperties<T>(
   const propertyIds = getGA4PropertiesForTerritory(territoryId);
   if (propertyIds.length === 0) {
     throw new Error(`No GA4 properties are mapped for territory: ${territoryId}`);
+  }
+  const limit = pLimit(GA4_PROPERTY_CONCURRENCY);
+  const settled = await Promise.all(propertyIds.map(propertyId => limit(async () => {
+    try {
+      return { propertyId, value: await request(propertyId), error: null };
+    } catch (error) {
+      return { propertyId, value: null, error: errorMessage(error) };
+    }
+  })));
+  const failedProperties = settled.flatMap(item => item.error !== null
+    ? [{ propertyId: item.propertyId, error: item.error }]
+    : []);
+  const results: Array<{ propertyId: string; value: T }> = settled.flatMap(item => item.error === null
+    ? [{ propertyId: item.propertyId, value: item.value as T }]
+    : []);
+  return {
+    results,
+    coverage: {
+      propertiesExpected: propertyIds.length,
+      propertiesSucceeded: results.length,
+      failedProperties,
+      complete: failedProperties.length === 0,
+    },
+  };
+}
+
+async function runAcrossPropertyIds<T>(
+  propertyIds: string[],
+  request: (propertyId: string) => Promise<T>,
+): Promise<{ results: Array<{ propertyId: string; value: T }>; coverage: GA4Coverage }> {
+  if (propertyIds.length === 0) {
+    throw new Error("No GA4 properties are eligible for this reporting period.");
   }
   const limit = pLimit(GA4_PROPERTY_CONCURRENCY);
   const settled = await Promise.all(propertyIds.map(propertyId => limit(async () => {
@@ -354,12 +453,13 @@ export async function fetchGA4TerritoryMonthSnapshot(
   territoryId: string,
   year: number,
   month: number,
+  propertyIds = getGA4PropertiesForTerritory(territoryId),
 ): Promise<GA4TerritoryMonthSnapshot> {
   const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
   const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
   const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
   const client = getGA4Client();
-  const { results, coverage } = await runAcrossTerritoryProperties(territoryId, async propertyId => {
+  const { results, coverage } = await runAcrossPropertyIds(propertyIds, async propertyId => {
     const [totals, pages] = await Promise.all([
       client.properties.runReport({
         property: `properties/${propertyId}`,
@@ -369,17 +469,9 @@ export async function fetchGA4TerritoryMonthSnapshot(
           limit: "1",
         },
       }),
-      client.properties.runReport({
-        property: `properties/${propertyId}`,
-        requestBody: {
-          dateRanges: [{ startDate, endDate }],
-          dimensions: [{ name: "pagePath" }],
-          metrics: [{ name: "sessions" }, { name: "activeUsers" }],
-          limit: "100000",
-        },
-      }),
+      fetchGA4PropertyMonthPages(client, propertyId, startDate, endDate),
     ]);
-    return { totals: totals.data.rows || [], pages: pages.data.rows || [] };
+    return { totals: totals.data.rows || [], pages };
   });
 
   if (coverage.propertiesSucceeded === 0) {
@@ -410,6 +502,41 @@ export async function fetchGA4TerritoryMonthSnapshot(
     .reduce((sum, page) => sum + page.sessions, 0);
 
   return { territoryId, year, month, sessions, activeUsers, priorityPageSessions, pages, coverage };
+}
+
+export type GA4PropertyLifecycleMetadata = {
+  propertyId: string;
+  createdAt: Date;
+  deletedAt: Date | null;
+};
+
+/** Fetch property lifecycle metadata without requesting analytics event data. */
+export async function fetchGA4PropertyLifecycleMetadata(
+  propertyIds: string[],
+): Promise<{ rows: GA4PropertyLifecycleMetadata[]; failedCount: number }> {
+  const client = getGA4AdminClient();
+  const uniquePropertyIds = Array.from(new Set(propertyIds));
+  const limit = pLimit(GA4_PROPERTY_CONCURRENCY);
+  const settled = await Promise.all(uniquePropertyIds.map(propertyId => limit(async () => {
+    try {
+      const response = await client.properties.get({ name: `properties/${propertyId}` });
+      const createdAt = response.data.createTime ? new Date(response.data.createTime) : null;
+      if (!createdAt || Number.isNaN(createdAt.getTime())) throw new Error("Property creation metadata is unavailable.");
+      const deletedAt = response.data.deleteTime ? new Date(response.data.deleteTime) : null;
+      if (deletedAt && Number.isNaN(deletedAt.getTime())) throw new Error("Property deletion metadata is invalid.");
+      return { propertyId, createdAt, deletedAt, failed: false };
+    } catch {
+      return { propertyId, createdAt: null, deletedAt: null, failed: true };
+    }
+  })));
+  return {
+    rows: settled.flatMap(item => item.failed || !item.createdAt ? [] : [{
+      propertyId: item.propertyId,
+      createdAt: item.createdAt,
+      deletedAt: item.deletedAt,
+    }]),
+    failedCount: settled.filter(item => item.failed).length,
+  };
 }
 
 /**

@@ -111,6 +111,8 @@ export const ga4ImportRuns = mysqlTable("ga4_import_runs", {
   propertiesSucceeded: int("propertiesSucceeded").notNull().default(0),
   failedPropertiesJson: text("failedPropertiesJson"),
   errorMessage: text("errorMessage"),
+  /** False when a partial retry was audited but a prior complete snapshot was retained. */
+  snapshotApplied: int("snapshotApplied").notNull().default(1),
   importedAt: timestamp("importedAt").defaultNow().notNull(),
 }, (table) => ({
   territoryPeriodIdx: index("ga4_import_runs_territory_period_idx").on(
@@ -123,6 +125,20 @@ export const ga4ImportRuns = mysqlTable("ga4_import_runs", {
 
 export type GA4ImportRun = typeof ga4ImportRuns.$inferSelect;
 export type InsertGA4ImportRun = typeof ga4ImportRuns.$inferInsert;
+
+/**
+ * Read-only GA4 Admin API metadata used to determine whether a mapped property
+ * existed in a historical reporting month. It contains no visitor data.
+ */
+export const ga4PropertyMetadata = mysqlTable("ga4_property_metadata", {
+  propertyId: varchar("propertyId", { length: 32 }).primaryKey(),
+  createdAt: timestamp("createdAt").notNull(),
+  deletedAt: timestamp("deletedAt"),
+  fetchedAt: timestamp("fetchedAt").defaultNow().notNull(),
+});
+
+export type GA4PropertyMetadata = typeof ga4PropertyMetadata.$inferSelect;
+export type InsertGA4PropertyMetadata = typeof ga4PropertyMetadata.$inferInsert;
 
 /**
  * GBP metrics by territory, metric type, year, and month.

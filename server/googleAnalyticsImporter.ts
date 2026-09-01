@@ -8,6 +8,7 @@ import {
 import { getGA4PropertiesForTerritory } from "../shared/ga4TerritoryProperties";
 import { getDb } from "./db";
 import { fetchGA4TerritoryMonthSnapshot } from "./googleAnalyticsClient";
+import { getGA4EligiblePropertyIdsForMonth } from "./googleAnalyticsPropertyMetadata";
 
 export type GA4ImportResult = {
   territoryId: string;
@@ -16,6 +17,8 @@ export type GA4ImportResult = {
   activeUsers: number;
   priorityPageSessions: number;
   pageCount: number;
+  snapshotApplied: boolean;
+  retainedExistingCompleteSnapshot: boolean;
   coverage: {
     propertiesExpected: number;
     propertiesSucceeded: number;
@@ -23,6 +26,15 @@ export type GA4ImportResult = {
     complete: boolean;
   };
 };
+
+export function shouldRetainExistingCompleteSnapshot(
+  coverage: GA4ImportResult["coverage"],
+  existingSnapshot: { propertiesExpected: number; propertiesSucceeded: number } | undefined,
+) {
+  if (coverage.complete || !existingSnapshot) return false;
+  return existingSnapshot.propertiesExpected > 0
+    && existingSnapshot.propertiesSucceeded === existingSnapshot.propertiesExpected;
+}
 
 function getCompletedMonthRange(year: number, month: number) {
   if (!Number.isInteger(year) || year < 2020 || year > 2100) {
@@ -52,10 +64,11 @@ export async function importGA4TerritoryMonth(
   if (propertyIds.length === 0) throw new Error(`No GA4 properties are mapped for ${territoryId}.`);
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable.");
+  const eligiblePropertyIds = await getGA4EligiblePropertyIdsForMonth(territoryId, year, month);
 
   let snapshot: Awaited<ReturnType<typeof fetchGA4TerritoryMonthSnapshot>>;
   try {
-    snapshot = await fetchGA4TerritoryMonthSnapshot(territoryId, year, month);
+    snapshot = await fetchGA4TerritoryMonthSnapshot(territoryId, year, month, eligiblePropertyIds);
   } catch (error) {
     try {
       await db.insert(ga4ImportRuns).values({
@@ -96,24 +109,34 @@ export async function importGA4TerritoryMonth(
     activeUsers: page.activeUsers,
     importedAt,
   }));
+  const [existingSnapshot] = await db.select({
+    propertiesExpected: ga4TerritoryMonthly.propertiesExpected,
+    propertiesSucceeded: ga4TerritoryMonthly.propertiesSucceeded,
+  }).from(ga4TerritoryMonthly).where(scope).limit(1);
+  const retainedExistingCompleteSnapshot = shouldRetainExistingCompleteSnapshot(
+    snapshot.coverage,
+    existingSnapshot,
+  );
 
   try {
     await db.transaction(async tx => {
-      await tx.delete(ga4TerritoryMonthly).where(scope);
-      await tx.delete(ga4TerritoryPages).where(pageScope);
-      await tx.insert(ga4TerritoryMonthly).values({
-        territoryId,
-        year,
-        month,
-        sessions: snapshot.sessions,
-        activeUsers: snapshot.activeUsers,
-        priorityPageSessions: snapshot.priorityPageSessions,
-        propertiesExpected: snapshot.coverage.propertiesExpected,
-        propertiesSucceeded: snapshot.coverage.propertiesSucceeded,
-        importedAt,
-      });
-      for (let index = 0; index < pageRows.length; index += 500) {
-        await tx.insert(ga4TerritoryPages).values(pageRows.slice(index, index + 500));
+      if (!retainedExistingCompleteSnapshot) {
+        await tx.delete(ga4TerritoryMonthly).where(scope);
+        await tx.delete(ga4TerritoryPages).where(pageScope);
+        await tx.insert(ga4TerritoryMonthly).values({
+          territoryId,
+          year,
+          month,
+          sessions: snapshot.sessions,
+          activeUsers: snapshot.activeUsers,
+          priorityPageSessions: snapshot.priorityPageSessions,
+          propertiesExpected: snapshot.coverage.propertiesExpected,
+          propertiesSucceeded: snapshot.coverage.propertiesSucceeded,
+          importedAt,
+        });
+        for (let index = 0; index < pageRows.length; index += 500) {
+          await tx.insert(ga4TerritoryPages).values(pageRows.slice(index, index + 500));
+        }
       }
       await tx.insert(ga4ImportRuns).values({
         territoryId,
@@ -125,6 +148,7 @@ export async function importGA4TerritoryMonth(
         failedPropertiesJson: snapshot.coverage.failedProperties.length
           ? JSON.stringify(snapshot.coverage.failedProperties)
           : null,
+        snapshotApplied: retainedExistingCompleteSnapshot ? 0 : 1,
         importedAt,
       });
     });
@@ -155,6 +179,8 @@ export async function importGA4TerritoryMonth(
     activeUsers: snapshot.activeUsers,
     priorityPageSessions: snapshot.priorityPageSessions,
     pageCount: snapshot.pages.length,
+    snapshotApplied: !retainedExistingCompleteSnapshot,
+    retainedExistingCompleteSnapshot,
     coverage: snapshot.coverage,
   };
 }

@@ -146,20 +146,33 @@ export const analyticsRouter = router({
     .query(async ({ input }) => {
       const db = await getDb();
       if (!db) return null;
-      const [latest] = await db.select().from(ga4ImportRuns)
+      const [latestAttempt] = await db.select().from(ga4ImportRuns)
         .where(eq(ga4ImportRuns.territoryId, input.territoryId))
-        .orderBy(desc(ga4ImportRuns.importedAt))
+        .orderBy(desc(ga4ImportRuns.year), desc(ga4ImportRuns.month), desc(ga4ImportRuns.importedAt))
         .limit(1);
-      if (!latest) return null;
-      let failedProperties: Array<{ propertyId: string; error: string }> = [];
-      try {
-        failedProperties = latest.failedPropertiesJson
-          ? JSON.parse(latest.failedPropertiesJson)
-          : [];
-      } catch {
-        failedProperties = [];
-      }
-      return { ...latest, failedProperties };
+      if (!latestAttempt) return null;
+      const [activeSnapshot] = await db.select().from(ga4ImportRuns)
+        .where(and(
+          eq(ga4ImportRuns.territoryId, input.territoryId),
+          eq(ga4ImportRuns.snapshotApplied, 1),
+        ))
+        .orderBy(desc(ga4ImportRuns.year), desc(ga4ImportRuns.month), desc(ga4ImportRuns.importedAt))
+        .limit(1);
+      const withFailedProperties = (run: typeof latestAttempt) => {
+        let failedProperties: Array<{ propertyId: string; error: string }> = [];
+        try {
+          failedProperties = run.failedPropertiesJson
+            ? JSON.parse(run.failedPropertiesJson)
+            : [];
+        } catch {
+          failedProperties = [];
+        }
+        return { ...run, failedProperties };
+      };
+      return {
+        latestAttempt: withFailedProperties(latestAttempt),
+        activeSnapshot: activeSnapshot ? withFailedProperties(activeSnapshot) : null,
+      };
     }),
 
   /**

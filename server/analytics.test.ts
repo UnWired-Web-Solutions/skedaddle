@@ -67,6 +67,11 @@ describe("analyticsRouter", () => {
     expect(mod.analyticsRouter._def.procedures.getGA4MappingStatus).toBeDefined();
     expect(mod.analyticsRouter._def.procedures.syncGA4TerritoryMonth).toBeDefined();
     expect(mod.analyticsRouter._def.procedures.getGA4ImportStatus).toBeDefined();
+    const routerSource = readFileSync(resolve(process.cwd(), "server/analyticsRouter.ts"), "utf8");
+    const analyticsPage = readFileSync(resolve(process.cwd(), "client/src/pages/Analytics.tsx"), "utf8");
+    expect(routerSource).toContain("activeSnapshot");
+    expect(routerSource).toContain("desc(ga4ImportRuns.year), desc(ga4ImportRuns.month)");
+    expect(analyticsPage).toContain("activeGA4Snapshot");
   });
 
   it("marks pre-April 2025 Search Console history as unavailable rather than estimating it", () => {
