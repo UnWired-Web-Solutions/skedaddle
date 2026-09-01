@@ -5,7 +5,10 @@ export const SALESFORCE_WORKBOOK_ID = "1WUAlglCwg85OrH_Dqqqw7zRZNGKxOlBPwzHF5cqD
 export const SALESFORCE_WORKBOOK_TITLE = "Salesforce Data";
 export const SALESFORCE_WORKBOOK_SHEET = "Sheet1";
 export const SALESFORCE_WORKBOOK_SOURCE_RANGE = "Sheet1!A:N";
-const BATCH_SIZE = 10_000;
+// The current workbook is approximately 270k rows. Fifty-thousand-row ranges
+// remain bounded while reducing network round-trips enough for Heartbeat's
+// execution window.
+const BATCH_SIZE = 50_000;
 
 type ServiceAccountCredential = {
   type: "service_account";
