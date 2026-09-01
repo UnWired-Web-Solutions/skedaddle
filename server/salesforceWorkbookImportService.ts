@@ -13,6 +13,8 @@ import {
   SALESFORCE_WORKBOOK_SHEET,
   SALESFORCE_WORKBOOK_SOURCE_RANGE,
   SALESFORCE_WORKBOOK_TITLE,
+  readSalesforceWorkbookDriveMetadata,
+  type SalesforceWorkbookDriveMetadata,
   type SalesforceWorkbookRead,
 } from "./googleSalesforceWorkbookClient";
 import {
@@ -28,11 +30,13 @@ export type SalesforceWorkbookTrigger = "scheduled" | "manual";
 
 export interface SalesforceWorkbookImportRepository {
   acquireLock(sourceId: number, lockToken: string, staleBefore: Date): Promise<boolean>;
+  recoverStaleRuns(sourceId: number, staleBefore: Date): Promise<void>;
   releaseLock(sourceId: number, lockToken: string): Promise<void>;
-  startRun(sourceId: number, triggerType: SalesforceWorkbookTrigger): Promise<number>;
+  startRun(sourceId: number, triggerType: SalesforceWorkbookTrigger, driveMetadata?: SalesforceWorkbookDriveMetadata): Promise<number>;
   findCompletedFingerprint(sourceId: number, fingerprint: string): Promise<number | null>;
-  markSkipped(runId: number, sourceId: number, lockToken: string, parsed: SalesforceWorkbookParseResult): Promise<void>;
-  activate(runId: number, sourceId: number, lockToken: string, parsed: SalesforceWorkbookParseResult): Promise<void>;
+  markSkipped(runId: number, sourceId: number, lockToken: string, parsed: SalesforceWorkbookParseResult, driveMetadata: SalesforceWorkbookDriveMetadata): Promise<void>;
+  markUnchangedRevision(runId: number, sourceId: number, lockToken: string, driveMetadata: SalesforceWorkbookDriveMetadata): Promise<void>;
+  activate(runId: number, sourceId: number, lockToken: string, parsed: SalesforceWorkbookParseResult, driveMetadata: SalesforceWorkbookDriveMetadata): Promise<void>;
   markFailed(runId: number, sourceId: number, lockToken: string, errorMessage: string): Promise<void>;
 }
 
@@ -83,6 +87,19 @@ export function createSalesforceWorkbookImportRepository(): SalesforceWorkbookIm
         ));
       return affectedRows(result) === 1;
     },
+    async recoverStaleRuns(sourceId, staleBefore) {
+      const db = await getDb();
+      if (!db) throw new Error("Database is unavailable.");
+      await db.update(salesforceWorkbookImportRuns).set({
+        status: "failed",
+        errorMessage: "Previous workbook refresh exceeded the safe execution window; stale lock recovered.",
+        completedAt: new Date(),
+      }).where(and(
+        eq(salesforceWorkbookImportRuns.sourceId, sourceId),
+        eq(salesforceWorkbookImportRuns.status, "running"),
+        lt(salesforceWorkbookImportRuns.startedAt, staleBefore),
+      ));
+    },
     async releaseLock(sourceId, lockToken) {
       const db = await getDb();
       if (!db) return;
@@ -90,10 +107,16 @@ export function createSalesforceWorkbookImportRepository(): SalesforceWorkbookIm
         .set({ importLockToken: null, importLockAcquiredAt: null })
         .where(and(eq(salesforceWorkbookSources.id, sourceId), eq(salesforceWorkbookSources.importLockToken, lockToken)));
     },
-    async startRun(sourceId, triggerType) {
+    async startRun(sourceId, triggerType, driveMetadata) {
       const db = await getDb();
       if (!db) throw new Error("Database is unavailable.");
-      const result = await db.insert(salesforceWorkbookImportRuns).values({ sourceId, triggerType, status: "running" });
+      const result = await db.insert(salesforceWorkbookImportRuns).values({
+        sourceId,
+        triggerType,
+        status: "running",
+        driveVersion: driveMetadata?.version,
+        driveModifiedAt: driveMetadata?.modifiedTime,
+      });
       const runId = Number(result[0]?.insertId);
       if (!Number.isInteger(runId) || runId <= 0) throw new Error("Workbook import run did not return an ID.");
       return runId;
@@ -115,13 +138,15 @@ export function createSalesforceWorkbookImportRepository(): SalesforceWorkbookIm
         .limit(1);
       return existing[0]?.id ?? null;
     },
-    async markSkipped(runId, sourceId, lockToken, parsed) {
+    async markSkipped(runId, sourceId, lockToken, parsed, driveMetadata) {
       const db = await getDb();
       if (!db) throw new Error("Database is unavailable.");
       await db.transaction(async tx => {
         await tx.update(salesforceWorkbookImportRuns).set({
           status: "skipped",
           sourceFingerprint: parsed.sourceFingerprint,
+          driveVersion: driveMetadata.version,
+          driveModifiedAt: driveMetadata.modifiedTime,
           sourceRowCount: parsed.sourceRowCount,
           rowsProcessed: parsed.rowsProcessed,
           rowsRejected: parsed.rowsRejected,
@@ -140,10 +165,30 @@ export function createSalesforceWorkbookImportRepository(): SalesforceWorkbookIm
           importLockAcquiredAt: null,
           lastCheckedAt: new Date(),
           lastError: null,
+          lastDriveVersion: driveMetadata.version,
+          lastDriveModifiedAt: driveMetadata.modifiedTime,
         }).where(and(eq(salesforceWorkbookSources.id, sourceId), eq(salesforceWorkbookSources.importLockToken, lockToken)));
       });
     },
-    async activate(runId, sourceId, lockToken, parsed) {
+    async markUnchangedRevision(runId, sourceId, lockToken, driveMetadata) {
+      const db = await getDb();
+      if (!db) throw new Error("Database is unavailable.");
+      await db.transaction(async tx => {
+        await tx.update(salesforceWorkbookImportRuns).set({
+          status: "skipped",
+          driveVersion: driveMetadata.version,
+          driveModifiedAt: driveMetadata.modifiedTime,
+          completedAt: new Date(),
+        }).where(eq(salesforceWorkbookImportRuns.id, runId));
+        await tx.update(salesforceWorkbookSources).set({
+          importLockToken: null,
+          importLockAcquiredAt: null,
+          lastCheckedAt: new Date(),
+          lastError: null,
+        }).where(and(eq(salesforceWorkbookSources.id, sourceId), eq(salesforceWorkbookSources.importLockToken, lockToken)));
+      });
+    },
+    async activate(runId, sourceId, lockToken, parsed, driveMetadata) {
       const db = await getDb();
       if (!db) throw new Error("Database is unavailable.");
       const activatedAt = new Date();
@@ -156,6 +201,8 @@ export function createSalesforceWorkbookImportRepository(): SalesforceWorkbookIm
         await tx.update(salesforceWorkbookImportRuns).set({
           status: parsed.rowsRejected > 0 ? "partial" : "complete",
           sourceFingerprint: parsed.sourceFingerprint,
+          driveVersion: driveMetadata.version,
+          driveModifiedAt: driveMetadata.modifiedTime,
           sourceRowCount: parsed.sourceRowCount,
           rowsProcessed: parsed.rowsProcessed,
           rowsRejected: parsed.rowsRejected,
@@ -176,6 +223,8 @@ export function createSalesforceWorkbookImportRepository(): SalesforceWorkbookIm
           importLockAcquiredAt: null,
           lastCheckedAt: activatedAt,
           lastError: null,
+          lastDriveVersion: driveMetadata.version,
+          lastDriveModifiedAt: driveMetadata.modifiedTime,
         }).where(and(eq(salesforceWorkbookSources.id, sourceId), eq(salesforceWorkbookSources.importLockToken, lockToken)));
         if (affectedRows(sourceUpdate) !== 1) throw new Error("Workbook import lock was lost before activation.");
       });
@@ -231,9 +280,10 @@ export async function getSalesforceWorkbookSourceByTaskUid(taskUid: string) {
 }
 
 export async function executeSalesforceWorkbookImport(input: {
-  source: Pick<SalesforceWorkbookSource, "id" | "status">;
+  source: Pick<SalesforceWorkbookSource, "id" | "status"> & { lastDriveVersion?: string | null };
   triggerType: SalesforceWorkbookTrigger;
   reader?: () => Promise<SalesforceWorkbookRead>;
+  metadataReader?: () => Promise<SalesforceWorkbookDriveMetadata>;
   repository?: SalesforceWorkbookImportRepository;
 }) {
   if (input.source.status !== "ready") return { ok: true as const, skipped: "source_not_ready" as const };
@@ -243,15 +293,21 @@ export async function executeSalesforceWorkbookImport(input: {
   if (!acquired) return { ok: true as const, skipped: "already_running" as const };
   let runId: number | null = null;
   try {
-    runId = await repository.startRun(input.source.id, input.triggerType);
+    await repository.recoverStaleRuns(input.source.id, new Date(Date.now() - LOCK_STALE_AFTER_MS));
+    const driveMetadata = await (input.metadataReader ?? readSalesforceWorkbookDriveMetadata)();
+    runId = await repository.startRun(input.source.id, input.triggerType, driveMetadata);
+    if (input.source.lastDriveVersion && input.source.lastDriveVersion === driveMetadata.version) {
+      await repository.markUnchangedRevision(runId, input.source.id, lockToken, driveMetadata);
+      return { ok: true as const, skipped: "unchanged_revision" as const, runId, driveMetadata };
+    }
     const workbook = await (input.reader ?? readSalesforceWorkbook)();
     const parsed = parseSalesforceWorkbookRows(workbook.header, workbook.rows);
     const previousRunId = await repository.findCompletedFingerprint(input.source.id, parsed.sourceFingerprint);
     if (previousRunId) {
-      await repository.markSkipped(runId, input.source.id, lockToken, parsed);
+      await repository.markSkipped(runId, input.source.id, lockToken, parsed, driveMetadata);
       return { ok: true as const, skipped: "unchanged" as const, runId, previousRunId, parsed };
     }
-    await repository.activate(runId, input.source.id, lockToken, parsed);
+    await repository.activate(runId, input.source.id, lockToken, parsed, driveMetadata);
     return {
       ok: true as const,
       status: parsed.rowsRejected > 0 ? "partial" as const : "complete" as const,

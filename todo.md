@@ -447,6 +447,8 @@
 - [x] Implement an auditable workbook import path that preserves source timestamps and never estimates missing Salesforce values — bounded read-only client, deterministic parser, atomic lock, unchanged-source skip, retained prior successful run, transactional aggregates, and failure audit complete
 - [ ] Run the approved Salesforce Drive workbook import automatically once per day with deterministic locking, change detection, failure auditing, and no AI-generated data — authenticated idempotent callback complete; deployed Heartbeat creation pending
 - [ ] Keep the daily workbook callback within the platform execution deadline — first run timed out at 30 seconds and retry completed in 29.767 seconds; header plus six bounded ranges now use one read-only batch request pending a final production retest with adequate margin
+- [ ] Add a Drive-revision metadata preflight so unchanged daily runs skip before downloading 270,112 rows and stale deployment-interrupted runs are reconciled explicitly
+- [ ] Enable the Google Drive API in `uws-gbp-analytics` with explicit approval, then verify read-only workbook revision metadata access
 - [x] Verify the deployed read-only Google service identity can access the approved workbook independently of the interactive UWS Drive session — exact workbook title, Sheet1, and 14-field header contract returned successfully
 - [x] Enable the Google Sheets API in `uws-gbp-analytics` with explicit approval, then re-run the service-identity workbook access check — enabled and verified read-only on September 1, 2026
 - [ ] Select and document the daily Eastern-time execution window after confirming the workbook’s observed update pattern

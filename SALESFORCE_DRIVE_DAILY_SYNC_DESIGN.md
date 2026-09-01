@@ -18,6 +18,8 @@
 
 The Google Sheets API was enabled in `uws-gbp-analytics` with explicit user approval. The service identity then returned the exact workbook title, source sheet, and header contract. This access is read-only and does not modify the workbook.
 
+The Google Drive API was also enabled in `uws-gbp-analytics` with explicit user approval after the service identity’s metadata preflight returned Google reason `accessNotConfigured`. It will be used only to read the workbook’s ID, title, MIME type, version, modified time, and trashed state before deciding whether the larger Sheets download is required. It does not change the workbook, its sharing, or its data.
+
 ## Current 14-field contract
 
 `Id`, `Status`, `SchedStartTime`, `LastModifiedDate`, `CreatedDate`, `Street`, `City`, `PostalCode`, `Work_Type__c`, `Reporting_Primary_Territory__c`, `Contact.Account.Lead_Source__c`, `salesperson_new__c`, `Species__c`, and `Invoice_pre_tax_amount__c`.

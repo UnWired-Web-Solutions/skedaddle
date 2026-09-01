@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { readSalesforceWorkbook, SALESFORCE_WORKBOOK_TITLE } from "./googleSalesforceWorkbookClient";
+import {
+  readSalesforceWorkbook,
+  readSalesforceWorkbookDriveMetadata,
+  SALESFORCE_WORKBOOK_TITLE,
+} from "./googleSalesforceWorkbookClient";
 
 describe("Google Salesforce workbook client", () => {
   it("reads metadata, header, and bounded data rows without requesting write access", async () => {
@@ -35,5 +39,31 @@ describe("Google Salesforce workbook client", () => {
       spreadsheets: { get: vi.fn().mockRejectedValue({ code: 403, message: "private upstream detail" }) },
     } as never;
     await expect(readSalesforceWorkbook(client)).rejects.toThrow("Google Sheets workbook read failed (status 403)");
+  });
+
+  it("reads only the validated Drive version and modification time for the preflight", async () => {
+    const client = {
+      files: {
+        get: vi.fn().mockResolvedValue({
+          data: {
+            id: "1WUAlglCwg85OrH_Dqqqw7zRZNGKxOlBPwzHF5cqD6sQ",
+            name: SALESFORCE_WORKBOOK_TITLE,
+            mimeType: "application/vnd.google-apps.spreadsheet",
+            version: "133",
+            modifiedTime: "2026-09-01T15:57:16.966Z",
+            trashed: false,
+          },
+        }),
+      },
+    } as never;
+    await expect(readSalesforceWorkbookDriveMetadata(client)).resolves.toEqual({
+      version: "133",
+      modifiedTime: "2026-09-01T15:57:16.966Z",
+    });
+  });
+
+  it("redacts Drive metadata failures", async () => {
+    const client = { files: { get: vi.fn().mockRejectedValue({ code: 403, message: "private Drive detail" }) } } as never;
+    await expect(readSalesforceWorkbookDriveMetadata(client)).rejects.toThrow("Google Drive workbook metadata read failed (status 403)");
   });
 });

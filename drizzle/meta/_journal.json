@@ -92,6 +92,13 @@
       "when": 1788278999258,
       "tag": "0012_thick_chat",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1788283397705,
+      "tag": "0013_spicy_firelord",
+      "breakpoints": true
     }
   ]
 }

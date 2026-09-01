@@ -1,4 +1,4 @@
-import { google, type sheets_v4 } from "googleapis";
+import { google, type drive_v3, type sheets_v4 } from "googleapis";
 import { ENV } from "./_core/env";
 
 export const SALESFORCE_WORKBOOK_ID = "1WUAlglCwg85OrH_Dqqqw7zRZNGKxOlBPwzHF5cqD6sQ";
@@ -43,9 +43,22 @@ export function getSalesforceWorkbookSheetsClient() {
   return google.sheets({ version: "v4", auth });
 }
 
+export function getSalesforceWorkbookDriveClient() {
+  const auth = new google.auth.GoogleAuth({
+    credentials: getCredential(),
+    scopes: ["https://www.googleapis.com/auth/drive.metadata.readonly"],
+  });
+  return google.drive({ version: "v3", auth });
+}
+
 function safeSheetsError(error: unknown): Error {
   const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "unknown";
   return new Error(`Google Sheets workbook read failed (status ${code}).`);
+}
+
+function safeDriveError(error: unknown): Error {
+  const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "unknown";
+  return new Error(`Google Drive workbook metadata read failed (status ${code}).`);
 }
 
 export type SalesforceWorkbookRead = {
@@ -55,6 +68,38 @@ export type SalesforceWorkbookRead = {
   header: unknown[];
   rows: unknown[][];
 };
+
+export type SalesforceWorkbookDriveMetadata = {
+  version: string;
+  modifiedTime: string;
+};
+
+export async function readSalesforceWorkbookDriveMetadata(
+  client: drive_v3.Drive = getSalesforceWorkbookDriveClient(),
+): Promise<SalesforceWorkbookDriveMetadata> {
+  try {
+    const response = await client.files.get({
+      fileId: SALESFORCE_WORKBOOK_ID,
+      fields: "id,name,mimeType,modifiedTime,version,trashed",
+      supportsAllDrives: true,
+    });
+    const metadata = response.data;
+    if (
+      metadata.id !== SALESFORCE_WORKBOOK_ID ||
+      metadata.name !== SALESFORCE_WORKBOOK_TITLE ||
+      metadata.mimeType !== "application/vnd.google-apps.spreadsheet" ||
+      metadata.trashed ||
+      !metadata.version ||
+      !metadata.modifiedTime
+    ) {
+      throw new Error("unexpected workbook metadata");
+    }
+    return { version: String(metadata.version), modifiedTime: metadata.modifiedTime };
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("Google Drive workbook metadata read failed")) throw error;
+    throw safeDriveError(error);
+  }
+}
 
 export async function readSalesforceWorkbook(
   client: sheets_v4.Sheets = getSalesforceWorkbookSheetsClient(),
