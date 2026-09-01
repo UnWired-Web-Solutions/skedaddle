@@ -163,7 +163,7 @@
 - [ ] Add coverage-aware durable GA4 engagement metrics for completed monthly page snapshots; show key events as unavailable pending a network-wide approved event definition
 - [x] Extend the existing direct GA4 top-pages reporting with verified engagement metrics and a visible key-event-definition limitation; do not retroactively label historical snapshots as engagement-complete — direct table now shows engaged sessions, engagement rate, and recorded engagement duration with property coverage
 - [x] Validate the unexpected zero-valued direct GA4 engagement-duration field against aggregate source queries before displaying it as a meaningful page-performance metric — source audit confirmed zero recorded duration for 4/5 Hamilton and 10/10 Durham properties; UI labels this direct result rather than fabricating an unavailable or inferred value
-- [ ] Checkpoint and deploy the direct GA4 engagement table, then verify the published interface and property-coverage label without publishing a key-event count
+- [x] Checkpoint and deploy the direct GA4 engagement table, then verify the published interface and property-coverage label without publishing a key-event count — delayed static rollout completed after checkpoint `ecceb344`; production Hamilton showed Direct GA4, 5/5 coverage, engagement columns, zero-duration explanation, and no key-event count
 - [x] Google Search Console data (clicks, impressions, avg position, top queries)
 - [x] Google Business Profile data (website clicks, phone calls by month; currently manual/static imports)
 - [x] Month/year filter + year-over-year comparison (last June vs this June)

@@ -18,3 +18,11 @@ The direct top-pages query remains paginated at 25,000 rows per property. The du
 ## Initial production rollout check — pending client asset
 
 Checkpoint `c7cb8918` published the updated backend state, but the first primary-domain browser check still referenced the prior `index-RTGO-mnp.js` asset and displayed the old `Live GA4: Top Pages by Sessions` heading. The page did not yet contain the new direct-engagement label. This is treated as a static-client rollout delay, not as successful production verification; no metric, source mapping, or data was modified while recording the discrepancy.
+
+The automatic rollout retry in checkpoint `ecceb344` was also checked after propagation time. It continued to reference `index-RTGO-mnp.js` and did not contain the direct-GA4 heading. The updated engagement query must therefore remain locally verified but not production-verified. The next publication attempt will retain the clean `dist` build safeguard; no analytics data or service configuration will be changed.
+
+After additional rollout time, the production `analytics.getGA4TerritoryTopPages` contract returned all three new field names—`engagedSessions`, `engagementRate`, and `userEngagementDurationSeconds`—with no API error. This confirms that the checkpointed server code has reached production. The final refreshed-client visual check remains necessary before the table itself is marked production-verified.
+
+## Successful production interface verification
+
+The refreshed primary production client now renders `Direct GA4: Top Page Performance`, reports complete Hamilton property coverage of 5/5, and displays Engaged, Engagement Rate, and Recorded Engagement Time in the page table. It also renders the direct-zero explanation and the key-event governance limitation. No key-event count, lead claim, conversion claim, or durable-historical engagement claim is present. The source-sensitive interface is therefore production-verified.
