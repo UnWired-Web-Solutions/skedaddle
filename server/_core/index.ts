@@ -9,6 +9,7 @@ import { registerGBPOAuthRoutes } from "../gbpOAuthRoutes";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { salesforceWorkbookRefreshHandler } from "../salesforceWorkbookSchedule";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -38,6 +39,9 @@ async function startServer() {
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   registerGBPOAuthRoutes(app);
+  app.post("/api/scheduled/salesforce-workbook-refresh", (req, res) => {
+    void salesforceWorkbookRefreshHandler(req, res);
+  });
   // tRPC API
   app.use(
     "/api/trpc",

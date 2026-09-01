@@ -66,7 +66,6 @@
     "input-otp": "^1.4.2",
     "jimp": "^1.6.1",
     "jose": "6.1.0",
-    "jsforce": "3",
     "jszip": "^3.10.1",
     "lucide-react": "^0.453.0",
     "mysql2": "^3.15.0",

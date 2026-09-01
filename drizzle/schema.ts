@@ -1,4 +1,4 @@
-import { index, int, json, longtext, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
+import { decimal, index, int, json, longtext, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -419,11 +419,113 @@ export const gbpImageJobs = mysqlTable("gbp_image_jobs", {
 export type GBPImageJob = typeof gbpImageJobs.$inferSelect;
 export type InsertGBPImageJob = typeof gbpImageJobs.$inferInsert;
 
-// ─── Salesforce Integration ──────────────────────────────────────────────────
+// ─── Salesforce-derived Drive workbook imports ───────────────────────────────
+
+/** Configuration and schedule ownership for the approved UWS workbook source. */
+export const salesforceWorkbookSources = mysqlTable("salesforce_workbook_sources", {
+  id: int("id").autoincrement().primaryKey(),
+  workbookId: varchar("workbookId", { length: 128 }).notNull(),
+  workbookTitle: varchar("workbookTitle", { length: 255 }).notNull(),
+  sheetName: varchar("sheetName", { length: 128 }).notNull(),
+  sourceRange: varchar("sourceRange", { length: 128 }).notNull(),
+  status: mysqlEnum("status", ["ready", "paused", "disabled"]).default("ready").notNull(),
+  scheduleCronTaskUid: varchar("scheduleCronTaskUid", { length: 65 }),
+  scheduleCron: varchar("scheduleCron", { length: 64 }),
+  lastSuccessfulRunId: int("lastSuccessfulRunId"),
+  importLockToken: varchar("importLockToken", { length: 64 }),
+  importLockAcquiredAt: timestamp("importLockAcquiredAt"),
+  lastCheckedAt: timestamp("lastCheckedAt"),
+  lastError: text("lastError"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  workbookIdUnique: uniqueIndex("sf_workbook_sources_workbook_id_unique").on(table.workbookId),
+  scheduleTaskIdx: index("sf_workbook_sources_schedule_task_idx").on(table.scheduleCronTaskUid),
+}));
+
+export type SalesforceWorkbookSource = typeof salesforceWorkbookSources.$inferSelect;
+export type InsertSalesforceWorkbookSource = typeof salesforceWorkbookSources.$inferInsert;
+
+/** Audit record for every scheduled or operator-requested workbook attempt. */
+export const salesforceWorkbookImportRuns = mysqlTable("salesforce_workbook_import_runs", {
+  id: int("id").autoincrement().primaryKey(),
+  sourceId: int("sourceId").notNull(),
+  triggerType: mysqlEnum("triggerType", ["scheduled", "manual"]).notNull(),
+  status: mysqlEnum("status", ["running", "complete", "partial", "failed", "skipped"]).notNull(),
+  sourceFingerprint: varchar("sourceFingerprint", { length: 64 }),
+  sourceRowCount: int("sourceRowCount").notNull().default(0),
+  rowsProcessed: int("rowsProcessed").notNull().default(0),
+  rowsRejected: int("rowsRejected").notNull().default(0),
+  blankIdCount: int("blankIdCount").notNull().default(0),
+  duplicateIdCount: int("duplicateIdCount").notNull().default(0),
+  maxSourceModifiedAt: varchar("maxSourceModifiedAt", { length: 40 }),
+  headerJson: json("headerJson"),
+  territoryCountsJson: longtext("territoryCountsJson"),
+  statusCountsJson: longtext("statusCountsJson"),
+  unknownTerritoriesJson: longtext("unknownTerritoriesJson"),
+  validationWarningsJson: longtext("validationWarningsJson"),
+  errorMessage: text("errorMessage"),
+  startedAt: timestamp("startedAt").defaultNow().notNull(),
+  completedAt: timestamp("completedAt"),
+  activatedAt: timestamp("activatedAt"),
+}, (table) => ({
+  sourceStatusStartedIdx: index("sf_workbook_runs_source_status_started_idx").on(
+    table.sourceId,
+    table.status,
+    table.startedAt,
+  ),
+  fingerprintIdx: index("sf_workbook_runs_fingerprint_idx").on(table.sourceId, table.sourceFingerprint),
+}));
+
+export type SalesforceWorkbookImportRun = typeof salesforceWorkbookImportRuns.$inferSelect;
+export type InsertSalesforceWorkbookImportRun = typeof salesforceWorkbookImportRuns.$inferInsert;
 
 /**
- * Stores Salesforce OAuth connection credentials.
- * Only one active connection per org is expected (Skedaddle's Salesforce instance).
+ * Lowest safe reporting grain retained from the workbook. Street addresses,
+ * salesperson names, contact IDs, and raw work-order IDs are never persisted.
+ */
+export const salesforceWorkbookAggregates = mysqlTable("salesforce_workbook_aggregates", {
+  id: int("id").autoincrement().primaryKey(),
+  importRunId: int("importRunId").notNull(),
+  territoryId: varchar("territoryId", { length: 64 }).notNull(),
+  sourceTerritoryLabel: varchar("sourceTerritoryLabel", { length: 128 }).notNull(),
+  periodYear: int("periodYear").notNull(),
+  periodMonth: int("periodMonth").notNull(),
+  statusLabel: varchar("statusLabel", { length: 128 }).notNull(),
+  speciesLabel: varchar("speciesLabel", { length: 128 }).notNull(),
+  cityLabel: varchar("cityLabel", { length: 128 }).notNull(),
+  currencyCode: mysqlEnum("currencyCode", ["CAD", "USD"]).notNull(),
+  recordCount: int("recordCount").notNull().default(0),
+  invoiceValueCount: int("invoiceValueCount").notNull().default(0),
+  invoicePreTaxAmount: decimal("invoicePreTaxAmount", { precision: 18, scale: 2 }).notNull().default("0.00"),
+}, (table) => ({
+  runTerritoryPeriodIdx: index("sf_workbook_aggregates_run_territory_period_idx").on(
+    table.importRunId,
+    table.territoryId,
+    table.periodYear,
+    table.periodMonth,
+  ),
+  runDimensionsUnique: uniqueIndex("sf_workbook_aggregates_run_dimensions_unique").on(
+    table.importRunId,
+    table.territoryId,
+    table.sourceTerritoryLabel,
+    table.periodYear,
+    table.periodMonth,
+    table.statusLabel,
+    table.speciesLabel,
+    table.cityLabel,
+    table.currencyCode,
+  ),
+}));
+
+export type SalesforceWorkbookAggregate = typeof salesforceWorkbookAggregates.$inferSelect;
+export type InsertSalesforceWorkbookAggregate = typeof salesforceWorkbookAggregates.$inferInsert;
+
+// ─── Retired Salesforce Connected App schema (historical only) ──────────────
+
+/**
+ * Historical table retained non-destructively after the Connected App/API path
+ * was retired. No active server route reads or writes this table.
  */
 export const salesforceConnections = mysqlTable("salesforce_connections", {
   id: int("id").autoincrement().primaryKey(),

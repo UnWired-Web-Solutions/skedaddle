@@ -172,13 +172,13 @@
 - [ ] Expand auto-posting to Instagram
 - [ ] Expand auto-posting to LinkedIn
 - [ ] Auto-respond to Google reviews (monitor → suggest response → client approves via text → posts)
-- [ ] Salesforce direct API connection (replace Looker Studio exports)
+- [x] Salesforce direct API connection (replace Looker Studio exports) — superseded September 1, 2026 by the approved UWS-owned Drive workbook source
 - [ ] AI video generation for GBP/social (Seedance2 or similar)
 - [ ] Sell platform to other franchises ($50K–$100K implementation)
 
 ## DATA ACCESS BLOCKERS
-- [ ] Get Salesforce raw CSV from Kira (email her directly — Dave approved)
-- [ ] Long-term: get Salesforce API license from Barry/Ryan
+- [x] Get Salesforce raw CSV from Kira (email her directly — Dave approved) — superseded by the accessible fresh UWS Drive workbook
+- [x] Long-term: get Salesforce API license from Barry/Ryan — removed from the active roadmap; Drive workbook is the approved source
 - [ ] East Coast (Halifax/Fredericton/Moncton/St. John) — separate from main dashboard, no Salesforce data
 
 ## GBP COMPLIANCE RULES (from Dave)
@@ -271,7 +271,7 @@
 - [x] Fix root cause of revenue discrepancy (Looker CSV double-counting + AI-fabricated data for missing territories)
 - [x] Regenerate all 18 territory reports with corrected revenue data from Kira's verified Salesforce exports
 - [ ] Send validation summary to Dave/Ryan/Barry
-- [ ] Future: Investigate Salesforce MCP/API for direct data access
+- [x] Future: Investigate Salesforce MCP/API for direct data access — superseded by the approved Drive workbook workflow
 - [ ] Use Basecamp for communication going forward (Dave's request)
 
 ## Salesforce Integration (Aug 4, 2026)
@@ -438,3 +438,18 @@
 - [x] Diagnose and fix the production exact-draft PDF export failure: Puppeteer reports a detached `about:blank` execution context after the report preview succeeds
 - [x] Run TypeScript, full Vitest, production build, relevant endpoint checks, and visual verification before publishing
 - [x] Checkpoint the verified result, push canonical GitHub `main`, and update session memory — checkpoint `41023153`; local and remote `main` matched at `41023153170e60914bed4725b83a980ca059d7ae`
+
+## Drive Workbook Salesforce Data Source — September 2026
+
+- [x] Confirm the exact fresh Google Drive workbook, sheet/range, modification time, columns, and authorized UWS access path — `Salesforce Data` (`1WUAlglCwg85OrH_Dqqqw7zRZNGKxOlBPwzHF5cqD6sQ`), `Sheet1!A:N`, version 125, modified 2026-09-01T15:11:50.582Z, 270,070 data rows, UWS-owned and readable
+- [x] Mark Salesforce Connected App/API work as superseded by the approved Drive workbook workflow; active API router, OAuth callback, setup page, navigation entry, and environment contract retired while historical task records remain
+- [x] Define source provenance, explicit territory mapping, status-preservation, currency, duplicate-ID, incomplete-period, sensitive-field, and missing-value safeguards with deterministic parser tests
+- [x] Implement an auditable workbook import path that preserves source timestamps and never estimates missing Salesforce values — bounded read-only client, deterministic parser, atomic lock, unchanged-source skip, retained prior successful run, transactional aggregates, and failure audit complete
+- [ ] Run the approved Salesforce Drive workbook import automatically once per day with deterministic locking, change detection, failure auditing, and no AI-generated data — authenticated idempotent callback complete; deployed Heartbeat creation pending
+- [x] Verify the deployed read-only Google service identity can access the approved workbook independently of the interactive UWS Drive session — exact workbook title, Sheet1, and 14-field header contract returned successfully
+- [x] Enable the Google Sheets API in `uws-gbp-analytics` with explicit approval, then re-run the service-identity workbook access check — enabled and verified read-only on September 1, 2026
+- [ ] Select and document the daily Eastern-time execution window after confirming the workbook’s observed update pattern
+- [ ] Update portal and report source disclosures to identify the Drive workbook rather than a live Salesforce API
+- [ ] Add read-only portal status and territory-period procedures for the active workbook run without exposing raw addresses, IDs, or salesperson fields — procedures implemented; endpoint/UI verification pending
+- [ ] Verify database reconciliation, endpoints, authenticated UI, reports, tests, and production build before activation
+- [ ] Checkpoint the verified workbook workflow, push canonical GitHub `main`, and update session memory

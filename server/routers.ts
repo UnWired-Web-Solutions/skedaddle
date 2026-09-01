@@ -4,10 +4,10 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { gbpImageRouter } from "./gbpImageRouter";
 import { analyticsRouter } from "./analyticsRouter";
-import { salesforceRouter } from "./salesforceRouter";
 import { proposalRouter } from "./proposalRouter";
 import { strategyReportRouter } from "./strategyReportRouter";
 import { suburbPageRouter } from "./suburbPageRouter";
+import { salesforceWorkbookRouter } from "./salesforceWorkbookRouter";
 
 export const appRouter = router({
   system: systemRouter,
@@ -21,10 +21,10 @@ export const appRouter = router({
   }),
   gbpImage: gbpImageRouter,
   analytics: analyticsRouter,
-  salesforce: salesforceRouter,
   proposal: proposalRouter,
   strategyReport: strategyReportRouter,
   suburbPage: suburbPageRouter,
+  salesforceWorkbook: salesforceWorkbookRouter,
 });
 
 export type AppRouter = typeof appRouter;

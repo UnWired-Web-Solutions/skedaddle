@@ -7,7 +7,6 @@ import {
   BarChart3,
   BookOpen,
   ChevronRight,
-  Cloud,
   FileBarChart,
   FileText,
   ImageIcon,
@@ -38,7 +37,6 @@ const TOP_NAV: NavItem[] = [
   { label: "Proposals", href: "/proposals", icon: <FileText size={16} />, adminOnly: true },
   { label: "Sales Strategy Report", href: "/strategy-report", icon: <FileBarChart size={16} />, adminOnly: true },
   { label: "Suburb Pages", href: "/suburb-pages", icon: <MapPin size={16} />, adminOnly: true },
-  { label: "Salesforce Setup", href: "/salesforce", icon: <Cloud size={16} />, adminOnly: true },
 ];
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {

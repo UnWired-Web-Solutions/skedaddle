@@ -64,6 +64,34 @@
       "when": 1788235340578,
       "tag": "0008_quick_human_torch",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1788278140708,
+      "tag": "0009_fast_kingpin",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1788278186824,
+      "tag": "0010_glorious_franklin_richards",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1788278380301,
+      "tag": "0011_lonely_raider",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1788278999258,
+      "tag": "0012_thick_chat",
+      "breakpoints": true
     }
   ]
 }

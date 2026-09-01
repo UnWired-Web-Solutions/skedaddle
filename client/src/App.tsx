@@ -14,7 +14,6 @@ import Resources from "./pages/Resources";
 import Tools from "./pages/Tools";
 import GbpImageGenerator from "./pages/GbpImageGenerator";
 import Analytics from "./pages/Analytics";
-import SalesforceConnect from "./pages/SalesforceConnect";
 import ProposalGenerator from "./pages/ProposalGenerator";
 import StrategyReportGenerator from "./pages/StrategyReportGenerator";
 import SuburbPageGenerator from "./pages/SuburbPageGenerator";
@@ -75,9 +74,6 @@ function Router() {
       </Route>
       <Route path="/analytics">
         <ProtectedRoute component={Analytics} />
-      </Route>
-      <Route path="/salesforce">
-        <ProtectedRoute component={SalesforceConnect} adminOnly />
       </Route>
       <Route path="/proposals">
         <ProtectedRoute component={ProposalGenerator} adminOnly />
