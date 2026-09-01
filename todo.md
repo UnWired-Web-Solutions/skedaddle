@@ -247,9 +247,9 @@
 - [x] Add network close rate benchmark by species to analytics dashboard (Dashboard.tsx close rate table)
 - [x] Fix sessions display: focus on species-specific + suburb/city pages only (Analytics.tsx)
 - [x] Fix page validation in reports: use imported GA4 and GSC data to confirm page evidence
-- [ ] Fix Ottawa missing from GA4 session rankings
-- [ ] Fix Denver (Colorado) missing from session rankings
-- [ ] Reconcile direct GA4 mapping, durable coverage, and ranking inputs for Ottawa, Denver, Hamilton, and Milwaukee before changing any displayed territory ranking
+- [x] Fix Ottawa missing from GA4 session rankings — reconciled as a stale task: no active session leaderboard exists, and Ottawa has durable direct GA4 coverage from July 2023 through August 2026
+- [x] Fix Denver (Colorado) missing from session rankings — reconciled as a stale task: no active session leaderboard exists, and Denver has durable direct GA4 coverage from its first eligible month, January 2025
+- [x] Reconcile direct GA4 mapping, durable coverage, and ranking inputs for Ottawa, Denver, Hamilton, and Milwaukee before changing any displayed territory ranking — documented aggregate-only review confirmed Milwaukee above Hamilton, Ottawa present, and Denver correctly pre-creation unavailable; no source/display defect found
 - [x] Replace the Network page’s static Salesforce revenue leaderboard with active Drive-workbook aggregates, split by verified currency and labelled partial when coverage is incomplete — production now renders the active partial workbook summary, separate CAD/USD ranks, and explicit exclusions without a T12 claim
 - [x] Add a public aggregate-only workbook network-performance contract for the active run, excluding customer-level fields and unapproved conversion/status semantics — `salesforceWorkbook.getNetworkPerformance` production contract and rendered table were verified with no raw source fields or conversion claim
 - [x] Flag GBP data as incomplete for multi-GBP territories (GBP disclaimer note added to Analytics.tsx)
@@ -267,9 +267,9 @@
 - [x] Fix report template: network close rate by species benchmark comparison
 - [x] Fix report template: identify anomalies (e.g., species pages linking to corporate)
 - [x] Fix report template: validate all data / flag potential hallucinations
-- [ ] Investigate: why Ottawa missing from session volume rankings
-- [ ] Investigate: why Hamilton shows above Milwaukee in sessions (data accuracy)
-- [ ] Investigate: how Denver/Colorado compares in sessions
+- [x] Investigate: why Ottawa missing from session volume rankings — current direct GA4 aggregate confirms Ottawa is present; legacy issue referred to a non-active ranking
+- [x] Investigate: why Hamilton shows above Milwaukee in sessions (data accuracy) — current January–August 2026 direct GA4 aggregate places Milwaukee above Hamilton
+- [x] Investigate: how Denver/Colorado compares in sessions — current direct GA4 aggregate is available from January 2025, its verified property-eligibility boundary; no earlier data is inferred
 - [ ] Include Waukesha in Wisconsin territory data
 - [x] Generate corrected reports for all 15 remaining territories
 - [x] Update Home page to show all 19 territories (change filter from full-data to dashboard-ready)
