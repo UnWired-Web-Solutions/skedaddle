@@ -428,3 +428,4 @@
 - [x] Send Dave a concise, verified GBP preparation and approval-blocker update; sent September 1, 2026 to the established UWS address without implying that live GBP data is connected
 - [x] Push the verified local GBP preparation and communication checkpoints to canonical GitHub `main` and verify the commit match; reauthorized UWS connection completed the non-force push on September 1, 2026
 - [x] Diagnose the canonical GitHub push denial by verifying effective collaborator role, repository rules, and connected-token access without changing repository settings; refreshed UWS Git credential resolved the transport denial
+- [x] Create a UWS-controlled, host-independent migration plan covering the Skedaddle codebase, database, secrets, auth, integrations, cutover, and rollback in `UWS_CONTROLLED_MIGRATION_PLAN.md`
