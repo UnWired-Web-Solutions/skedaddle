@@ -426,4 +426,5 @@
 - [ ] Verify the live API end to end, inspect the authenticated dashboard visually, run TypeScript/tests/build, and publish
 - [ ] Update the data-source documentation and session memory with the verified live GBP connection
 - [x] Send Dave a concise, verified GBP preparation and approval-blocker update; sent September 1, 2026 to the established UWS address without implying that live GBP data is connected
-- [ ] Push the verified local GBP preparation and communication checkpoints to canonical `uws-dev/skedaddle:main` and verify the commit match; current `aybello` GitHub token was denied write access (403) on September 1, 2026
+- [x] Push the verified local GBP preparation and communication checkpoints to canonical GitHub `main` and verify the commit match; reauthorized UWS connection completed the non-force push on September 1, 2026
+- [x] Diagnose the canonical GitHub push denial by verifying effective collaborator role, repository rules, and connected-token access without changing repository settings; refreshed UWS Git credential resolved the transport denial
