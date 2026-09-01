@@ -426,3 +426,4 @@
 - [ ] Verify the live API end to end, inspect the authenticated dashboard visually, run TypeScript/tests/build, and publish
 - [ ] Update the data-source documentation and session memory with the verified live GBP connection
 - [x] Send Dave a concise, verified GBP preparation and approval-blocker update; sent September 1, 2026 to the established UWS address without implying that live GBP data is connected
+- [ ] Push the verified local GBP preparation and communication checkpoints to canonical `uws-dev/skedaddle:main` and verify the commit match; current `aybello` GitHub token was denied write access (403) on September 1, 2026
