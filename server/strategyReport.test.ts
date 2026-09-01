@@ -10,6 +10,27 @@ vi.mock("./_core/env", () => ({
 }));
 
 describe("Strategy Report Router", { timeout: 15_000 }, () => {
+  it("starts independent narrative tasks concurrently while preserving section order", async () => {
+    const { runReportNarrativeTasks } = await import("./strategyReportRouter");
+    let started = 0;
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const tasks = ["executive", "gap", "program", "content", "gbp", "plan", "risks", "recommendations"]
+      .map(label => async () => {
+        started += 1;
+        await gate;
+        return label;
+      });
+
+    const pending = runReportNarrativeTasks(tasks);
+    await Promise.resolve();
+    expect(started).toBe(4);
+    release();
+    await expect(pending).resolves.toEqual([
+      "executive", "gap", "program", "content", "gbp", "plan", "risks", "recommendations",
+    ]);
+  });
+
   it("should export buildTerritoryData function", async () => {
     const { buildTerritoryData } = await import("./strategyReportRouter");
     expect(buildTerritoryData).toBeDefined();
@@ -128,8 +149,10 @@ describe("Strategy Report Router", { timeout: 15_000 }, () => {
     const data = await buildTerritoryData("hamilton");
 
     if (data.gbp.monthly.length > 0) {
-      const maxCalls = Math.max(...data.gbp.monthly.map(m => m.calls));
-      expect(data.gbp.peakCalls).toBe(maxCalls);
+      const calls = data.gbp.monthly
+        .map(month => month.calls)
+        .filter((value): value is number => value !== null);
+      expect(data.gbp.peakCalls).toBe(calls.length > 0 ? Math.max(...calls) : null);
     }
   });
 

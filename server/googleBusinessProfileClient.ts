@@ -26,6 +26,15 @@ export type GBPLiveLocation = {
 };
 export type GBPPerformanceValue = { date: string; value: number };
 
+type GBPDailyMetricApiResponse = {
+  timeSeries?: {
+    datedValues?: Array<{
+      date?: { year?: number; month?: number; day?: number };
+      value?: number | string;
+    }>;
+  };
+};
+
 export function hasGBPAuthConfiguration(): boolean {
   return Boolean(ENV.gbpOAuthClientId && ENV.gbpOAuthClientSecret && ENV.gbpOAuthRefreshToken);
 }
@@ -150,6 +159,25 @@ export function buildGBPDailyMetricUrl(locationName: string, metricType: string,
   return url.toString();
 }
 
+export function parseGBPDailyMetricResponse(data: GBPDailyMetricApiResponse): GBPPerformanceValue[] {
+  return (data.timeSeries?.datedValues ?? []).map(item => {
+    const { year, month, day } = item.date ?? {};
+    const date = year && month && day
+      ? `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+      : "";
+    const value = Number(item.value);
+    if (
+      item.value === undefined ||
+      !isISODate(date) ||
+      !Number.isSafeInteger(value) ||
+      value < 0
+    ) {
+      throw new Error("GBP Performance API returned a malformed daily metric value.");
+    }
+    return { date, value };
+  });
+}
+
 export async function getGBPDailyMetricTimeSeries(
   locationName: string,
   metricType: string,
@@ -163,14 +191,6 @@ export async function getGBPDailyMetricTimeSeries(
     const detail = await response.text();
     throw new Error(`GBP Performance API request failed (${response.status}): ${detail || response.statusText}`);
   }
-  const data = await response.json() as {
-    timeSeries?: { datedValues?: Array<{ date?: { year?: number; month?: number; day?: number }; value?: number | string }> };
-  };
-  return (data.timeSeries?.datedValues ?? []).flatMap(item => {
-    const { year, month, day } = item.date ?? {};
-    if (!year || !month || !day || item.value === undefined) return [];
-    const value = Number(item.value);
-    if (!Number.isFinite(value)) return [];
-    return [{ date: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`, value }];
-  });
+  const data = await response.json() as GBPDailyMetricApiResponse;
+  return parseGBPDailyMetricResponse(data);
 }

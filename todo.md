@@ -433,6 +433,7 @@
 ## Codex Update Review — Sep 1, 2026
 - [x] Identify the newly available Codex branch or pull request and establish its true merge base against current `main` — `codex/gbp-integration-safety-fixes`, commit `de9582e`, based on checkpoint `a2fc281`
 - [x] Review changed code, migrations, data-integrity safeguards, and custom local-auth compatibility — documented in `CODEX_GBP_SAFETY_REVIEW_2026-09-01.md`; branch passed TypeScript and 135 tests with 11 intentional skips before integration
-- [ ] Correct and integrate only the approved update without regressing GSC, GA4, GBP, reports, or portal authentication
+- [x] Correct and integrate only the approved update without regressing GSC, GA4, GBP, reports, or portal authentication — cherry-picked `de9582e` as `3b5fea5` and added persistence, parser, report-context, and insight-label safeguards
+- [ ] Diagnose and fix the production Ottawa strategy-report failure that returned an HTML response where the client expected JSON during fresh post-Codex verification
 - [ ] Run TypeScript, full Vitest, production build, relevant endpoint checks, and visual verification before publishing
 - [ ] Checkpoint the verified result, push canonical GitHub `main`, and update session memory

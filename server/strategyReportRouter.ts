@@ -473,6 +473,26 @@ export async function buildTerritoryData(
 
 // ─── Claude API helper ───────────────────────────────────────────────────────
 
+export async function runReportNarrativeTasks<T>(
+  tasks: Array<() => Promise<T>>,
+  concurrency = 4,
+): Promise<T[]> {
+  if (!Number.isInteger(concurrency) || concurrency < 1) {
+    throw new Error("Report narrative concurrency must be a positive integer.");
+  }
+  const results = new Array<T>(tasks.length);
+  let nextIndex = 0;
+  const workers = Array.from({ length: Math.min(concurrency, tasks.length) }, async () => {
+    while (nextIndex < tasks.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await tasks[index]();
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
 async function callClaude(prompt: string, model: string = "claude-opus-5", maxTokens: number = 4000): Promise<string> {
   // Primary path: Direct Anthropic API (Claude Opus 5)
   const apiKey = ENV.anthropicApiKey;
@@ -548,8 +568,15 @@ function formatPct(n: number): string {
 function gbpSourceLabel(source: TerritoryDataObject["analyticsSource"]["gbp"]): string {
   if (source === "persisted_business_profile_api") return "persisted Google Business Profile API import";
   if (source === "legacy_spreadsheet") return "historical Google Business Profile spreadsheet";
-  if (source === "mixed") return "Google Business Profile API with metric-level historical fallback";
+  if (source === "mixed") return "mixed Google Business Profile sources and/or coverage states; see metric-period disclosures";
   return "Google Business Profile data unavailable";
+}
+
+function gbpPromptCoverageContext(data: TerritoryDataObject): string {
+  const incomplete = data.gbp.incompletePeriods.length > 0
+    ? data.gbp.incompletePeriods.join(", ")
+    : "none";
+  return `GBP source: ${gbpSourceLabel(data.analyticsSource.gbp)}. Incomplete live periods excluded from headline values: ${incomplete}. Do not describe excluded periods as zero, complete, or part of the reported totals.`;
 }
 
 function escapeHtml(value: string): string {
@@ -587,6 +614,7 @@ TERRITORY DATA:
 - Top suburbs/cities by revenue: ${data.topSuburbNames.slice(0, 6).join(", ")}
 - GBP total calls (available period): ${formatNumber(data.gbp.totalCalls)}
 - GBP total website clicks: ${formatNumber(data.gbp.totalClicks)}
+- ${gbpPromptCoverageContext(data)}
 - Search Console evidence: ${data.gsc.monthly.length ? `${formatNumber(data.gsc.totalClicks)} organic clicks across ${data.gsc.monthly.length} months (${gscSourceLabel})` : "Unavailable; do not claim Search Console performance"}
 - GA4 priority-page evidence: ${ga4Evidence}
 - This territory's average job value: ${formatCurrency(data.avgJobValue, data.currencySymbol)}
@@ -616,7 +644,7 @@ Return ONLY the paragraph text (no headings, no HTML tags, no markdown). Use pla
   const topSpecies = data.topSpeciesNames.slice(0, 3).join(", ");
   const topSuburbs = data.topSuburbNames.slice(0, 3).join(", ");
   return `<p class="narrative">${data.name} is a ${data.totalRevenue > 1000000 ? "proven" : "developing"} Skedaddle market generating ${formatCurrency(data.totalRevenue, data.currencySymbol)} from ${data.reportingPeriod.label} across ${formatNumber(data.totalJobs)} closed jobs, with an average ticket of ${formatCurrency(data.avgJobValue, data.currencySymbol)}. The territory's top revenue species are ${topSpecies}.</p>
-<p class="narrative">The Google Business Profile generated ${formatNumber(data.gbp.totalCalls)} calls and ${formatNumber(data.gbp.totalClicks)} website clicks over the available tracking period.${data.gsc.monthly.length ? ` The available ${data.analyticsSource.gsc === "persisted_search_console" ? "persisted Search Console import" : "historical Search Console snapshot"} recorded ${formatNumber(data.gsc.totalClicks)} organic clicks.` : " No Search Console history is available for this report."}${data.ga4.monthly.length ? ` Persisted GA4 imports recorded ${formatNumber(data.ga4.totalPriorityPageSessions)} species and location-page sessions.` : ""} Geographically, the primary markets are ${topSuburbs}.</p>
+<p class="narrative">The available ${gbpSourceLabel(data.analyticsSource.gbp)} recorded ${formatNumber(data.gbp.totalCalls)} calls and ${formatNumber(data.gbp.totalClicks)} website clicks.${data.gbp.incompletePeriods.length ? ` Incomplete live periods excluded from these headline values: ${data.gbp.incompletePeriods.join(", ")}.` : ""}${data.gsc.monthly.length ? ` The available ${data.analyticsSource.gsc === "persisted_search_console" ? "persisted Search Console import" : "historical Search Console snapshot"} recorded ${formatNumber(data.gsc.totalClicks)} organic clicks.` : " No Search Console history is available for this report."}${data.ga4.monthly.length ? ` Persisted GA4 imports recorded ${formatNumber(data.ga4.totalPriorityPageSessions)} species and location-page sessions.` : ""} Geographically, the primary markets are ${topSuburbs}.</p>
 <p class="narrative">This report outlines a structured digital marketing program built around local SEO, hub-and-spoke content architecture, and species-specific suburb pages to grow organic visibility and lead volume across the territory.</p>`;
 }
 
@@ -770,6 +798,7 @@ GBP DATA:
 - Average monthly calls: ${data.gbp.avgMonthlyCalls === null ? "Unavailable" : Math.round(data.gbp.avgMonthlyCalls)}
 - Average monthly clicks: ${data.gbp.avgMonthlyClicks === null ? "Unavailable" : Math.round(data.gbp.avgMonthlyClicks)}
 - Months of data: ${data.gbp.monthly.length}
+- ${gbpPromptCoverageContext(data)}
 - Confirmed current publishing volume: ${data.currentGbpPostVolume}
 - Approved proposed publishing volume: ${data.proposedGbpPostsPerMonth || "Not provided"}
 
@@ -793,7 +822,7 @@ Return ONLY paragraph text (no headings, no HTML, no markdown). Use double line 
   const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
   if (paragraphs.length > 0) return narrativeParagraphsHtml(text);
   console.warn(`AI section returned empty for ${data.name}`);
-  return `<p class="narrative">The measured GBP baseline for the aligned reporting period is ${formatNumber(data.gbp.totalCalls)} calls and ${formatNumber(data.gbp.totalClicks)} website clicks. The approved publishing target is ${data.proposedGbpPostsPerMonth ? `${data.proposedGbpPostsPerMonth} posts per month` : "not yet provided"}; no volume is inferred from engagement.</p><p class="narrative">Rotate posts through ${escapeHtml(data.topSuburbNames.slice(0, 4).join(", "))} and lead with ${escapeHtml(data.topSpeciesNames.slice(0, 3).join(", "))} according to ${escapeHtml(data.seasonalTiming)}. Link posts to verified destination pages and review calls and clicks monthly.</p>`;
+  return `<p class="narrative">The available ${gbpSourceLabel(data.analyticsSource.gbp)} records ${formatNumber(data.gbp.totalCalls)} calls and ${formatNumber(data.gbp.totalClicks)} website clicks.${data.gbp.incompletePeriods.length ? ` Incomplete live periods excluded from these values: ${data.gbp.incompletePeriods.join(", ")}.` : ""} The approved publishing target is ${data.proposedGbpPostsPerMonth ? `${data.proposedGbpPostsPerMonth} posts per month` : "not yet provided"}; no volume is inferred from engagement.</p><p class="narrative">Rotate posts through ${escapeHtml(data.topSuburbNames.slice(0, 4).join(", "))} and lead with ${escapeHtml(data.topSpeciesNames.slice(0, 3).join(", "))} according to ${escapeHtml(data.seasonalTiming)}. Link posts to verified destination pages and review calls and clicks monthly.</p>`;
 }
 
 async function generateNinetyDayPlan(data: TerritoryDataObject, priorContext: string): Promise<string> {
@@ -847,6 +876,7 @@ TERRITORY DATA:
 - Top species: ${data.topSpeciesNames.join(", ")}
 - Top suburbs: ${data.topSuburbNames.slice(0, 6).join(", ")}
 - GBP calls: ${formatNumber(data.gbp.totalCalls)}
+- ${gbpPromptCoverageContext(data)}
 
 Identify 4-6 delivery dependencies and data gaps. Do not characterize revenue concentration as fragility and do not discuss territory close rate because territory proposal/appointment counts are unavailable. Focus on page-status verification, approved production capacity, tracking coverage, local-fact review, seasonal timing, and ownership.
 
@@ -1690,38 +1720,20 @@ export async function generateStrategyReport(
   config: StrategyConfig = DEFAULT_STRATEGY_CONFIG,
   onProgress?: (section: string, pct: number) => void
 ): Promise<{ html: string; pdfUrl?: string; sections: SectionResult[]; data: TerritoryDataObject }> {
-  // Step 1: Build territory data object
   onProgress?.("Building territory data...", 5);
   const data = await buildTerritoryData(territoryId, config);
 
-  const sections: SectionResult[] = [];
-  let priorContext = "";
-
-  // Step 2: Executive Summary (AI)
-  onProgress?.("Writing Executive Summary...", 10);
-  const execSummaryHtml = await generateExecutiveSummary(data);
-  sections.push({ id: "executive_summary", title: "Executive Summary", html: execSummaryHtml, isAiGenerated: true });
-  priorContext += `Executive Summary established: ${data.name} territory, ${formatCurrency(data.totalRevenue, data.currencySymbol)} revenue, ${formatNumber(data.totalJobs)} jobs, top species ${data.topSpeciesNames.slice(0, 3).join(", ")}, top suburbs ${data.topSuburbNames.slice(0, 3).join(", ")}. `;
-
-  // Step 3: Current Campaign (Template)
   onProgress?.("Building Current Campaign section...", 18);
   const currentCampaignHtml = buildCurrentCampaignHtml(data);
-  sections.push({ id: "current_campaign", title: "What's Running Now — Current Campaign", html: currentCampaignHtml, isAiGenerated: false });
 
-  // Step 4: Data Foundation — Species Analysis (Template + context)
   onProgress?.("Building Species Revenue Analysis...", 25);
   const speciesTableHtml = buildSpeciesTableHtml(data);
-  // Build species narrative in the territory's own currency.
   const topSpecies = data.species[0];
   const secondSpecies = data.species[1];
   const speciesNarrative = `<p class="narrative">${topSpecies?.species || "Primary species"} leads with ${formatCurrency(topSpecies?.total_revenue || 0, data.currencySymbol)} in closed revenue (${formatPct(topSpecies?.pctRevenue || 0)} of total), followed by ${secondSpecies?.species || "secondary species"} at ${formatCurrency(secondSpecies?.total_revenue || 0, data.currencySymbol)}. The top ${Math.min(data.species.length, 3)} species account for ${formatPct(data.species.slice(0, 3).reduce((sum, s) => sum + s.pctRevenue, 0))} of closed revenue, so content prioritization should follow this territory demand mix. Average job value is shown descriptively in ${data.currency}; it is not used as a close-rate proxy or compared across currencies.</p>`;
-  sections.push({ id: "species_analysis", title: "Sales & Species Analysis — Revenue by Species", html: speciesTableHtml + speciesNarrative, isAiGenerated: false });
-  priorContext += `Top species: ${data.species.slice(0, 3).map(s => `${s.species} (${formatPct(s.pctRevenue)})`).join(", ")}. `;
 
-  // Step 5: Suburb/City Revenue (Template)
   onProgress?.("Building Suburb Revenue Analysis...", 32);
   const suburbTableHtml = buildSuburbTableHtml(data);
-  // Build suburb narrative based on validated page data
   const confirmedNoPage = data.suburbs.filter(s => s.hasPage === false);
   const confirmedHasPage = data.suburbs.filter(s => s.hasPage === true);
   let suburbNarrativeText: string;
@@ -1735,64 +1747,57 @@ export async function generateStrategyReport(
     suburbNarrativeText = `${data.suburbs[0]?.suburb || "Primary market"} leads with ${formatCurrency(data.suburbs[0]?.revenue || 0, data.currencySymbol)} in closed revenue across ${data.suburbs[0]?.jobs || 0} jobs. The top 5 suburbs account for ${formatPct(data.suburbs.slice(0, 5).reduce((sum, s) => sum + s.pctRevenue, 0))} of total territory revenue. Page coverage for these suburbs has not yet been audited — a content audit is recommended to identify which revenue-generating suburbs lack dedicated pages.`;
   }
   const suburbNarrative = `<p class="narrative">${suburbNarrativeText}</p>`;
-  sections.push({ id: "suburb_revenue", title: "Revenue by City — Top Markets", html: suburbTableHtml + suburbNarrative, isAiGenerated: false });
-  // Build accurate prior context for AI sections
   const pageGapContext = data.suburbPageStatus === "unknown"
     ? `Page status unknown for most suburbs (audit needed).`
     : `${confirmedNoPage.length} suburbs confirmed without pages (${confirmedNoPage.map(s => s.suburb).join(", ")}). ${confirmedHasPage.length} have confirmed pages.`;
-  priorContext += `Top suburbs: ${data.suburbs.slice(0, 5).map(s => `${s.suburb} (${formatCurrency(s.revenue, data.currencySymbol)})`).join(", ")}. ${pageGapContext} `;
 
-  // Step 6: GBP Performance Data (Template)
   onProgress?.("Building GBP Performance section...", 38);
   const performanceHtml = buildGbpDataHtml(data) + buildOrganicAnalyticsHtml(data);
-  sections.push({ id: "data_foundation", title: "Digital Performance — GBP, Search Console & GA4", html: performanceHtml, isAiGenerated: false });
-  priorContext += `GBP: ${formatNumber(data.gbp.totalCalls)} calls, ${formatNumber(data.gbp.totalClicks)} clicks over ${data.gbp.monthly.length} months. Peak: ${data.gbp.peakMonth}. `;
-
-  // Step 7: Gap Analysis (AI)
-  onProgress?.("Writing Gap Analysis...", 45);
-  const gapHtml = await generateGapAnalysis(data, priorContext);
-  sections.push({ id: "gap_analysis", title: "Content Architecture Gap — The Opportunity", html: gapHtml, isAiGenerated: true });
-  priorContext += `Gap analysis: ${data.suburbPageStatus === "unknown" ? "Page audit needed — status unknown for most suburbs" : `${confirmedNoPage.length} suburbs confirmed without pages`}. Primary structural gap identified. `;
-
-  // Step 8: Proposed Program (AI)
-  onProgress?.("Writing Proposed Program...", 55);
-  const proposedHtml = await generateProposedProgram(data, priorContext);
-  sections.push({ id: "proposed_program", title: "Proposed Program — Full Build", html: proposedHtml, isAiGenerated: true });
-
-  // Step 9: Scale Comparison (Template)
-  onProgress?.("Building Scale Comparison...", 62);
   const scaleHtml = buildScaleComparisonHtml(data);
-  sections.push({ id: "scale_comparison", title: "Scale Comparison — Current vs. Proposed", html: scaleHtml, isAiGenerated: false });
+  const priorContext = [
+    `Executive Summary facts: ${data.name} territory, ${formatCurrency(data.totalRevenue, data.currencySymbol)} revenue, ${formatNumber(data.totalJobs)} jobs.`,
+    `Top species: ${data.species.slice(0, 3).map(s => `${s.species} (${formatPct(s.pctRevenue)})`).join(", ")}.`,
+    `Top suburbs: ${data.suburbs.slice(0, 5).map(s => `${s.suburb} (${formatCurrency(s.revenue, data.currencySymbol)})`).join(", ")}. ${pageGapContext}`,
+    `GBP available values: ${formatNumber(data.gbp.totalCalls)} calls, ${formatNumber(data.gbp.totalClicks)} clicks across ${data.gbp.monthly.length} represented months. ${gbpPromptCoverageContext(data)}`,
+  ].join(" ");
 
-  // Step 10: Content Architecture (AI)
-  onProgress?.("Writing Content Architecture...", 68);
-  const contentArchHtml = await generateContentArchitecture(data, priorContext);
-  sections.push({ id: "content_architecture", title: "Website Content Architecture", html: contentArchHtml, isAiGenerated: true });
+  onProgress?.("Writing narrative sections...", 45);
+  const [
+    execSummaryHtml,
+    gapHtml,
+    proposedHtml,
+    contentArchHtml,
+    gbpStrategyHtml,
+    ninetyDayRaw,
+    risksRaw,
+    recsRaw,
+  ] = await runReportNarrativeTasks([
+    () => generateExecutiveSummary(data),
+    () => generateGapAnalysis(data, priorContext),
+    () => generateProposedProgram(data, priorContext),
+    () => generateContentArchitecture(data, priorContext),
+    () => generateGbpStrategy(data, priorContext),
+    () => generateNinetyDayPlan(data, priorContext),
+    () => generateRisksAndMitigations(data, priorContext),
+    () => generateRecommendations(data, priorContext),
+  ]);
 
-  // Step 11: GBP Strategy (AI)
-  onProgress?.("Writing GBP Strategy...", 75);
-  const gbpStrategyHtml = await generateGbpStrategy(data, priorContext);
-  sections.push({ id: "gbp_strategy", title: "Google Business Profile Strategy", html: gbpStrategyHtml, isAiGenerated: true });
+  const sections: SectionResult[] = [
+    { id: "executive_summary", title: "Executive Summary", html: execSummaryHtml, isAiGenerated: true },
+    { id: "current_campaign", title: "What's Running Now — Current Campaign", html: currentCampaignHtml, isAiGenerated: false },
+    { id: "species_analysis", title: "Sales & Species Analysis — Revenue by Species", html: speciesTableHtml + speciesNarrative, isAiGenerated: false },
+    { id: "suburb_revenue", title: "Revenue by City — Top Markets", html: suburbTableHtml + suburbNarrative, isAiGenerated: false },
+    { id: "data_foundation", title: "Digital Performance — GBP, Search Console & GA4", html: performanceHtml, isAiGenerated: false },
+    { id: "gap_analysis", title: "Content Architecture Gap — The Opportunity", html: gapHtml, isAiGenerated: true },
+    { id: "proposed_program", title: "Proposed Program — Full Build", html: proposedHtml, isAiGenerated: true },
+    { id: "scale_comparison", title: "Scale Comparison — Current vs. Proposed", html: scaleHtml, isAiGenerated: false },
+    { id: "content_architecture", title: "Website Content Architecture", html: contentArchHtml, isAiGenerated: true },
+    { id: "gbp_strategy", title: "Google Business Profile Strategy", html: gbpStrategyHtml, isAiGenerated: true },
+    { id: "ninety_day_plan", title: "90-Day Action Plan", html: formatNinetyDayPlanHtml(ninetyDayRaw), isAiGenerated: true },
+    { id: "risks", title: "Delivery Dependencies and Mitigations", html: formatRisksHtml(risksRaw), isAiGenerated: true },
+    { id: "recommendations", title: "Summary of Recommendations", html: formatRecommendationsHtml(recsRaw), isAiGenerated: true },
+  ];
 
-  // Step 12: 90-Day Action Plan (AI)
-  onProgress?.("Writing 90-Day Action Plan...", 82);
-  const ninetyDayRaw = await generateNinetyDayPlan(data, priorContext);
-  const ninetyDayHtml = formatNinetyDayPlanHtml(ninetyDayRaw);
-  sections.push({ id: "ninety_day_plan", title: "90-Day Action Plan", html: ninetyDayHtml, isAiGenerated: true });
-
-  // Step 13: Risks & Mitigations (AI)
-  onProgress?.("Writing Delivery Dependencies...", 88);
-  const risksRaw = await generateRisksAndMitigations(data, priorContext);
-  const risksHtml = formatRisksHtml(risksRaw);
-  sections.push({ id: "risks", title: "Delivery Dependencies and Mitigations", html: risksHtml, isAiGenerated: true });
-
-  // Step 14: Summary of Recommendations (AI)
-  onProgress?.("Writing Recommendations...", 93);
-  const recsRaw = await generateRecommendations(data, priorContext);
-  const recsHtml = formatRecommendationsHtml(recsRaw);
-  sections.push({ id: "recommendations", title: "Summary of Recommendations", html: recsHtml, isAiGenerated: true });
-
-  // Step 15: Assemble full HTML
   onProgress?.("Assembling document...", 97);
   const fullHtml = buildFullReportHtml(data, sections);
 

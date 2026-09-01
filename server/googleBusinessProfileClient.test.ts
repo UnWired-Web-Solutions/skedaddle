@@ -4,6 +4,7 @@ import {
   hasGBPAuthConfiguration,
   hasGBPOAuthClientConfiguration,
   listGBPLocations,
+  parseGBPDailyMetricResponse,
   validateGBPOAuthClientCredentials,
 } from "./googleBusinessProfileClient";
 
@@ -30,6 +31,18 @@ describe("Google Business Profile client", () => {
 
   it("does not claim configured live access unless all OAuth secrets are present", () => {
     expect(typeof hasGBPAuthConfiguration()).toBe("boolean");
+  });
+
+  it("parses exact non-negative integer values and rejects malformed Google rows", () => {
+    expect(parseGBPDailyMetricResponse({
+      timeSeries: { datedValues: [{ date: { year: 2026, month: 8, day: 3 }, value: "4" }] },
+    })).toEqual([{ date: "2026-08-03", value: 4 }]);
+    expect(() => parseGBPDailyMetricResponse({
+      timeSeries: { datedValues: [{ date: { year: 2026, month: 2, day: 30 }, value: 1 }] },
+    })).toThrow("malformed daily metric");
+    expect(() => parseGBPDailyMetricResponse({
+      timeSeries: { datedValues: [{ date: { year: 2026, month: 8, day: 3 }, value: "1.5" }] },
+    })).toThrow("malformed daily metric");
   });
 
   it.runIf(process.env.RUN_LIVE_API_TESTS === "1")("validates the configured client ID and secret with Google without accessing GBP data", async () => {

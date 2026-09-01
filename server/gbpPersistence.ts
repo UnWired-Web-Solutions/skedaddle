@@ -5,8 +5,8 @@
  */
 import { and, eq, gte, lte } from "drizzle-orm";
 import { gbpDailyMetrics, gbpImportRuns, gbpTerritoryMonthly } from "../drizzle/schema";
-import { getCompleteCalendarMonthRange, isISODate } from "../shared/gbpDataSafety";
-import type { GBPMonthlyMetricSnapshot } from "./googleBusinessProfileImporter";
+import { isISODate } from "../shared/gbpDataSafety";
+import { assertCompletedGBPMonth, type GBPMonthlyMetricSnapshot } from "./googleBusinessProfileImporter";
 import { getDb } from "./db";
 
 export type GBPPersistencePlan = {
@@ -36,9 +36,10 @@ export function buildGBPPersistencePlan(input: {
   year: number;
   month: number;
   snapshots: GBPMonthlyMetricSnapshot[];
+  now?: Date;
 }): GBPPersistencePlan {
   if (!input.territoryId) throw new Error("GBP persistence requires a territory ID.");
-  const expectedRange = getCompleteCalendarMonthRange(input.year, input.month);
+  const expectedRange = assertCompletedGBPMonth(input.year, input.month, input.now);
   if (input.snapshots.length === 0) throw new Error("GBP persistence requires at least one metric snapshot.");
 
   const metricTypes = new Set<string>();
@@ -81,15 +82,31 @@ export function buildGBPPersistencePlan(input: {
       failedLocations.push({ locationId, metricType: snapshot.metricType });
     });
     if (snapshot.coverageStatus === "unavailable") {
-      if (snapshot.value !== null || snapshot.rows.length !== 0) {
-        throw new Error("Unavailable GBP metric snapshots may not contain totals or raw rows.");
+      if (
+        snapshot.value !== null ||
+        snapshot.rows.length !== 0 ||
+        snapshot.locationsSucceeded !== 0 ||
+        successfulLocationIds.length !== 0 ||
+        failedLocationIds.length !== snapshot.locationsExpected
+      ) {
+        throw new Error("Unavailable GBP metric snapshots require zero usable locations, a null total, and no raw rows.");
       }
     } else {
       if (snapshot.value === null) throw new Error("Available GBP metric snapshots require an explicit total.");
+      if (snapshot.rows.length === 0) throw new Error("Available GBP metric snapshots require raw daily values.");
       const rawTotal = snapshot.rows.reduce((sum, row) => sum + row.value, 0);
       if (rawTotal !== snapshot.value) throw new Error("GBP monthly total must equal its explicit raw daily values.");
-      if (snapshot.coverageStatus === "complete" && snapshot.locationsSucceeded !== snapshot.locationsExpected) {
-        throw new Error("Complete GBP coverage requires every expected location to succeed.");
+      if (
+        snapshot.coverageStatus === "complete" &&
+        (snapshot.locationsSucceeded !== snapshot.locationsExpected || failedLocationIds.length !== 0)
+      ) {
+        throw new Error("Complete GBP coverage requires every expected location to succeed with no failed locations.");
+      }
+      if (
+        snapshot.coverageStatus === "partial" &&
+        (snapshot.locationsSucceeded <= 0 || snapshot.locationsSucceeded >= snapshot.locationsExpected || failedLocationIds.length === 0)
+      ) {
+        throw new Error("Partial GBP coverage requires at least one usable and at least one failed location.");
       }
     }
     if (snapshot.coverageStatus !== "complete") status = "partial";

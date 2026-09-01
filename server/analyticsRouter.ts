@@ -1031,9 +1031,15 @@ export const analyticsRouter = router({
 
             const gbpDropThreshold = territoryId ? -15 : -30;
             const gbpGrowthThreshold = territoryId ? 25 : 50;
+            const metricLabel = ({
+              calls: "calls",
+              website_clicks: "website clicks",
+              directions: "direction requests",
+              searches: "searches",
+            } as Record<string, string>)[row.metricType];
+            if (!metricLabel) continue;
 
             if (pct <= gbpDropThreshold) {
-              const metricLabel = row.metricType === "calls" ? "calls" : row.metricType === "website_clicks" ? "website clicks" : "direction requests";
               insights.push({
                 type: "warning",
                 territory: group.name,
@@ -1045,7 +1051,6 @@ export const analyticsRouter = router({
                 changePercent: pct,
               });
             } else if (pct >= gbpGrowthThreshold) {
-              const metricLabel = row.metricType === "calls" ? "calls" : row.metricType === "website_clicks" ? "website clicks" : "direction requests";
               insights.push({
                 type: "success",
                 territory: group.name,
