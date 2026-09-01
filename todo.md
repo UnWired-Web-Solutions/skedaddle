@@ -270,7 +270,8 @@
 - [x] Investigate: why Ottawa missing from session volume rankings — current direct GA4 aggregate confirms Ottawa is present; legacy issue referred to a non-active ranking
 - [x] Investigate: why Hamilton shows above Milwaukee in sessions (data accuracy) — current January–August 2026 direct GA4 aggregate places Milwaukee above Hamilton
 - [x] Investigate: how Denver/Colorado compares in sessions — current direct GA4 aggregate is available from January 2025, its verified property-eligibility boundary; no earlier data is inferred
-- [ ] Include Waukesha in Wisconsin territory data
+- [x] Include Waukesha in Wisconsin territory data — verified already included through Milwaukee’s approved Lake Country/Waukesha GA4 property, GSC scope, territory mapping, and active workbook city aggregate
+- [x] Audit whether Waukesha is already covered by the explicitly mapped Milwaukee/Lake Country GA4 property and active workbook aggregates before changing any territory scope — aggregate-only audit confirmed scope; no mapping or territory change required
 - [x] Generate corrected reports for all 15 remaining territories
 - [x] Update Home page to show all 19 territories (change filter from full-data to dashboard-ready)
 - [x] Update admin note text since all territories now have dashboards
