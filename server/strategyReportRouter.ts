@@ -70,14 +70,15 @@ export interface TerritoryDataObject {
     hasPage: boolean | null; // true = confirmed page, false = confirmed no page, null = unknown
   }>;
   gbp: {
-    monthly: Array<{ month: string; searches: number; calls: number; website_clicks: number }>;
-    totalSearches: number;
-    totalCalls: number;
-    totalClicks: number;
+    monthly: Array<{ month: string; searches: number | null; calls: number | null; website_clicks: number | null; sources: string[]; incompleteMetrics: string[] }>;
+    totalSearches: number | null;
+    totalCalls: number | null;
+    totalClicks: number | null;
     peakMonth: string;
-    peakCalls: number;
-    avgMonthlyCalls: number;
-    avgMonthlyClicks: number;
+    peakCalls: number | null;
+    avgMonthlyCalls: number | null;
+    avgMonthlyClicks: number | null;
+    incompletePeriods: string[];
   };
   gsc: {
     monthly: Array<{ month: string; clicks: number; impressions: number; avg_position: number }>;
@@ -111,6 +112,7 @@ export interface TerritoryDataObject {
     } | null;
   };
   analyticsSource: {
+    gbp: "persisted_business_profile_api" | "legacy_spreadsheet" | "mixed" | "unavailable";
     ga4: "persisted_data_api" | "unavailable";
     gsc: "persisted_search_console" | "historical_snapshot" | "unavailable";
   };
@@ -329,16 +331,41 @@ export async function buildTerritoryData(
     ? "unknown"
     : measuredOrCuratedCount === suburbs.length ? "validated" : "partial";
 
-  // GBP aggregation
-  const gbpMonthly = (dashData.gbp.monthly || []).filter((row: { month: string }) => dashboardMonthInInitialReport(row.month));
-  const totalSearches = gbpMonthly.reduce((sum: number, m: any) => sum + m.searches, 0);
-  const totalCalls = gbpMonthly.reduce((sum: number, m: any) => sum + m.calls, 0);
-  const totalClicks = gbpMonthly.reduce((sum: number, m: any) => sum + m.website_clicks, 0);
-  const peakMonth = gbpMonthly.length > 0
-    ? gbpMonthly.reduce((max: any, m: any) => m.calls > max.calls ? m : max, gbpMonthly[0])
-    : { month: "N/A", calls: 0 };
-  const avgMonthlyCalls = gbpMonthly.length > 0 ? totalCalls / gbpMonthly.length : 0;
-  const avgMonthlyClicks = gbpMonthly.length > 0 ? totalClicks / gbpMonthly.length : 0;
+  // GBP aggregation. Incomplete live metrics remain null and never become 0.
+  const hasResolvedGbp = Boolean(reportingAnalytics?.gbp.monthly.length);
+  const gbpMonthly = hasResolvedGbp
+    ? reportingAnalytics!.gbp.monthly.map(row => ({
+      month: row.month,
+      searches: row.searches,
+      calls: row.calls,
+      website_clicks: row.website_clicks,
+      sources: row.sources,
+      incompleteMetrics: row.incompleteMetrics,
+    }))
+    : (dashData.gbp.monthly || [])
+      .filter((row: { month: string }) => dashboardMonthInInitialReport(row.month))
+      .map((row: { month: string; searches: number; calls: number; website_clicks: number }) => ({
+        ...row,
+        sources: ["legacy_spreadsheet"],
+        incompleteMetrics: [],
+      }));
+  const sumKnown = (metric: "searches" | "calls" | "website_clicks") => {
+    const values = gbpMonthly.map(row => row[metric]).filter((value): value is number => value !== null);
+    return values.length > 0 ? values.reduce((sum, value) => sum + value, 0) : null;
+  };
+  const averageKnown = (metric: "calls" | "website_clicks") => {
+    const values = gbpMonthly.map(row => row[metric]).filter((value): value is number => value !== null);
+    return values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+  };
+  const totalSearches = sumKnown("searches");
+  const totalCalls = sumKnown("calls");
+  const totalClicks = sumKnown("website_clicks");
+  const callMonths = gbpMonthly.filter((row): row is typeof row & { calls: number } => row.calls !== null);
+  const peakMonth = callMonths.length > 0
+    ? callMonths.reduce((max, row) => row.calls > max.calls ? row : max, callMonths[0])
+    : null;
+  const avgMonthlyCalls = averageKnown("calls");
+  const avgMonthlyClicks = averageKnown("website_clicks");
 
   // Engagement does not reveal publishing volume. Campaign volumes are explicit
   // report inputs and remain "not provided" when the operator has not confirmed them.
@@ -375,10 +402,11 @@ export async function buildTerritoryData(
       totalSearches,
       totalCalls,
       totalClicks,
-      peakMonth: peakMonth.month,
-      peakCalls: peakMonth.calls,
+      peakMonth: peakMonth?.month ?? "N/A",
+      peakCalls: peakMonth?.calls ?? null,
       avgMonthlyCalls,
       avgMonthlyClicks,
+      incompletePeriods: reportingAnalytics?.gbp.incompletePeriods ?? [],
     },
     gsc: {
       monthly: gscMonthly,
@@ -405,6 +433,15 @@ export async function buildTerritoryData(
         : null,
     },
     analyticsSource: {
+      gbp: !hasResolvedGbp
+        ? gbpMonthly.length > 0 ? "legacy_spreadsheet" : "unavailable"
+        : reportingAnalytics!.gbp.sources.length > 1
+          ? "mixed"
+          : reportingAnalytics!.gbp.sources[0] === "persisted_business_profile_api"
+            ? "persisted_business_profile_api"
+            : reportingAnalytics!.gbp.sources[0] === "legacy_spreadsheet"
+              ? "legacy_spreadsheet"
+              : "unavailable",
       ga4: reportingAnalytics?.ga4.monthly.length ? "persisted_data_api" : "unavailable",
       gsc: hasPersistedGsc
         ? "persisted_search_console"
@@ -500,12 +537,19 @@ function formatCurrency(amount: number, symbol: string): string {
   return `${symbol}${amount.toFixed(0)}`;
 }
 
-function formatNumber(n: number): string {
-  return n.toLocaleString("en-US");
+function formatNumber(n: number | null): string {
+  return n === null ? "Not available" : n.toLocaleString("en-US");
 }
 
 function formatPct(n: number): string {
   return `${n.toFixed(1)}%`;
+}
+
+function gbpSourceLabel(source: TerritoryDataObject["analyticsSource"]["gbp"]): string {
+  if (source === "persisted_business_profile_api") return "persisted Google Business Profile API import";
+  if (source === "legacy_spreadsheet") return "historical Google Business Profile spreadsheet";
+  if (source === "mixed") return "Google Business Profile API with metric-level historical fallback";
+  return "Google Business Profile data unavailable";
 }
 
 function escapeHtml(value: string): string {
@@ -723,8 +767,8 @@ GBP DATA:
 - Total calls (available period): ${formatNumber(data.gbp.totalCalls)}
 - Total website clicks: ${formatNumber(data.gbp.totalClicks)}
 - Peak month: ${data.gbp.peakMonth} (${data.gbp.peakCalls} calls)
-- Average monthly calls: ${Math.round(data.gbp.avgMonthlyCalls)}
-- Average monthly clicks: ${Math.round(data.gbp.avgMonthlyClicks)}
+- Average monthly calls: ${data.gbp.avgMonthlyCalls === null ? "Unavailable" : Math.round(data.gbp.avgMonthlyCalls)}
+- Average monthly clicks: ${data.gbp.avgMonthlyClicks === null ? "Unavailable" : Math.round(data.gbp.avgMonthlyClicks)}
 - Months of data: ${data.gbp.monthly.length}
 - Confirmed current publishing volume: ${data.currentGbpPostVolume}
 - Approved proposed publishing volume: ${data.proposedGbpPostsPerMonth || "Not provided"}
@@ -924,7 +968,7 @@ function buildCurrentCampaignHtml(data: TerritoryDataObject): string {
         </tr>
       </tbody>
     </table>
-    <p class="narrative">The confirmed campaign inputs are ${data.currentGbpPostVolume} for GBP and ${data.currentBlogPostVolume} for blog content. During ${data.reportingPeriod.label}, GBP generated ${formatNumber(Math.round(data.gbp.avgMonthlyCalls))} calls and ${formatNumber(Math.round(data.gbp.avgMonthlyClicks))} website clicks per month on average; engagement is not used to infer publishing volume. ${confirmedNoPages.length > 0 ? `${confirmedNoPages.length} suburbs generating significant revenue (${confirmedNoPages.map(s => s.suburb).join(", ")}) are confirmed without dedicated pages.` : data.suburbPageStatus === "unknown" ? "Suburb page coverage has not been audited; page recommendations remain provisional until the audit is complete." : "Existing suburb pages provide a foundation, with remaining confirmed gaps shown above."} ${data.campaignNotes ? `Campaign notes: ${escapeHtml(data.campaignNotes)}` : ""}</p>`;
+    <p class="narrative">The confirmed campaign inputs are ${data.currentGbpPostVolume} for GBP and ${data.currentBlogPostVolume} for blog content. During ${data.reportingPeriod.label}, average GBP calls were ${formatNumber(data.gbp.avgMonthlyCalls === null ? null : Math.round(data.gbp.avgMonthlyCalls))} and average website clicks were ${formatNumber(data.gbp.avgMonthlyClicks === null ? null : Math.round(data.gbp.avgMonthlyClicks))} per month; engagement is not used to infer publishing volume. ${confirmedNoPages.length > 0 ? `${confirmedNoPages.length} suburbs generating significant revenue (${confirmedNoPages.map(s => s.suburb).join(", ")}) are confirmed without dedicated pages.` : data.suburbPageStatus === "unknown" ? "Suburb page coverage has not been audited; page recommendations remain provisional until the audit is complete." : "Existing suburb pages provide a foundation, with remaining confirmed gaps shown above."} ${data.campaignNotes ? `Campaign notes: ${escapeHtml(data.campaignNotes)}` : ""}</p>`;
 }
 
 function buildSpeciesTableHtml(data: TerritoryDataObject): string {
@@ -1013,7 +1057,7 @@ function buildGbpDataHtml(data: TerritoryDataObject): string {
           <td class="num">${formatNumber(m.searches)}</td>
           <td class="num">${formatNumber(m.calls)}</td>
           <td class="num">${formatNumber(m.website_clicks)}</td>
-          <td class="num">${formatNumber(m.calls + m.website_clicks)}</td>
+          <td class="num">${m.calls !== null && m.website_clicks !== null ? formatNumber(m.calls + m.website_clicks) : "Not available"}</td>
         </tr>`).join("");
 
   return `
@@ -1034,11 +1078,11 @@ function buildGbpDataHtml(data: TerritoryDataObject): string {
           <td class="num"><strong>${formatNumber(data.gbp.totalSearches)}</strong></td>
           <td class="num"><strong>${formatNumber(data.gbp.totalCalls)}</strong></td>
           <td class="num"><strong>${formatNumber(data.gbp.totalClicks)}</strong></td>
-          <td class="num"><strong>${formatNumber(data.gbp.totalCalls + data.gbp.totalClicks)}</strong></td>
+          <td class="num"><strong>${data.gbp.totalCalls !== null && data.gbp.totalClicks !== null ? formatNumber(data.gbp.totalCalls + data.gbp.totalClicks) : "Not available"}</strong></td>
         </tr>
       </tbody>
     </table>
-    <p class="narrative">Peak call month: <strong>${data.gbp.peakMonth}</strong> with ${data.gbp.peakCalls} calls. Average monthly combined activity (calls + website clicks): ${Math.round(data.gbp.avgMonthlyCalls + data.gbp.avgMonthlyClicks)}. GBP is functioning as a direct lead channel — combined calls and website clicks represent the primary inbound lead volume from local search.</p>`;
+    <p class="narrative">${data.gbp.peakCalls === null ? "A peak call month is not available." : `Peak call month: <strong>${data.gbp.peakMonth}</strong> with ${formatNumber(data.gbp.peakCalls)} calls.`} Average monthly combined activity (calls + website clicks): ${data.gbp.avgMonthlyCalls !== null && data.gbp.avgMonthlyClicks !== null ? formatNumber(Math.round(data.gbp.avgMonthlyCalls + data.gbp.avgMonthlyClicks)) : "Not available"}.${data.gbp.incompletePeriods.length ? ` Incomplete live periods excluded from headline totals: ${data.gbp.incompletePeriods.join(", ")}.` : ""}</p>`;
 }
 
 function buildOrganicAnalyticsHtml(data: TerritoryDataObject): string {
@@ -1525,7 +1569,7 @@ function buildFullReportHtml(data: TerritoryDataObject, sections: SectionResult[
     <strong>Reporting period:</strong> ${data.reportingPeriod.start} through ${data.reportingPeriod.end}<br>
     <strong>Territory Revenue:</strong> ${formatCurrency(data.totalRevenue, data.currencySymbol)}<br>
     <strong>Closed Jobs:</strong> ${formatNumber(data.totalJobs)}<br>
-    <strong>Data Sources:</strong> Salesforce CRM, Google Business Profile Insights${data.gsc.monthly.length > 0 ? data.analyticsSource.gsc === "persisted_search_console" ? ", persisted Google Search Console import" : ", historical Google Search Console snapshot" : ""}${data.ga4.monthly.length > 0 ? ", persisted Google Analytics 4 Data API import" : ""}
+    <strong>Data Sources:</strong> Salesforce CRM, ${gbpSourceLabel(data.analyticsSource.gbp)}${data.gsc.monthly.length > 0 ? data.analyticsSource.gsc === "persisted_search_console" ? ", persisted Google Search Console import" : ", historical Google Search Console snapshot" : ""}${data.ga4.monthly.length > 0 ? ", persisted Google Analytics 4 Data API import" : ""}
   </div>
 </div>
 

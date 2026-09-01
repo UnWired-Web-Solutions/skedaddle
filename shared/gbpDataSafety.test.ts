@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assessGBPPeriodCoverage, getCompleteCalendarMonthRange, isGBPYoYEligible } from "./gbpDataSafety";
+import { assessGBPPeriodCoverage, getCompleteCalendarMonthRange, isGBPYoYEligible, toGBPReportingMetricType } from "./gbpDataSafety";
 
 describe("GBP data-safety rules", () => {
   it("uses persisted live data only when every expected mapped location succeeds", () => {
@@ -64,5 +64,12 @@ describe("GBP data-safety rules", () => {
   it("returns calendar-complete month boundaries and rejects invalid months", () => {
     expect(getCompleteCalendarMonthRange(2026, 2)).toEqual({ startDate: "2026-02-01", endDate: "2026-02-28" });
     expect(() => getCompleteCalendarMonthRange(2026, 13)).toThrow("valid calendar month");
+  });
+
+  it("translates Google enums only at the reporting boundary", () => {
+    expect(toGBPReportingMetricType("CALL_CLICKS")).toBe("calls");
+    expect(toGBPReportingMetricType("WEBSITE_CLICKS")).toBe("website_clicks");
+    expect(toGBPReportingMetricType("BUSINESS_DIRECTION_REQUESTS")).toBe("directions");
+    expect(toGBPReportingMetricType("UNKNOWN_FUTURE_METRIC")).toBe("UNKNOWN_FUTURE_METRIC");
   });
 });

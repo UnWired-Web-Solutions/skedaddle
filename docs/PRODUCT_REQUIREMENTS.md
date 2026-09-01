@@ -28,6 +28,8 @@ The current Salesforce snapshot covers 2025-07-01 through 2026-06-30. Until Sale
 
 Only complete GA4 import months belong in headline totals, top-page rankings, comparisons, or AI context. Partial months must be shown separately with the expected/succeeded property counts. Missing data is “unavailable,” never zero.
 
+Google Business Profile raw rows retain Google's metric enums, while reporting maps them to the portal's established metric keys. A live period replaces its equivalent legacy metric only after that canonical mapping. A location with an empty response is not counted as successfully covered, and a store code alone can never authorize a territory assignment because Google guarantees store-code uniqueness only within an account.
+
 Year-over-year values use only months present in both the current and previous-year periods. The report must state the matched months. If there are no comparable months, it must say that YoY is unavailable.
 
 A dedicated suburb hub is confirmed only by a dedicated location-page URL whose final path segment matches the suburb. Blog posts and species-by-suburb URLs do not prove that a hub exists. Curated audit results may override measured evidence when their source is documented.

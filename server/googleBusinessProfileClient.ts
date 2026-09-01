@@ -15,6 +15,7 @@ const PERFORMANCE_BASE_URL = "https://businessprofileperformance.googleapis.com/
 
 export type GBPAccount = { name: string; accountName?: string; type?: string; role?: string };
 export type GBPLiveLocation = {
+  accountName: string;
   name: string;
   title: string;
   storeCode?: string;
@@ -109,20 +110,23 @@ export async function listGBPAccounts(): Promise<GBPAccount[]> {
 }
 
 /** Lists every accessible location, including locations inherited through a business group. */
-export async function listGBPLocations(): Promise<GBPLiveLocation[]> {
+export async function listGBPLocations(accountName: string): Promise<GBPLiveLocation[]> {
+  if (!/^accounts\/(?!-$)[^/]+$/.test(accountName)) {
+    throw new Error("GBP account name must use the accounts/{accountId} format.");
+  }
   const locations: GBPLiveLocation[] = [];
   let pageToken: string | undefined;
   do {
     const response = await requestGBP<{ locations?: GBPLiveLocation[]; nextPageToken?: string }>(
       BUSINESS_INFORMATION_BASE_URL,
-      "accounts/-/locations",
+      `${accountName}/locations`,
       {
         pageSize: 100,
         pageToken,
         readMask: "name,title,storeCode,websiteUri,storefrontAddress,metadata,openInfo",
       },
     );
-    locations.push(...(response.locations ?? []));
+    locations.push(...(response.locations ?? []).map(location => ({ ...location, accountName })));
     pageToken = response.nextPageToken;
   } while (pageToken);
   return locations;

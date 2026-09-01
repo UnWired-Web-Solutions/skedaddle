@@ -56,6 +56,45 @@ describe("GBP monthly import safeguards", () => {
     expect(snapshot.coverageStatus).toBe("unavailable");
   });
 
+  it("does not call a month complete when one location returns an empty response", () => {
+    const [snapshot] = buildGBPMonthlyMetricSnapshots({
+      locationIds: [101, 102],
+      metricTypes: ["CALL_CLICKS"],
+      year: 2026,
+      month: 8,
+      now: fixedNow,
+      results: [
+        { locationId: 101, metricType: "CALL_CLICKS", success: true, rows: [{ date: "2026-08-03", value: 7 }] },
+        { locationId: 102, metricType: "CALL_CLICKS", success: true, rows: [] },
+      ],
+    });
+    expect(snapshot).toMatchObject({
+      value: 7,
+      coverageStatus: "partial",
+      locationsExpected: 2,
+      locationsSucceeded: 1,
+      failedLocationIds: [102],
+    });
+  });
+
+  it("rejects malformed, negative, and non-integer daily values", () => {
+    const base = {
+      locationIds: [101], metricTypes: ["CALL_CLICKS"], year: 2026, month: 8, now: fixedNow,
+    };
+    expect(() => buildGBPMonthlyMetricSnapshots({
+      ...base,
+      results: [{ locationId: 101, metricType: "CALL_CLICKS", success: true, rows: [{ date: "2026-08-1", value: 1 }] }],
+    })).toThrow("invalid daily value");
+    expect(() => buildGBPMonthlyMetricSnapshots({
+      ...base,
+      results: [{ locationId: 101, metricType: "CALL_CLICKS", success: true, rows: [{ date: "2026-08-01", value: -1 }] }],
+    })).toThrow("invalid daily value");
+    expect(() => buildGBPMonthlyMetricSnapshots({
+      ...base,
+      results: [{ locationId: 101, metricType: "CALL_CLICKS", success: true, rows: [{ date: "2026-08-01", value: 1.5 }] }],
+    })).toThrow("invalid daily value");
+  });
+
   it("blocks current or future periods", () => {
     expect(() => assertCompletedGBPMonth(2026, 9, fixedNow)).toThrow("completed calendar months");
     expect(() => assertCompletedGBPMonth(2026, 10, fixedNow)).toThrow("completed calendar months");

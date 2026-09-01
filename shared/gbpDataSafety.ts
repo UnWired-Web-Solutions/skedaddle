@@ -10,6 +10,22 @@ export type GBPPeriodCoverage = {
   yoyEligible: boolean;
 };
 
+/**
+ * Google metric enums are retained verbatim in the raw/live tables. Reporting
+ * uses the portal's established keys so a live value replaces (rather than
+ * sits beside) the equivalent legacy spreadsheet value.
+ */
+const GBP_REPORTING_METRIC_TYPES: Readonly<Record<string, string>> = {
+  CALL_CLICKS: "calls",
+  WEBSITE_CLICKS: "website_clicks",
+  BUSINESS_DIRECTION_REQUESTS: "directions",
+  BUSINESS_BOOKINGS: "bookings",
+};
+
+export function toGBPReportingMetricType(metricType: string): string {
+  return GBP_REPORTING_METRIC_TYPES[metricType] ?? metricType;
+}
+
 export function assessGBPPeriodCoverage(input: {
   liveRows: number;
   liveCoverageStatus?: "complete" | "partial" | "unavailable";

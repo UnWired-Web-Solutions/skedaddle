@@ -1,4 +1,8 @@
-import { assessGBPPeriodCoverage, type GBPPeriodCoverage } from "../shared/gbpDataSafety";
+import {
+  assessGBPPeriodCoverage,
+  toGBPReportingMetricType,
+  type GBPPeriodCoverage,
+} from "../shared/gbpDataSafety";
 
 export type PersistedGBPMonthlyMetric = {
   year: number;
@@ -27,7 +31,7 @@ export type ResolvedGBPMonthlyMetric = {
 };
 
 function keyOf(row: { year: number; month: number; metricType: string }) {
-  return `${row.year}|${row.month}|${row.metricType}`;
+  return `${row.year}|${row.month}|${toGBPReportingMetricType(row.metricType)}`;
 }
 
 /**
@@ -44,12 +48,12 @@ export function resolveGBPMonthlyMetricSources(input: {
   for (const row of input.persisted) {
     const key = keyOf(row);
     if (persistedByKey.has(key)) throw new Error(`Duplicate persisted GBP monthly metric: ${key}.`);
-    persistedByKey.set(key, row);
+    persistedByKey.set(key, { ...row, metricType: toGBPReportingMetricType(row.metricType) });
   }
   for (const row of input.legacy) {
     const key = keyOf(row);
     if (legacyByKey.has(key)) throw new Error(`Duplicate legacy GBP monthly metric: ${key}.`);
-    legacyByKey.set(key, row);
+    legacyByKey.set(key, { ...row, metricType: toGBPReportingMetricType(row.metricType) });
   }
 
   const keys = new Set([...Array.from(persistedByKey.keys()), ...Array.from(legacyByKey.keys())]);

@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
-  findGBPLocationRegistryEntry,
+  findApprovedGBPLocationBinding,
+  findGBPLocationCandidateByShopCode,
+  getGBPImportEligibleBindings,
   getGBPMappingSummary,
-  getGBPReadyLocationMappings,
+  getGBPReadyLocationCandidates,
 } from "../shared/gbpLocationRegistry";
 
 describe("GBP location registry", () => {
   it("allows only explicitly mapped, verified locations into territory imports", () => {
-    const entries = getGBPReadyLocationMappings();
+    const entries = getGBPReadyLocationCandidates();
     expect(entries.length).toBeGreaterThan(0);
     expect(entries.every(entry => entry.mappingStatus === "ready")).toBe(true);
     expect(entries.every(entry => entry.operationalStatus === "verified")).toBe(true);
@@ -15,14 +17,24 @@ describe("GBP location registry", () => {
   });
 
   it("does not infer a mapping for blank or ambiguous shop codes", () => {
-    expect(findGBPLocationRegistryEntry(null)).toBeNull();
-    expect(findGBPLocationRegistryEntry("27")?.mappingStatus).toBe("review_required");
-    expect(findGBPLocationRegistryEntry("3")?.territoryId).toBeNull();
+    expect(findGBPLocationCandidateByShopCode(null)).toBeNull();
+    expect(findGBPLocationCandidateByShopCode("27")?.mappingStatus).toBe("review_required");
+    expect(findGBPLocationCandidateByShopCode("3")?.territoryId).toBeNull();
   });
 
   it("keeps permanently closed listings excluded", () => {
-    expect(findGBPLocationRegistryEntry("30")?.mappingStatus).toBe("excluded");
-    expect(findGBPLocationRegistryEntry("38")?.mappingStatus).toBe("excluded");
+    expect(findGBPLocationCandidateByShopCode("30")?.mappingStatus).toBe("excluded");
+    expect(findGBPLocationCandidateByShopCode("38")?.mappingStatus).toBe("excluded");
+  });
+
+  it("never authorizes an import from a shop code without an exact approved API binding", () => {
+    expect(findGBPLocationCandidateByShopCode("1")?.territoryId).toBe("hamilton");
+    expect(findApprovedGBPLocationBinding({
+      accountName: "accounts/123",
+      apiLocationName: "locations/456",
+      shopCode: "1",
+    })).toBeNull();
+    expect(getGBPImportEligibleBindings()).toEqual([]);
   });
 
   it("exposes an auditable candidate summary", () => {
@@ -31,5 +43,6 @@ describe("GBP location registry", () => {
     expect(summary.ready).toBeGreaterThan(10);
     expect(summary.reviewRequired).toBeGreaterThan(0);
     expect(summary.excluded).toBeGreaterThan(0);
+    expect(summary.importEligible).toBe(0);
   });
 });

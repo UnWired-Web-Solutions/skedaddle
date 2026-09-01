@@ -30,8 +30,8 @@ import { GSC_TERRITORY_SCOPES } from "../shared/gscTerritoryPaths";
 import { getGA4MappingSummary } from "../shared/ga4TerritoryProperties";
 import { getGBPMappingSummary } from "../shared/gbpLocationRegistry";
 import { hasGBPAuthConfiguration, hasGBPOAuthClientConfiguration } from "./googleBusinessProfileClient";
-import { resolveGBPMonthlyMetricSources } from "./gbpMetricSourceResolver";
 import { isGBPYoYEligible } from "../shared/gbpDataSafety";
+import { loadResolvedGBPMonthly } from "./gbpReportingData";
 
 // ─── Procedures ──────────────────────────────────────────────────────────────
 
@@ -350,12 +350,18 @@ export const analyticsRouter = router({
       })
       .from(ga4TerritoryMonthly);
 
-    const [gbpRange] = await db
+    const [legacyGbpRange] = await db
       .select({
         minYear: sql<number>`MIN(year)`,
         maxYear: sql<number>`MAX(year)`,
       })
       .from(gbpMetrics);
+    const [liveGbpRange] = await db
+      .select({
+        minYear: sql<number>`MIN(${gbpTerritoryMonthly.year})`,
+        maxYear: sql<number>`MAX(${gbpTerritoryMonthly.year})`,
+      })
+      .from(gbpTerritoryMonthly);
 
     const [gscRange] = await db
       .select({
@@ -364,12 +370,22 @@ export const analyticsRouter = router({
       })
       .from(gscPageMetrics);
 
+    const gbpMinYears = [legacyGbpRange?.minYear, liveGbpRange?.minYear]
+      .filter((value): value is number => value !== null && value !== undefined)
+      .map(Number);
+    const gbpMaxYears = [legacyGbpRange?.maxYear, liveGbpRange?.maxYear]
+      .filter((value): value is number => value !== null && value !== undefined)
+      .map(Number);
+
     return {
       ga4: {
         minYear: liveGa4Range?.minYear ?? legacyGa4Range?.minYear,
         maxYear: liveGa4Range?.maxYear ?? legacyGa4Range?.maxYear,
       },
-      gbp: { minYear: gbpRange.minYear, maxYear: gbpRange.maxYear },
+      gbp: {
+        minYear: gbpMinYears.length ? Math.min(...gbpMinYears) : null,
+        maxYear: gbpMaxYears.length ? Math.max(...gbpMaxYears) : null,
+      },
       gsc: { minYear: gscRange.minYear, maxYear: gscRange.maxYear },
     };
   }),
@@ -383,7 +399,6 @@ export const analyticsRouter = router({
 
     const territoryId = input?.territoryId;
     const ga4Subs = territoryId ? getSubLocations(territoryId, "ga4") : [];
-    const gbpSubs = territoryId ? getSubLocations(territoryId, "gbp") : [];
 
     const [legacyGa4Latest] = await db
       .select({ period: sql<number>`MAX(${ga4Sessions.year} * 100 + ${ga4Sessions.month})` })
@@ -397,10 +412,16 @@ export const analyticsRouter = router({
         sql`${ga4TerritoryMonthly.propertiesExpected} > 0`,
         eq(ga4TerritoryMonthly.propertiesSucceeded, ga4TerritoryMonthly.propertiesExpected),
       ));
-    const [gbpLatest] = await db
+    const [legacyGbpLatest] = await db
       .select({ period: sql<number>`MAX(${gbpMetrics.year} * 100 + ${gbpMetrics.month})` })
-      .from(gbpMetrics)
-      .where(territoryId ? (gbpSubs.length ? inArray(gbpMetrics.territory, gbpSubs) : sql`1 = 0`) : undefined);
+      .from(gbpMetrics);
+    const [liveGbpLatest] = await db
+      .select({ period: sql<number>`MAX(${gbpTerritoryMonthly.year} * 100 + ${gbpTerritoryMonthly.month})` })
+      .from(gbpTerritoryMonthly)
+      .where(and(
+        eq(gbpTerritoryMonthly.coverageStatus, "complete"),
+        sql`${gbpTerritoryMonthly.value} IS NOT NULL`,
+      ));
     const [gscLatest] = await db
       .select({ period: sql<number>`MAX(${gscPageMetrics.year} * 100 + ${gscPageMetrics.month})` })
       .from(gscPageMetrics)
@@ -410,7 +431,23 @@ export const analyticsRouter = router({
       ? { year: Math.floor(Number(period) / 100), month: Number(period) % 100 }
       : null;
     const ga4 = decode(liveGa4Latest?.period) ?? decode(legacyGa4Latest?.period);
-    const gbp = decode(gbpLatest?.period);
+    const territoryGBP = territoryId ? await loadResolvedGBPMonthly({
+      db,
+      territoryId,
+      startYear: 2000,
+      endYear: 2100,
+    }) : null;
+    const latestTerritoryGBPPeriod = territoryGBP
+      ?.filter(row => row.value !== null && (row.source === "persisted_business_profile_api" || row.source === "legacy_spreadsheet"))
+      .reduce<number | null>((latestPeriod, row) => {
+        const period = row.year * 100 + row.month;
+        return latestPeriod === null || period > latestPeriod ? period : latestPeriod;
+      }, null);
+    const latestGlobalGBPPeriod = Math.max(
+      Number(legacyGbpLatest?.period || 0),
+      Number(liveGbpLatest?.period || 0),
+    ) || null;
+    const gbp = decode(territoryId ? latestTerritoryGBPPeriod : latestGlobalGBPPeriod);
     const gsc = decode(gscLatest?.period);
     // Use the latest period covered by all three territory feeds (the earliest
     // boundary) so the brief never pairs a current metric with a missing one.
@@ -514,43 +551,11 @@ export const analyticsRouter = router({
         return legacyResults.map(row => ({ ...row, source: "legacy_spreadsheet" as const }));
 
       } else {
-        const [persisted, legacy] = await Promise.all([
-          db.select({
-            year: gbpTerritoryMonthly.year,
-            month: gbpTerritoryMonthly.month,
-            metricType: gbpTerritoryMonthly.metricType,
-            value: gbpTerritoryMonthly.value,
-            coverageStatus: gbpTerritoryMonthly.coverageStatus,
-            locationsExpected: gbpTerritoryMonthly.locationsExpected,
-            locationsSucceeded: gbpTerritoryMonthly.locationsSucceeded,
-          })
-            .from(gbpTerritoryMonthly)
-            .where(and(
-              eq(gbpTerritoryMonthly.territoryId, input.territoryId),
-              sql`${gbpTerritoryMonthly.year} >= ${input.startYear}`,
-              sql`${gbpTerritoryMonthly.year} <= ${input.endYear}`,
-            )),
-          subLocations.length === 0 ? Promise.resolve([]) : db
-            .select({
-              year: gbpMetrics.year,
-              month: gbpMetrics.month,
-              metricType: gbpMetrics.metricType,
-              value: sql<number>`SUM(value)`,
-            })
-            .from(gbpMetrics)
-            .where(and(
-              inArray(gbpMetrics.territory, subLocations),
-              sql`${gbpMetrics.year} >= ${input.startYear}`,
-              sql`${gbpMetrics.year} <= ${input.endYear}`,
-            ))
-            .groupBy(gbpMetrics.year, gbpMetrics.month, gbpMetrics.metricType),
-        ]);
-        return resolveGBPMonthlyMetricSources({
-          persisted: persisted.map(row => ({
-            ...row,
-            value: row.value === null ? null : Number(row.value),
-          })),
-          legacy: legacy.map(row => ({ ...row, value: Number(row.value) })),
+        return loadResolvedGBPMonthly({
+          db,
+          territoryId: input.territoryId,
+          startYear: input.startYear,
+          endYear: input.endYear,
         });
       }
     }),
@@ -572,7 +577,6 @@ export const analyticsRouter = router({
       const { territoryId, year, month } = input;
       const prevYear = year - 1;
       const ga4Subs = getSubLocations(territoryId, "ga4");
-      const gbpSubs = getSubLocations(territoryId, "gbp");
 
       // GA4 sessions comparison (aggregated across sub-locations)
       const liveCurrentGA4 = await db
@@ -649,48 +653,15 @@ export const analyticsRouter = router({
       // GBP comparisons resolve persisted complete data first. Partial or
       // unavailable live attempts stay explicit and cannot inherit a legacy
       // value for the same metric-period.
-      const [liveCurrentGBP, livePrevGBP, legacyCurrentGBP, legacyPrevGBP] = await Promise.all([
-        db.select({
-          year: gbpTerritoryMonthly.year, month: gbpTerritoryMonthly.month,
-          metricType: gbpTerritoryMonthly.metricType, value: gbpTerritoryMonthly.value,
-          coverageStatus: gbpTerritoryMonthly.coverageStatus,
-          locationsExpected: gbpTerritoryMonthly.locationsExpected,
-          locationsSucceeded: gbpTerritoryMonthly.locationsSucceeded,
-        }).from(gbpTerritoryMonthly).where(and(
-          eq(gbpTerritoryMonthly.territoryId, territoryId),
-          eq(gbpTerritoryMonthly.year, year), eq(gbpTerritoryMonthly.month, month),
-        )),
-        db.select({
-          year: gbpTerritoryMonthly.year, month: gbpTerritoryMonthly.month,
-          metricType: gbpTerritoryMonthly.metricType, value: gbpTerritoryMonthly.value,
-          coverageStatus: gbpTerritoryMonthly.coverageStatus,
-          locationsExpected: gbpTerritoryMonthly.locationsExpected,
-          locationsSucceeded: gbpTerritoryMonthly.locationsSucceeded,
-        }).from(gbpTerritoryMonthly).where(and(
-          eq(gbpTerritoryMonthly.territoryId, territoryId),
-          eq(gbpTerritoryMonthly.year, prevYear), eq(gbpTerritoryMonthly.month, month),
-        )),
-        gbpSubs.length === 0 ? Promise.resolve([]) : db.select({
-          year: gbpMetrics.year, month: gbpMetrics.month, metricType: gbpMetrics.metricType,
-          value: sql<number>`SUM(value)`,
-        }).from(gbpMetrics).where(and(
-          inArray(gbpMetrics.territory, gbpSubs), eq(gbpMetrics.year, year), eq(gbpMetrics.month, month),
-        )).groupBy(gbpMetrics.year, gbpMetrics.month, gbpMetrics.metricType),
-        gbpSubs.length === 0 ? Promise.resolve([]) : db.select({
-          year: gbpMetrics.year, month: gbpMetrics.month, metricType: gbpMetrics.metricType,
-          value: sql<number>`SUM(value)`,
-        }).from(gbpMetrics).where(and(
-          inArray(gbpMetrics.territory, gbpSubs), eq(gbpMetrics.year, prevYear), eq(gbpMetrics.month, month),
-        )).groupBy(gbpMetrics.year, gbpMetrics.month, gbpMetrics.metricType),
-      ]);
-      const currentGBP = resolveGBPMonthlyMetricSources({
-        persisted: liveCurrentGBP.map(row => ({ ...row, value: row.value === null ? null : Number(row.value) })),
-        legacy: legacyCurrentGBP.map(row => ({ ...row, value: Number(row.value) })),
+      const resolvedGBP = await loadResolvedGBPMonthly({
+        db,
+        territoryId,
+        startYear: prevYear,
+        endYear: year,
+        month,
       });
-      const prevGBP = resolveGBPMonthlyMetricSources({
-        persisted: livePrevGBP.map(row => ({ ...row, value: row.value === null ? null : Number(row.value) })),
-        legacy: legacyPrevGBP.map(row => ({ ...row, value: Number(row.value) })),
-      });
+      const currentGBP = resolvedGBP.filter(row => row.year === year);
+      const prevGBP = resolvedGBP.filter(row => row.year === prevYear);
       const currentGBPByMetric = new Map(currentGBP.map(row => [row.metricType, row]));
       const prevGBPByMetric = new Map(prevGBP.map(row => [row.metricType, row]));
       const gbpComparisonEligibility = Object.fromEntries(Array.from(new Set([
@@ -738,19 +709,12 @@ export const analyticsRouter = router({
 
       const { territoryId, year, month } = input;
       const ga4Subs = getSubLocations(territoryId, "ga4");
-      const gbpSubs = getSubLocations(territoryId, "gbp");
 
       const ga4Conditions: any[] = [
         inArray(ga4Sessions.territory, ga4Subs.length > 0 ? ga4Subs : [""]),
         eq(ga4Sessions.year, year),
       ];
       if (month) ga4Conditions.push(eq(ga4Sessions.month, month));
-
-      const gbpConditions: any[] = [
-        inArray(gbpMetrics.territory, gbpSubs.length > 0 ? gbpSubs : [""]),
-        eq(gbpMetrics.year, year),
-      ];
-      if (month) gbpConditions.push(eq(gbpMetrics.month, month));
 
       const liveGa4Conditions = [
         eq(ga4TerritoryMonthly.territoryId, territoryId),
@@ -771,14 +735,31 @@ export const analyticsRouter = router({
         .from(ga4Sessions)
         .where(and(...ga4Conditions, inArray(ga4Sessions.pageType, ["species_pages", "location_page"])));
 
-      const gbpSummary = await db
-        .select({
-          metricType: gbpMetrics.metricType,
-          total: sql<number>`SUM(value)`,
-        })
-        .from(gbpMetrics)
-        .where(and(...gbpConditions))
-        .groupBy(gbpMetrics.metricType);
+      const resolvedGBP = await loadResolvedGBPMonthly({
+        db,
+        territoryId,
+        startYear: year,
+        endYear: year,
+        month,
+      });
+      const headlineGBP = resolvedGBP.filter(row =>
+        row.value !== null &&
+        (row.source === "persisted_business_profile_api" || row.source === "legacy_spreadsheet"),
+      );
+      const gbpTotals = headlineGBP.reduce<Record<string, number>>((totals, row) => {
+        totals[row.metricType] = (totals[row.metricType] ?? 0) + Number(row.value);
+        return totals;
+      }, {});
+      const incompleteGBPPeriods = resolvedGBP
+        .filter(row => row.source === "partial" || row.source === "unavailable")
+        .map(row => ({
+          year: row.year,
+          month: row.month,
+          metricType: row.metricType,
+          source: row.source,
+          locationsExpected: row.coverage.locationsExpected,
+          locationsSucceeded: row.coverage.locationsSucceeded,
+        }));
 
       return {
         totalSessions: Number(liveGa4Summary?.rowCount || 0) > 0
@@ -788,7 +769,11 @@ export const analyticsRouter = router({
           importedMonths: Number(liveGa4Summary?.rowCount),
           completeMonths: Number(liveGa4Summary?.completeMonths),
         } : null,
-        gbp: Object.fromEntries(gbpSummary.map(r => [r.metricType, r.total])),
+        gbp: gbpTotals,
+        gbpCoverage: {
+          sources: Array.from(new Set(headlineGBP.map(row => row.source))).sort(),
+          incompletePeriods: incompleteGBPPeriods,
+        },
       };
     }),
 
@@ -1020,39 +1005,28 @@ export const analyticsRouter = router({
 
         // GBP calls YoY
         if (group.gbpTerritories.length > 0) {
-          const currentGBP = await db
-            .select({
-              metricType: gbpMetrics.metricType,
-              value: sql<number>`SUM(value)`,
-            })
-            .from(gbpMetrics)
-            .where(and(
-              inArray(gbpMetrics.territory, group.gbpTerritories),
-              eq(gbpMetrics.year, year),
-              eq(gbpMetrics.month, month),
-            ))
-            .groupBy(gbpMetrics.metricType);
-
-          const prevGBPData = await db
-            .select({
-              metricType: gbpMetrics.metricType,
-              value: sql<number>`SUM(value)`,
-            })
-            .from(gbpMetrics)
-            .where(and(
-              inArray(gbpMetrics.territory, group.gbpTerritories),
-              eq(gbpMetrics.year, prevYear),
-              eq(gbpMetrics.month, month),
-            ))
-            .groupBy(gbpMetrics.metricType);
-
-          const prevGBPMap = new Map(prevGBPData.map(r => [r.metricType, Number(r.value)]));
+          const resolvedGBP = await loadResolvedGBPMonthly({
+            db,
+            territoryId: group.id,
+            startYear: prevYear,
+            endYear: year,
+            month,
+          });
+          const currentGBP = resolvedGBP.filter(row => row.year === year);
+          const prevGBPMap = new Map(resolvedGBP.filter(row => row.year === prevYear).map(row => [row.metricType, row]));
 
           for (const row of currentGBP) {
             if (row.metricType === "total" || row.metricType === "bookings") continue;
-            const prev = prevGBPMap.get(row.metricType);
-            if (!prev || prev < 15) continue;
-            const current = Number(row.value);
+            const previousRow = prevGBPMap.get(row.metricType);
+            if (
+              !previousRow ||
+              !isGBPYoYEligible(row.coverage, previousRow.coverage) ||
+              row.value === null ||
+              previousRow.value === null ||
+              previousRow.value < 15
+            ) continue;
+            const prev = previousRow.value;
+            const current = row.value;
             const pct = ((current - prev) / prev) * 100;
 
             const gbpDropThreshold = territoryId ? -15 : -30;
