@@ -259,6 +259,9 @@
 - [x] Remove hard-coded custom local-auth credential material from source control; retain only non-secret role and territory authorization mapping in code — frontend registry removed; server-only source scan passed
 - [x] Generate and set one new temporary shared local-auth password in managed server configuration, retaining all approved usernames and territory assignments — user-approved managed registry configured; no value committed or documented
 - [ ] Checkpoint and deploy the local-auth remediation, then verify successful and rejected published sign-in flows without displaying the shared credential
+- [ ] Verify the published local-auth procedure using the managed registry without placing account credentials in a browser or command output
+- [ ] Correct the redacted production local-auth verifier to use the same tRPC batch envelope as the portal client before interpreting an HTTP 404 as a deployment failure
+- [ ] Republish the unchanged local-auth server route after confirming the corrected verifier passes locally, then verify the production artifact exposes the procedure
 
 ## Dave's Email Feedback — Strategy Template Fixes (Jul 23, 2026)
 - [x] Fix report template: use combined GBP (calls + website clicks) not just calls

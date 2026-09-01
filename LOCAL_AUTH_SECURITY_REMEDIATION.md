@@ -22,3 +22,7 @@ The portal’s required custom local authentication has been moved from a browse
 At the user’s direction, the current registry uses a temporary shared credential for the retained accounts. Because this is a shared credential, it must be replaced with per-account strong credentials before the portal is extended beyond its current internal UWS/Dave/Ay use. Password values are deliberately omitted from this document and all source-controlled files.
 
 The client retains the minimal, non-secret user context in session storage to preserve the portal’s existing local navigation behavior. The current portal’s data procedures remain public by project requirement; this remediation prevents password disclosure in the browser bundle but does not transform the broader local-auth model into server-enforced per-route authorization.
+
+## Deployment-verification evidence
+
+The redacted verifier was corrected to use the same tRPC batch envelope as the portal client. It passed against the current local server, confirming both the transport shape and managed secret registry. At the time of this record, production still returned HTTP 404 for the new procedure after two rollout waits, which indicates a stale server artifact rather than malformed input or a credential error. A new clean publication attempt is required before published login behavior can be verified.
