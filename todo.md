@@ -429,3 +429,10 @@
 - [x] Push the verified local GBP preparation and communication checkpoints to canonical GitHub `main` and verify the commit match; reauthorized UWS connection completed the non-force push on September 1, 2026
 - [x] Diagnose the canonical GitHub push denial by verifying effective collaborator role, repository rules, and connected-token access without changing repository settings; refreshed UWS Git credential resolved the transport denial
 - [x] Create a UWS-controlled, host-independent migration plan covering the Skedaddle codebase, database, secrets, auth, integrations, cutover, and rollback in `UWS_CONTROLLED_MIGRATION_PLAN.md`
+
+## Codex Update Review — Sep 1, 2026
+- [x] Identify the newly available Codex branch or pull request and establish its true merge base against current `main` — `codex/gbp-integration-safety-fixes`, commit `de9582e`, based on checkpoint `a2fc281`
+- [x] Review changed code, migrations, data-integrity safeguards, and custom local-auth compatibility — documented in `CODEX_GBP_SAFETY_REVIEW_2026-09-01.md`; branch passed TypeScript and 135 tests with 11 intentional skips before integration
+- [ ] Correct and integrate only the approved update without regressing GSC, GA4, GBP, reports, or portal authentication
+- [ ] Run TypeScript, full Vitest, production build, relevant endpoint checks, and visual verification before publishing
+- [ ] Checkpoint the verified result, push canonical GitHub `main`, and update session memory
