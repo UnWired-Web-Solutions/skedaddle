@@ -66,6 +66,42 @@ The first exact-draft PDF export attempt then failed with Puppeteer/browser cont
 
 A deterministic rendering-boundary regression reproduced that exact detached `about:blank` failure. The PDF renderer now retries once only for that specific transient execution-context error and launches a fresh Chromium browser for the retry; unrelated rendering or storage failures are not retried. The regression failed before the fix and passed afterward. The complete strategy report test file passed, TypeScript passed, the full suite passed (**141 tests; 11 intentional skips**), and the production build passed. Final live export and page-by-page PDF inspection remained required after rollout.
 
+After rollout, the exact-draft export initially returned an HTTP 500 during deployment turnover, then succeeded once the new revision was active. The saved Ottawa draft `7ecf28eb-5bd1-4f5a-ad23-1ca28a05fd93` exported successfully through the production `strategyReport.exportPdf` endpoint, returning a storage-backed PDF URL and a `generatedAt` timestamp.
+
+Initial page-by-page PDF review findings from pages 1–5:
+
+- Cover page rendered successfully with reporting period `2025-07-01 through 2026-06-30` and truthful source disclosure: Salesforce CRM, historical Google Business Profile spreadsheet, and persisted Google Search Console import.
+- Executive Summary rendered without blank sections or overflow and preserved the intended no-fabrication wording around GA4 being unavailable for the assessed priority-page context.
+- Current Campaign section correctly treated GBP mapping as configuration evidence rather than a live listing audit and preserved `Not provided` / `Unknown` states instead of inventing campaign volume.
+- Species Analysis and Top Markets tables rendered legibly with no split rows or missing values in the reviewed pages.
+
+Remaining requirement: inspect pages 6–14 for GBP source labeling, later strategy sections, recommendations, pagination, and any rendering defects before marking the report verification complete.
+
+Additional page-by-page PDF review findings from pages 6–10:
+
+- The GBP Performance section preserved truthful availability rules: Searches remained `Not available`, monthly calls and website clicks stayed historical, Search Console was labelled `persisted search console`, and GA4 was explicitly shown as unavailable rather than coerced into zero.
+- The matched-month year-over-year area remained source-aware and constrained to comparable months, with no mixed-source or partial-period claims introduced.
+- Top Search Console Pages and Top Search Terms tables rendered across multiple pages without broken header styling, clipped rows, or missing text.
+- The Content Architecture Gap narrative preserved the verified page-audit framing and did not convert unaudited page presence into fabricated coverage.
+- The Proposed Program narrative remained conditional on missing program inputs and used recommendation language rather than presenting unprovided campaign volume as fact.
+
+Remaining requirement: inspect pages 11–14 for the final strategy sections, footer continuity, recommendations, and any last-page rendering or pagination defects before completing report verification.
+
+Final page-by-page PDF review findings from pages 11–14:
+
+- Scale Comparison, Website Content Architecture, and Google Business Profile Strategy preserved the intended `Not provided`, `Unknown`, and historical-source language instead of converting missing scope into asserted deliverables.
+- The 90-Day Action Plan rendered as a structured month-by-month list with no clipped bullets, missing headings, or broken page transitions.
+- Delivery Dependencies and Mitigations remained tabular, legible, and fully visible on one page.
+- Summary of Recommendations rendered cleanly on the final page with footer continuity intact; no orphan headings, duplicated sections, or truncated bottom content were visible.
+
+Completed end-to-end production verification outcome:
+
+- Ottawa preview mutation completed successfully on the final recovery release.
+- Exact-draft PDF export succeeded from the saved preview draft and returned a storage-backed PDF path.
+- The downloaded production PDF contained 14 letter-sized pages and passed page-by-page visual review for content continuity, source disclosures, partial/unavailable handling, and pagination.
+
+Conclusion: the Codex GBP safety integration plus the two report-system recoveries are now verified on production.
+
 ## Preliminary verdict
 
 **Corrections applied; final approval pending full-suite, build, endpoint, and visual verification.** The branch’s architecture was retained without enabling OAuth, live imports, or listing changes.
