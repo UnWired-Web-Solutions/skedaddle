@@ -65,17 +65,18 @@ The first release provides **manual administrative refreshes only**. A territory
 6. Create an import-run audit record with successful, skipped, and failed location counts.
 7. Return a coverage state that the dashboard renders directly.
 
-A month is **complete** only when all ready locations expected for that territory return successfully for the full requested period. A period with no Google rows remains `unavailable`, not zero. Legacy spreadsheet values may appear only for periods that have not been replaced by a complete live import, with a visible source label.
+A month is **complete** only when all ready locations expected for that territory return successfully for the full requested period. A period with no Google rows remains `unavailable`, not zero. A partial or unavailable live refresh stays visible as that state; legacy spreadsheet values may appear only when no live result has been attempted for the same territory, month, and metric.
 
 ## Dashboard behavior
 
 The Analytics page will continue to show Calls, Website Clicks, and Directions. It will source a period in this order:
 
 1. Complete persisted live GBP territory aggregate (`persisted_business_profile_api`)
-2. Legacy spreadsheet record for an uncovered period (`legacy_spreadsheet`)
-3. Explicit unavailable state (`unavailable`)
+2. Partial persisted live attempt, visibly labelled and excluded from YoY (`partial`)
+3. Explicit attempted-but-unavailable live state with a null value (`unavailable`)
+4. Legacy spreadsheet record only when no live result has been attempted for that metric-period (`legacy_spreadsheet`)
 
-The GBP YoY overlay and comparisons must use only like-for-like sources. It must show a coverage warning instead of calculating a percent change when either comparison period is partial or unavailable.
+The GBP YoY overlay and comparisons must use only like-for-like sources. It must show a coverage warning instead of calculating a percent change when either comparison period is partial, unavailable, or comes from a different source.
 
 ## Activation criteria
 

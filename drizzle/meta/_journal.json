@@ -57,6 +57,13 @@
       "when": 1788231301877,
       "tag": "0007_dizzy_falcon",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1788235340578,
+      "tag": "0008_quick_human_torch",
+      "breakpoints": true
     }
   ]
 }

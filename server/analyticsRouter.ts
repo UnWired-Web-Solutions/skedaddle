@@ -13,6 +13,7 @@ import {
   ga4TerritoryMonthly,
   ga4TerritoryPages,
   gbpMetrics,
+  gbpTerritoryMonthly,
   gscPageMetrics,
   gscQueryMetrics,
   salesforcePerformanceSnapshots,
@@ -29,6 +30,8 @@ import { GSC_TERRITORY_SCOPES } from "../shared/gscTerritoryPaths";
 import { getGA4MappingSummary } from "../shared/ga4TerritoryProperties";
 import { getGBPMappingSummary } from "../shared/gbpLocationRegistry";
 import { hasGBPAuthConfiguration, hasGBPOAuthClientConfiguration } from "./googleBusinessProfileClient";
+import { resolveGBPMonthlyMetricSources } from "./gbpMetricSourceResolver";
+import { isGBPYoYEligible } from "../shared/gbpDataSafety";
 
 // ─── Procedures ──────────────────────────────────────────────────────────────
 
@@ -433,9 +436,9 @@ export const analyticsRouter = router({
       if (!db) return [];
 
       const subLocations = getSubLocations(input.territoryId, input.dataSource);
-      if (subLocations.length === 0) return [];
 
       if (input.dataSource === "ga4") {
+        if (subLocations.length === 0) return [];
         const [liveResults, coverageRows] = await Promise.all([
           db.select({
               year: ga4TerritoryPages.year,
@@ -511,23 +514,44 @@ export const analyticsRouter = router({
         return legacyResults.map(row => ({ ...row, source: "legacy_spreadsheet" as const }));
 
       } else {
-        const results = await db
-          .select({
-            year: gbpMetrics.year,
-            month: gbpMetrics.month,
-            metricType: gbpMetrics.metricType,
-            value: sql<number>`SUM(value)`,
+        const [persisted, legacy] = await Promise.all([
+          db.select({
+            year: gbpTerritoryMonthly.year,
+            month: gbpTerritoryMonthly.month,
+            metricType: gbpTerritoryMonthly.metricType,
+            value: gbpTerritoryMonthly.value,
+            coverageStatus: gbpTerritoryMonthly.coverageStatus,
+            locationsExpected: gbpTerritoryMonthly.locationsExpected,
+            locationsSucceeded: gbpTerritoryMonthly.locationsSucceeded,
           })
-          .from(gbpMetrics)
-          .where(and(
-            inArray(gbpMetrics.territory, subLocations),
-            sql`${gbpMetrics.year} >= ${input.startYear}`,
-            sql`${gbpMetrics.year} <= ${input.endYear}`,
-          ))
-          .groupBy(gbpMetrics.year, gbpMetrics.month, gbpMetrics.metricType)
-          .orderBy(gbpMetrics.year, gbpMetrics.month);
-
-        return results;
+            .from(gbpTerritoryMonthly)
+            .where(and(
+              eq(gbpTerritoryMonthly.territoryId, input.territoryId),
+              sql`${gbpTerritoryMonthly.year} >= ${input.startYear}`,
+              sql`${gbpTerritoryMonthly.year} <= ${input.endYear}`,
+            )),
+          subLocations.length === 0 ? Promise.resolve([]) : db
+            .select({
+              year: gbpMetrics.year,
+              month: gbpMetrics.month,
+              metricType: gbpMetrics.metricType,
+              value: sql<number>`SUM(value)`,
+            })
+            .from(gbpMetrics)
+            .where(and(
+              inArray(gbpMetrics.territory, subLocations),
+              sql`${gbpMetrics.year} >= ${input.startYear}`,
+              sql`${gbpMetrics.year} <= ${input.endYear}`,
+            ))
+            .groupBy(gbpMetrics.year, gbpMetrics.month, gbpMetrics.metricType),
+        ]);
+        return resolveGBPMonthlyMetricSources({
+          persisted: persisted.map(row => ({
+            ...row,
+            value: row.value === null ? null : Number(row.value),
+          })),
+          legacy: legacy.map(row => ({ ...row, value: Number(row.value) })),
+        });
       }
     }),
 
@@ -622,32 +646,62 @@ export const analyticsRouter = router({
           eq(ga4TerritoryMonthly.month, month),
         ));
 
-      // GBP metrics comparison (aggregated across sub-locations)
-      const currentGBP = gbpSubs.length > 0 ? await db
-        .select({
-          metricType: gbpMetrics.metricType,
+      // GBP comparisons resolve persisted complete data first. Partial or
+      // unavailable live attempts stay explicit and cannot inherit a legacy
+      // value for the same metric-period.
+      const [liveCurrentGBP, livePrevGBP, legacyCurrentGBP, legacyPrevGBP] = await Promise.all([
+        db.select({
+          year: gbpTerritoryMonthly.year, month: gbpTerritoryMonthly.month,
+          metricType: gbpTerritoryMonthly.metricType, value: gbpTerritoryMonthly.value,
+          coverageStatus: gbpTerritoryMonthly.coverageStatus,
+          locationsExpected: gbpTerritoryMonthly.locationsExpected,
+          locationsSucceeded: gbpTerritoryMonthly.locationsSucceeded,
+        }).from(gbpTerritoryMonthly).where(and(
+          eq(gbpTerritoryMonthly.territoryId, territoryId),
+          eq(gbpTerritoryMonthly.year, year), eq(gbpTerritoryMonthly.month, month),
+        )),
+        db.select({
+          year: gbpTerritoryMonthly.year, month: gbpTerritoryMonthly.month,
+          metricType: gbpTerritoryMonthly.metricType, value: gbpTerritoryMonthly.value,
+          coverageStatus: gbpTerritoryMonthly.coverageStatus,
+          locationsExpected: gbpTerritoryMonthly.locationsExpected,
+          locationsSucceeded: gbpTerritoryMonthly.locationsSucceeded,
+        }).from(gbpTerritoryMonthly).where(and(
+          eq(gbpTerritoryMonthly.territoryId, territoryId),
+          eq(gbpTerritoryMonthly.year, prevYear), eq(gbpTerritoryMonthly.month, month),
+        )),
+        gbpSubs.length === 0 ? Promise.resolve([]) : db.select({
+          year: gbpMetrics.year, month: gbpMetrics.month, metricType: gbpMetrics.metricType,
           value: sql<number>`SUM(value)`,
-        })
-        .from(gbpMetrics)
-        .where(and(
-          inArray(gbpMetrics.territory, gbpSubs),
-          eq(gbpMetrics.year, year),
-          eq(gbpMetrics.month, month),
-        ))
-        .groupBy(gbpMetrics.metricType) : [];
-
-      const prevGBP = gbpSubs.length > 0 ? await db
-        .select({
-          metricType: gbpMetrics.metricType,
+        }).from(gbpMetrics).where(and(
+          inArray(gbpMetrics.territory, gbpSubs), eq(gbpMetrics.year, year), eq(gbpMetrics.month, month),
+        )).groupBy(gbpMetrics.year, gbpMetrics.month, gbpMetrics.metricType),
+        gbpSubs.length === 0 ? Promise.resolve([]) : db.select({
+          year: gbpMetrics.year, month: gbpMetrics.month, metricType: gbpMetrics.metricType,
           value: sql<number>`SUM(value)`,
-        })
-        .from(gbpMetrics)
-        .where(and(
-          inArray(gbpMetrics.territory, gbpSubs),
-          eq(gbpMetrics.year, prevYear),
-          eq(gbpMetrics.month, month),
-        ))
-        .groupBy(gbpMetrics.metricType) : [];
+        }).from(gbpMetrics).where(and(
+          inArray(gbpMetrics.territory, gbpSubs), eq(gbpMetrics.year, prevYear), eq(gbpMetrics.month, month),
+        )).groupBy(gbpMetrics.year, gbpMetrics.month, gbpMetrics.metricType),
+      ]);
+      const currentGBP = resolveGBPMonthlyMetricSources({
+        persisted: liveCurrentGBP.map(row => ({ ...row, value: row.value === null ? null : Number(row.value) })),
+        legacy: legacyCurrentGBP.map(row => ({ ...row, value: Number(row.value) })),
+      });
+      const prevGBP = resolveGBPMonthlyMetricSources({
+        persisted: livePrevGBP.map(row => ({ ...row, value: row.value === null ? null : Number(row.value) })),
+        legacy: legacyPrevGBP.map(row => ({ ...row, value: Number(row.value) })),
+      });
+      const currentGBPByMetric = new Map(currentGBP.map(row => [row.metricType, row]));
+      const prevGBPByMetric = new Map(prevGBP.map(row => [row.metricType, row]));
+      const gbpComparisonEligibility = Object.fromEntries(Array.from(new Set([
+        ...Array.from(currentGBPByMetric.keys()), ...Array.from(prevGBPByMetric.keys()),
+      ])).map(metricType => [
+        metricType,
+        Boolean(currentGBPByMetric.get(metricType) && prevGBPByMetric.get(metricType) && isGBPYoYEligible(
+          currentGBPByMetric.get(metricType)!.coverage,
+          prevGBPByMetric.get(metricType)!.coverage,
+        )),
+      ]));
 
       return {
         ga4: { current: currentGA4, previous: prevGA4 },
@@ -661,7 +715,7 @@ export const analyticsRouter = router({
             complete: prevGA4Coverage.propertiesExpected > 0 && prevGA4Coverage.propertiesExpected === prevGA4Coverage.propertiesSucceeded,
           } : null,
         },
-        gbp: { current: currentGBP, previous: prevGBP },
+        gbp: { current: currentGBP, previous: prevGBP, comparisonEligibility: gbpComparisonEligibility },
         year,
         prevYear,
         month,

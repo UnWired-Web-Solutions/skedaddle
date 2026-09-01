@@ -237,8 +237,9 @@ export const gbpTerritoryMonthly = mysqlTable("gbp_territory_monthly", {
   year: int("year").notNull(),
   month: int("month").notNull(),
   metricType: varchar("metricType", { length: 96 }).notNull(),
-  value: int("value").notNull(),
-  coverageStatus: mysqlEnum("coverageStatus", ["complete", "partial"]).notNull(),
+  /** Null means Google returned no raw value for an attempted metric refresh; never convert it to zero. */
+  value: int("value"),
+  coverageStatus: mysqlEnum("coverageStatus", ["complete", "partial", "unavailable"]).notNull(),
   locationsExpected: int("locationsExpected").notNull(),
   locationsSucceeded: int("locationsSucceeded").notNull(),
   sourceStartDate: varchar("sourceStartDate", { length: 10 }).notNull(),

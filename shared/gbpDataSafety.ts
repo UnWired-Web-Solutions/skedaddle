@@ -12,7 +12,7 @@ export type GBPPeriodCoverage = {
 
 export function assessGBPPeriodCoverage(input: {
   liveRows: number;
-  liveCoverageStatus?: "complete" | "partial";
+  liveCoverageStatus?: "complete" | "partial" | "unavailable";
   locationsExpected?: number;
   locationsSucceeded?: number;
   hasLegacyRecord: boolean;
@@ -42,6 +42,19 @@ export function assessGBPPeriodCoverage(input: {
     };
   }
 
+  // An explicit unavailable row means a live refresh was attempted but Google
+  // returned no usable raw values. Do not hide that outcome behind a prior
+  // spreadsheet number.
+  if (input.liveCoverageStatus === "unavailable") {
+    return {
+      source: "unavailable",
+      locationsExpected,
+      locationsSucceeded,
+      complete: false,
+      yoyEligible: false,
+    };
+  }
+
   if (input.hasLegacyRecord) {
     return {
       source: "legacy_spreadsheet",
@@ -62,7 +75,7 @@ export function assessGBPPeriodCoverage(input: {
 }
 
 export function isGBPYoYEligible(current: GBPPeriodCoverage, previous: GBPPeriodCoverage): boolean {
-  return current.yoyEligible && previous.yoyEligible && current.source !== "partial" && previous.source !== "partial";
+  return current.yoyEligible && previous.yoyEligible && current.source === previous.source;
 }
 
 export function isISODate(value: string): boolean {

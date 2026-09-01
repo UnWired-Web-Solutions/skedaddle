@@ -418,6 +418,8 @@
 - [ ] Obtain and securely store a UWS `business.manage` refresh authorization only after Google approves Performance API access; do not request GBP data before approval
 - [x] Add non-network GBP persistence helpers that atomically record raw daily values, month rollups, and import-run coverage only from an explicitly validated plan; inventory persistence remains pending authoritative API access
 - [ ] Build the authenticated GBP client and territory-safe historical importer
+- [x] Add complete-live-first, partial-visible, unavailable-before-legacy GBP query precedence and like-for-like YoY eligibility; validated against the running Minneapolis legacy endpoint without changing its values
+- [x] Refine the GBP monthly schema to preserve an explicit unavailable metric state with a nullable value, rather than falling back to legacy data after a failed or empty live metric response; reviewed migration `0008_quick_human_torch.sql` applied
 - [ ] Replace static GBP dashboard snapshots with persisted live metrics and visible coverage states
 - [ ] Add manual refresh controls for verified territories; do not schedule recurring imports until the live flow is validated
 - [ ] Add Vitest coverage for authenticated inventory sync, raw-metric persistence, and end-to-end manual import behavior after Google credentials are approved

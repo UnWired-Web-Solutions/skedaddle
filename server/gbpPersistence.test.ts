@@ -35,7 +35,7 @@ describe("GBP persistence planning", () => {
     expect(plan.snapshots[0]?.coverageStatus).toBe("partial");
   });
 
-  it("does not produce a monthly row or fabricated zero for an unavailable response", () => {
+  it("preserves an explicit unavailable metric without fabricating a zero", () => {
     const snapshots = buildGBPMonthlyMetricSnapshots({
       locationIds: [11], metricTypes: ["BUSINESS_DIRECTION_REQUESTS"], year: 2026, month: 8, now: fixedNow,
       results: [{ locationId: 11, metricType: "BUSINESS_DIRECTION_REQUESTS", success: true, rows: [] }],
@@ -44,5 +44,6 @@ describe("GBP persistence planning", () => {
     expect(plan.status).toBe("partial");
     expect(plan.rawRows).toEqual([]);
     expect(plan.snapshots[0]?.value).toBeNull();
+    expect(plan.snapshots[0]?.coverageStatus).toBe("unavailable");
   });
 });

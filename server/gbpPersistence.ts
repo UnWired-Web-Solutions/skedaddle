@@ -118,8 +118,9 @@ export function buildGBPPersistencePlan(input: {
 
 /**
  * Replaces only the requested territory-month snapshot in one transaction.
- * Failed locations never become zero rows; incomplete/unavailable aggregate
- * metrics remove prior live totals so readers fall back to labelled legacy data.
+ * Failed locations never become zero rows. Unavailable aggregate metrics persist
+ * an explicit null-value row, preventing a stale legacy fallback from looking like
+ * a valid replacement for an attempted live refresh.
  */
 export async function persistGBPMonthlyPlan(plan: GBPPersistencePlan): Promise<{ importRunId: number }> {
   const db = await getDb();
@@ -160,23 +161,20 @@ export async function persistGBPMonthlyPlan(plan: GBPPersistencePlan): Promise<{
         eq(gbpTerritoryMonthly.metricType, snapshot.metricType),
       );
       await tx.delete(gbpTerritoryMonthly).where(monthlyScope);
-      if (snapshot.value !== null) {
-        const coverageStatus = snapshot.coverageStatus === "complete" ? "complete" : "partial";
-        await tx.insert(gbpTerritoryMonthly).values({
-          territoryId: plan.territoryId,
-          year: plan.year,
-          month: plan.month,
-          metricType: snapshot.metricType,
-          value: snapshot.value,
-          coverageStatus,
-          locationsExpected: snapshot.locationsExpected,
-          locationsSucceeded: snapshot.locationsSucceeded,
-          sourceStartDate: plan.sourceStartDate,
-          sourceEndDate: plan.sourceEndDate,
-          importRunId,
-          importedAt,
-        });
-      }
+      await tx.insert(gbpTerritoryMonthly).values({
+        territoryId: plan.territoryId,
+        year: plan.year,
+        month: plan.month,
+        metricType: snapshot.metricType,
+        value: snapshot.value,
+        coverageStatus: snapshot.coverageStatus,
+        locationsExpected: snapshot.locationsExpected,
+        locationsSucceeded: snapshot.locationsSucceeded,
+        sourceStartDate: plan.sourceStartDate,
+        sourceEndDate: plan.sourceEndDate,
+        importRunId,
+        importedAt,
+      });
     }
     if (plan.rawRows.length) {
       await tx.insert(gbpDailyMetrics).values(plan.rawRows.map(row => ({

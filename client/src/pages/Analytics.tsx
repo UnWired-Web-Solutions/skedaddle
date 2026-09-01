@@ -439,19 +439,33 @@ export default function Analytics() {
     for (const row of gbpTrend as any[]) {
       const key = `${row.year}-${String(row.month).padStart(2, "0")}`;
       if (!grouped[key]) {
-        grouped[key] = { name: `${MONTHS[row.month - 1]} '${String(row.year).slice(2)}`, year: row.year, month: row.month };
+        grouped[key] = {
+          name: `${MONTHS[row.month - 1]} '${String(row.year).slice(2)}`,
+          year: row.year,
+          month: row.month,
+          sources: new Set<string>(),
+          hasPartial: false,
+          hasUnavailable: false,
+        };
       }
+      grouped[key].sources.add(row.source || "legacy_spreadsheet");
+      if (row.source === "partial") grouped[key].hasPartial = true;
+      if (row.source === "unavailable") grouped[key].hasUnavailable = true;
       const mt = row.metricType === "calls" ? "Calls" :
         row.metricType === "website_clicks" ? "Website Clicks" :
         row.metricType === "directions" ? "Directions" :
         row.metricType === "bookings" ? "Bookings" :
         row.metricType === "total" ? "Total" : row.metricType;
-      if (mt !== "Total") {
-        grouped[key][mt] = (grouped[key][mt] || 0) + Number(row.value);
+      if (mt !== "Total" && typeof row.value === "number") {
+        grouped[key][mt] = (grouped[key][mt] ?? 0) + row.value;
       }
     }
 
-    return Object.values(grouped).sort((a: any, b: any) =>
+    return Object.values(grouped).map((row: any) => ({
+      ...row,
+      source: row.sources.size === 1 ? Array.from(row.sources)[0] : "mixed",
+      sources: Array.from(row.sources),
+    })).sort((a: any, b: any) =>
       a.year !== b.year ? a.year - b.year : a.month - b.month
     );
   }, [gbpTrend]);
@@ -461,46 +475,68 @@ export default function Analytics() {
     if (!gbpTrend || !Array.isArray(gbpTrend)) return [];
 
     // Group by month, summing all metric types into a "Total Interactions" value per year
-    const byMonthYear: Record<string, Record<number, number>> = {};
+    const byMonthYear: Record<string, Record<number, { total: number; sources: Set<string>; hasPartial: boolean; hasUnavailable: boolean }>> = {};
     for (const row of gbpTrend as any[]) {
-      if (row.metricType === "total") continue;
+      if (row.metricType === "total" || typeof row.value !== "number") continue;
       const monthKey = String(row.month);
       if (!byMonthYear[monthKey]) byMonthYear[monthKey] = {};
-      byMonthYear[monthKey][row.year] = (byMonthYear[monthKey][row.year] || 0) + Number(row.value);
+      if (!byMonthYear[monthKey][row.year]) {
+        byMonthYear[monthKey][row.year] = { total: 0, sources: new Set<string>(), hasPartial: false, hasUnavailable: false };
+      }
+      const period = byMonthYear[monthKey][row.year];
+      period.total += row.value;
+      period.sources.add(row.source || "legacy_spreadsheet");
+      period.hasPartial ||= row.source === "partial";
+      period.hasUnavailable ||= row.source === "unavailable";
     }
 
     // Build chart data: one row per month, with columns for each year
     return Array.from({ length: 12 }, (_, i) => {
       const m = i + 1;
       const monthData = byMonthYear[String(m)] || {};
+      const current = monthData[selectedYear];
+      const previous = monthData[selectedYear - 1];
+      const validTotal = (period: typeof current) => period && !period.hasPartial && !period.hasUnavailable && period.sources.size === 1
+        ? period.total
+        : null;
       return {
         name: MONTHS[i],
         month: m,
-        [`${selectedYear}`]: monthData[selectedYear] || 0,
-        [`${selectedYear - 1}`]: monthData[selectedYear - 1] || 0,
+        [`${selectedYear}`]: validTotal(current),
+        [`${selectedYear - 1}`]: validTotal(previous),
       };
-    }).filter(d => (d[`${selectedYear}`] as number) > 0 || (d[`${selectedYear - 1}`] as number) > 0);
+    }).filter(d => d[`${selectedYear}`] !== null || d[`${selectedYear - 1}`] !== null);
   }, [gbpTrend, selectedYear]);
+
+  const partialGBPPeriods = useMemo(
+    () => gbpChartData.filter((row: any) => row.hasPartial).map((row: any) => row.name),
+    [gbpChartData],
+  );
+  const unavailableGBPPeriods = useMemo(
+    () => gbpChartData.filter((row: any) => row.hasUnavailable).map((row: any) => row.name),
+    [gbpChartData],
+  );
 
   // ─── YoY KPI calculations ──────────────────────────────────────────────────
   const yoyKPIs = useMemo(() => {
     if (!yoyData) return null;
 
-    const getCurrent = (arr: any[], key: string) => {
+    const getGBPValue = (arr: any[], key: string): number | null => {
       const found = arr.find((r: any) => r.metricType === key || r.pageType === key);
-      return found ? Number(found.value || found.sessions || 0) : 0;
-    };
-    const getPrev = (arr: any[], key: string) => {
-      const found = arr.find((r: any) => r.metricType === key || r.pageType === key);
-      return found ? Number(found.value || found.sessions || 0) : 0;
+      return typeof found?.value === "number" ? found.value : null;
     };
 
-    const currentCalls = getCurrent(yoyData.gbp.current, "calls");
-    const prevCalls = getPrev(yoyData.gbp.previous, "calls");
-    const currentClicks = getCurrent(yoyData.gbp.current, "website_clicks");
-    const prevClicks = getPrev(yoyData.gbp.previous, "website_clicks");
-    const currentDirections = getCurrent(yoyData.gbp.current, "directions");
-    const prevDirections = getPrev(yoyData.gbp.previous, "directions");
+    const getGBPComparison = (metricType: string) => {
+      const current = getGBPValue(yoyData.gbp.current, metricType);
+      const previous = getGBPValue(yoyData.gbp.previous, metricType);
+      const eligible = yoyData.gbp.comparisonEligibility?.[metricType] === true;
+      return {
+        current,
+        previous,
+        eligible,
+        delta: eligible && current !== null && previous !== null ? formatDelta(current, previous) : undefined,
+      };
+    };
 
     // Sum species + suburb page sessions (not total, to match chart focus)
     const getSum = (arr: any[], keys: string[]) =>
@@ -512,9 +548,9 @@ export default function Analytics() {
     const prevSessions = getSum(yoyData.ga4.previous, ["species_pages", "location_page"]);
 
     return {
-      calls: { current: currentCalls, previous: prevCalls, delta: formatDelta(currentCalls, prevCalls) },
-      clicks: { current: currentClicks, previous: prevClicks, delta: formatDelta(currentClicks, prevClicks) },
-      directions: { current: currentDirections, previous: prevDirections, delta: formatDelta(currentDirections, prevDirections) },
+      calls: getGBPComparison("calls"),
+      clicks: getGBPComparison("website_clicks"),
+      directions: getGBPComparison("directions"),
       sessions: { current: currentSessions, previous: prevSessions, delta: formatDelta(currentSessions, prevSessions) },
     };
   }, [yoyData]);
@@ -525,9 +561,9 @@ export default function Analytics() {
     const headers = ["Metric", `${MONTHS[comparisonMonth - 1]} ${selectedYear - 1}`, `${MONTHS[comparisonMonth - 1]} ${selectedYear}`, "Change %"];
     const rows = Object.entries(yoyKPIs).map(([key, data]) => [
       key === "clicks" ? "Website Clicks" : key.charAt(0).toUpperCase() + key.slice(1),
-      String(data.previous),
-      String(data.current),
-      data.delta.text,
+      data.previous === null ? "Unavailable" : String(data.previous),
+      data.current === null ? "Unavailable" : String(data.current),
+      data.delta?.text || "Not comparable",
     ]);
     downloadCSV(`yoy_${selectedTerritoryName}_${MONTHS[comparisonMonth - 1]}_${selectedYear}.csv`, headers, rows);
   }, [yoyKPIs, selectedTerritoryName, selectedYear, comparisonMonth]);
@@ -547,12 +583,14 @@ export default function Analytics() {
 
   const handleExportGBP = useCallback(() => {
     if (!gbpChartData.length) return;
-    const headers = ["Month", "Calls", "Website Clicks", "Directions"];
+    const headers = ["Month", "Calls", "Website Clicks", "Directions", "Source", "Coverage"];
     const rows = gbpChartData.map((d: any) => [
       d.name,
-      String(d.Calls || 0),
-      String(d["Website Clicks"] || 0),
-      String(d.Directions || 0),
+      d.Calls === undefined ? "Unavailable" : String(d.Calls),
+      d["Website Clicks"] === undefined ? "Unavailable" : String(d["Website Clicks"]),
+      d.Directions === undefined ? "Unavailable" : String(d.Directions),
+      d.source === "persisted_business_profile_api" ? "Persisted Business Profile API" : d.source === "legacy_spreadsheet" ? "Legacy spreadsheet" : d.source,
+      d.hasUnavailable ? "Unavailable" : d.hasPartial ? "Partial" : "Complete or legacy",
     ]);
     downloadCSV(`gbp_metrics_${selectedTerritoryName}_${selectedYear - 1}-${selectedYear}.csv`, headers, rows);
   }, [gbpChartData, selectedTerritoryName, selectedYear]);
@@ -819,21 +857,21 @@ export default function Analytics() {
             <KpiCard
               icon={Phone}
               label="GBP Calls"
-              value={yoyKPIs?.calls.current.toLocaleString() || "—"}
+              value={yoyKPIs?.calls.current?.toLocaleString() ?? "Unavailable"}
               delta={yoyKPIs?.calls.delta}
               color={GOLD}
             />
             <KpiCard
               icon={MousePointer}
               label="Website Clicks"
-              value={yoyKPIs?.clicks.current.toLocaleString() || "—"}
+              value={yoyKPIs?.clicks.current?.toLocaleString() ?? "Unavailable"}
               delta={yoyKPIs?.clicks.delta}
               color="#b85c38"
             />
             <KpiCard
               icon={MapPin}
               label="Directions"
-              value={yoyKPIs?.directions.current.toLocaleString() || "—"}
+              value={yoyKPIs?.directions.current?.toLocaleString() ?? "Unavailable"}
               delta={yoyKPIs?.directions.delta}
               color="#6b8f71"
             />
@@ -954,6 +992,16 @@ export default function Analytics() {
               <Download size={12} /> Export CSV
             </button>
           </div>
+          {partialGBPPeriods.length > 0 && (
+            <div style={{ marginBottom: 14, padding: "10px 12px", borderRadius: 7, background: "#fff0ee", border: "1px solid #efb7b0", color: "#9d3024", fontSize: 12 }}>
+              Partial GBP coverage: {partialGBPPeriods.join(", ")}. These values are shown for auditability but are not complete territory totals and are excluded from the YoY overlay.
+            </div>
+          )}
+          {unavailableGBPPeriods.length > 0 && (
+            <div style={{ marginBottom: 14, padding: "10px 12px", borderRadius: 7, background: "#fff0ee", border: "1px solid #efb7b0", color: "#9d3024", fontSize: 12 }}>
+              GBP data unavailable after a live refresh attempt: {unavailableGBPPeriods.join(", ")}. No zero values or legacy substitutes are shown for these metrics.
+            </div>
+          )}
           {gbpLoading ? (
             <div style={{ height: 280, display: "flex", alignItems: "center", justifyContent: "center", color: "#aaa" }}>Loading...</div>
           ) : gbpYoYLineData.length === 0 ? (
@@ -1018,14 +1066,13 @@ export default function Analytics() {
                 </tr>
               </thead>
               <tbody>
-                {yoyKPIs && Object.entries(yoyKPIs).map(([key, data]) => (
+                {yoyKPIs && Object.entries(yoyKPIs).map(([key, data]: [string, any]) => (
                   <tr key={key} style={{ borderBottom: `1px solid ${MIST}` }}>
                     <td style={{ padding: "10px 12px", fontWeight: 500, color: FOREST, textTransform: "capitalize" }}>{key === "clicks" ? "Website Clicks" : key}</td>
-                    <td style={{ padding: "10px 12px", textAlign: "right", color: "#666" }}>{data.previous.toLocaleString()}</td>
-                    <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600, color: FOREST }}>{data.current.toLocaleString()}</td>
-                    <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600, color: data.delta.color, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
-                      <DeltaIcon direction={data.delta.direction} />
-                      {data.delta.text}
+                    <td style={{ padding: "10px 12px", textAlign: "right", color: "#666" }}>{data.previous === null ? "Unavailable" : data.previous.toLocaleString()}</td>
+                    <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600, color: FOREST }}>{data.current === null ? "Unavailable" : data.current.toLocaleString()}</td>
+                    <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600, color: data.delta?.color || "#888", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
+                      {data.delta ? <><DeltaIcon direction={data.delta.direction} />{data.delta.text}</> : "Not comparable"}
                     </td>
                   </tr>
                 ))}

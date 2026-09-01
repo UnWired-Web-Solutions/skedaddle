@@ -37,6 +37,30 @@ describe("GBP data-safety rules", () => {
     expect(coverage.complete).toBe(false);
   });
 
+  it("does not hide an attempted unavailable live metric behind a spreadsheet record", () => {
+    const coverage = assessGBPPeriodCoverage({
+      liveRows: 0,
+      liveCoverageStatus: "unavailable",
+      locationsExpected: 2,
+      locationsSucceeded: 2,
+      hasLegacyRecord: true,
+    });
+    expect(coverage.source).toBe("unavailable");
+    expect(coverage.yoyEligible).toBe(false);
+  });
+
+  it("blocks YoY when two individually valid values came from different sources", () => {
+    const live = assessGBPPeriodCoverage({
+      liveRows: 1,
+      liveCoverageStatus: "complete",
+      locationsExpected: 1,
+      locationsSucceeded: 1,
+      hasLegacyRecord: true,
+    });
+    const legacy = assessGBPPeriodCoverage({ liveRows: 0, hasLegacyRecord: true });
+    expect(isGBPYoYEligible(live, legacy)).toBe(false);
+  });
+
   it("returns calendar-complete month boundaries and rejects invalid months", () => {
     expect(getCompleteCalendarMonthRange(2026, 2)).toEqual({ startDate: "2026-02-01", endDate: "2026-02-28" });
     expect(() => getCompleteCalendarMonthRange(2026, 13)).toThrow("valid calendar month");
