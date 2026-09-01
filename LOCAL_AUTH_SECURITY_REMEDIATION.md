@@ -26,3 +26,5 @@ The client retains the minimal, non-secret user context in session storage to pr
 ## Deployment-verification evidence
 
 The redacted verifier was corrected to use the same tRPC batch envelope as the portal client. It passed against the current local server, confirming both the transport shape and managed secret registry. At the time of this record, production still returned HTTP 404 for the new procedure after two rollout waits, which indicates a stale server artifact rather than malformed input or a credential error. A new clean publication attempt is required before published login behavior can be verified.
+
+The clean publication checkpoint `df660789` subsequently propagated successfully. The same redacted verifier passed against production: an authorized managed account was accepted with a password-free user-context response, and the same username with an invalid password received only `invalid_credentials` and no user object. No account identifier or password value was printed or placed into a browser automation action.
