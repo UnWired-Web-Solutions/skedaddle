@@ -8,6 +8,7 @@ import { proposalRouter } from "./proposalRouter";
 import { strategyReportRouter } from "./strategyReportRouter";
 import { suburbPageRouter } from "./suburbPageRouter";
 import { salesforceWorkbookRouter } from "./salesforceWorkbookRouter";
+import { localAuthRouter } from "./localAuthRouter";
 
 export const appRouter = router({
   system: systemRouter,
@@ -25,6 +26,7 @@ export const appRouter = router({
   strategyReport: strategyReportRouter,
   suburbPage: suburbPageRouter,
   salesforceWorkbook: salesforceWorkbookRouter,
+  localAuth: localAuthRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -255,6 +255,10 @@
 - [x] Flag GBP data as incomplete for multi-GBP territories (GBP disclaimer note added to Analytics.tsx)
 - [ ] Fix GBP post volume: 20-25 posts/month per sub-location for large territories
 - [ ] Add corporate vs franchise distinction to territory data
+- [ ] Audit existing source-backed ownership/context fields; display only verified corporate-versus-franchise classifications and otherwise use an explicit unknown state
+- [x] Remove hard-coded custom local-auth credential material from source control; retain only non-secret role and territory authorization mapping in code — frontend registry removed; server-only source scan passed
+- [x] Generate and set one new temporary shared local-auth password in managed server configuration, retaining all approved usernames and territory assignments — user-approved managed registry configured; no value committed or documented
+- [ ] Checkpoint and deploy the local-auth remediation, then verify successful and rejected published sign-in flows without displaying the shared credential
 
 ## Dave's Email Feedback — Strategy Template Fixes (Jul 23, 2026)
 - [x] Fix report template: use combined GBP (calls + website clicks) not just calls

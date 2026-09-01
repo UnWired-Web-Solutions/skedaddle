@@ -12,20 +12,18 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError("");
     setLoading(true);
 
-    setTimeout(() => {
-      const result = login(username, password);
-      if (result.success) {
-        navigate("/");
-      } else {
-        setError(result.error || "Login failed.");
-        setLoading(false);
-      }
-    }, 300);
+    const result = await login(username, password);
+    if (result.success) {
+      navigate("/");
+    } else {
+      setError(result.error || "Login failed.");
+      setLoading(false);
+    }
   };
 
   return (
