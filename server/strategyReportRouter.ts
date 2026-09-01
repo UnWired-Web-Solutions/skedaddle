@@ -475,7 +475,7 @@ export async function buildTerritoryData(
 
 export async function runReportNarrativeTasks<T>(
   tasks: Array<() => Promise<T>>,
-  concurrency = 4,
+  concurrency = 8,
 ): Promise<T[]> {
   if (!Number.isInteger(concurrency) || concurrency < 1) {
     throw new Error("Report narrative concurrency must be a positive integer.");
@@ -493,14 +493,34 @@ export async function runReportNarrativeTasks<T>(
   return results;
 }
 
+const DIRECT_CLAUDE_TOTAL_BUDGET_MS = 65_000;
+const DIRECT_CLAUDE_ATTEMPT_TIMEOUT_MS = 45_000;
+const FORGE_CLAUDE_TIMEOUT_MS = 25_000;
+
+async function withReportTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} exceeded ${timeoutMs}ms`)), timeoutMs);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function callClaude(prompt: string, model: string = "claude-opus-5", maxTokens: number = 4000): Promise<string> {
   // Primary path: Direct Anthropic API (Claude Opus 5)
   const apiKey = ENV.anthropicApiKey;
   if (apiKey) {
+    const directDeadline = Date.now() + DIRECT_CLAUDE_TOTAL_BUDGET_MS;
     for (let attempt = 0; attempt < 2; attempt++) {
+      const remainingMs = directDeadline - Date.now();
+      if (remainingMs < 1_000) break;
       try {
         const resp = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
+          signal: AbortSignal.timeout(Math.min(DIRECT_CLAUDE_ATTEMPT_TIMEOUT_MS, remainingMs)),
           headers: {
             "x-api-key": apiKey,
             "anthropic-version": "2023-06-01",
@@ -533,11 +553,15 @@ async function callClaude(prompt: string, model: string = "claude-opus-5", maxTo
   try {
     const forgeModel = "claude-opus-4-7"; // Best Claude model available on forge
     console.log(`Using forge API fallback with ${forgeModel}`);
-    const result = await invokeLLM({
-      model: forgeModel,
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: maxTokens,
-    });
+    const result = await withReportTimeout(
+      invokeLLM({
+        model: forgeModel,
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: maxTokens,
+      }),
+      FORGE_CLAUDE_TIMEOUT_MS,
+      `Forge ${forgeModel} report request`,
+    );
     const content = result.choices[0]?.message?.content;
     const text = typeof content === "string" ? content : Array.isArray(content) ? content.map((p: any) => p.type === "text" ? p.text : "").join("") : "";
     if (text.trim().length > 20) return text;

@@ -24,7 +24,7 @@ describe("Strategy Report Router", { timeout: 15_000 }, () => {
 
     const pending = runReportNarrativeTasks(tasks);
     await Promise.resolve();
-    expect(started).toBe(4);
+    expect(started).toBe(tasks.length);
     release();
     await expect(pending).resolves.toEqual([
       "executive", "gap", "program", "content", "gbp", "plan", "risks", "recommendations",

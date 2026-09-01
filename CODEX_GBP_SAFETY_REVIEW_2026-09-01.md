@@ -42,6 +42,22 @@ The production generation workflow advanced through Executive Summary, Current C
 
 The first production verification request ultimately failed after approximately 158 seconds with `Unexpected token '<', "<!DOCTYPE "... is not valid JSON`, consistent with an HTML gateway response replacing the expected tRPC JSON after a long-running request. A deterministic regression demonstrated the latency multiplier: only one of eight independent narrative tasks started while the first remained pending. The orchestration now uses a bounded four-worker pool, preserves the original section order, and supplies every narrative with the same deterministic territory/source context. The regression changed from one started task to four concurrently started tasks. After the fix, TypeScript passed, the complete suite passed (**139 tests; 11 intentional skips**), and the production build succeeded. The original production draft/PDF workflow still required a post-deployment rerun before release approval.
 
+Checkpoint `f2c367da` deployed the recovery build. The authenticated production report page reloaded successfully and Ottawa was selected with the same zero/unprovided campaign inputs for the exact post-fix reproduction.
+
+The first request started after the checkpoint was saved but before the platform emitted its deployment-success notification. It later returned the same HTML-for-JSON error, so that run is not evidence about the new code: it overlapped rollout and may have remained pinned to the prior production revision. A clean reproduction must begin only after deployment success is confirmed.
+
+After deployment success was confirmed, the production page was reloaded and Ottawa was selected again with the same zero/unprovided campaign inputs for the definitive clean reproduction.
+
+The definitive clean request began at approximately 06:28:26 EDT on the confirmed production revision and entered the generation state normally.
+
+The clean request progressed through initial territory and Current Campaign assembly without a client or server response-format error; final completion remained pending.
+
+It then advanced through Gap Analysis and Proposed Program generation on the confirmed deployment; final completion remained pending.
+
+The definitive confirmed-deployment run still returned the same HTML-for-JSON error after approximately 129 seconds. This validates the gateway-duration hypothesis and disproves four-worker concurrency as sufficient: two narrative waves can still cross the production request limit. The next correction must place all eight independent narrative calls in one bounded wave and enforce an end-to-end model-call deadline so one stalled upstream request cannot hold the mutation beyond the gateway window.
+
+The concurrency regression was tightened and failed against the four-worker implementation (`4` tasks started versus `8` required). The generator now starts all eight independent narrative calls in one wave, limits direct Anthropic attempts to a shared 65-second budget, and limits the forge fallback to 25 seconds before each section uses its existing deterministic fallback. The tightened regression passed, TypeScript passed, the complete suite passed again (**139 tests; 11 intentional skips**), and the production build succeeded. A second clean production draft/PDF run remained required after deployment.
+
 ## Preliminary verdict
 
 **Corrections applied; final approval pending full-suite, build, endpoint, and visual verification.** The branch’s architecture was retained without enabling OAuth, live imports, or listing changes.
