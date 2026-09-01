@@ -27,6 +27,8 @@ import { importSearchConsoleTerritoryMonth } from "./googleSearchConsoleImporter
 import { getGscTerritoryScope } from "../shared/gscTerritoryPaths";
 import { GSC_TERRITORY_SCOPES } from "../shared/gscTerritoryPaths";
 import { getGA4MappingSummary } from "../shared/ga4TerritoryProperties";
+import { getGBPMappingSummary } from "../shared/gbpLocationRegistry";
+import { hasGBPAuthConfiguration } from "./googleBusinessProfileClient";
 
 // ─── Procedures ──────────────────────────────────────────────────────────────
 
@@ -102,6 +104,29 @@ export const analyticsRouter = router({
 
   /** Auditable mapping counts; account discovery and territory assignment are not conflated. */
   getGA4MappingStatus: publicProcedure.query(() => getGA4MappingSummary()),
+
+  /**
+   * Read-only implementation status for the pending live GBP feed. It reports
+   * no metric values and makes no Google request, so a zero Performance API
+   * quota cannot be mistaken for an active data connection.
+   */
+  getGBPIntegrationStatus: publicProcedure.query(() => ({
+    liveDataActive: false,
+    approval: {
+      status: "pending_google_allowlist_review" as const,
+      caseId: "6-1216000040949",
+      statedReviewWindow: "approximately 7–10 business days",
+      performanceQuotaLastVerified: 0,
+    },
+    oauthConfigured: hasGBPAuthConfiguration(),
+    mapping: getGBPMappingSummary(),
+    nextRequirements: [
+      "Google must approve Business Profile Performance API access and assign a nonzero quota.",
+      "A UWS business.manage offline OAuth authorization must be stored through project secrets.",
+      "Authoritative API location resources must be reconciled with the candidate mapping registry.",
+      "One completed historical month must reconcile across the API response, raw rows, territory rollup, and dashboard before broader use.",
+    ],
+  })),
 
   /** Import one completed GA4 month into the durable territory reporting tables. */
   syncGA4TerritoryMonth: publicProcedure

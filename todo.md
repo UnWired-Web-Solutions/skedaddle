@@ -401,3 +401,20 @@
 - [x] Read the oversized Salesforce master sheet through the Sheets API in six ranges and validate all 269,890 current rows
 - [x] Cross-check exact workbook totals, periods, status values, species, city, and territory structures without estimating missing data
 - [x] Document the Salesforce status-mapping, mixed-currency, snapshot-timing, and sensitive-data caveats for future portal integration
+
+## Live Google Business Profile Integration — Aug 31, 2026
+- [x] Audit the current static GBP data, database schema, analytics procedures, dashboard charts, and Google credential setup
+- [x] Confirm the official GBP APIs, OAuth scopes, UWS account access, and available Skedaddle profile inventory — 32 profiles visible; Performance API enabled but zero approved quota
+- [x] Submit the official GBP API allowlist request — Google case `6-1216000040949`, with stated 7–10 business-day review window
+- [x] Document the OAuth, mapping, persistence, audit, source-label, and manual-refresh design in `GBP_LIVE_DATA_MODEL.md`
+- [x] Create a source-traceable GBP location-to-territory candidate registry with explicit ready, review-required, and excluded states; live API resource reconciliation remains mandatory before import
+- [x] Add durable GBP location, raw-daily-metric, territory-monthly, and import-run tables with source periods, import timestamps, coverage counts, and unique safeguards; reviewed migration `0007_dizzy_falcon.sql` applied
+- [x] Add a fail-closed GBP OAuth client contract and pure coverage safeguards; live API requests remain disabled until project secrets and Google approval are verified
+- [x] Correct the Analytics GBP disclosure to identify current values as legacy spreadsheet data rather than a live connection
+- [x] Add a public, read-only GBP readiness endpoint and dashboard status that exposes the pending case, OAuth readiness, and safe mapping counts without querying GBP or enabling refresh
+- [ ] Build the authenticated GBP client and territory-safe historical importer
+- [ ] Replace static GBP dashboard snapshots with persisted live metrics and visible coverage states
+- [ ] Add manual refresh controls for verified territories; do not schedule recurring imports until the live flow is validated
+- [ ] Add Vitest coverage for authenticated inventory sync, raw-metric persistence, and end-to-end manual import behavior after Google credentials are approved
+- [ ] Verify the live API end to end, inspect the authenticated dashboard visually, run TypeScript/tests/build, and publish
+- [ ] Update the data-source documentation and session memory with the verified live GBP connection

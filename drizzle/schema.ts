@@ -142,6 +142,129 @@ export type GBPMetric = typeof gbpMetrics.$inferSelect;
 export type InsertGBPMetric = typeof gbpMetrics.$inferInsert;
 
 /**
+ * Authoritative locations returned by the Business Information API. The
+ * resource name is the integration key; a location remains non-importable
+ * until its mapping status is explicitly `ready`.
+ */
+export const gbpLocations = mysqlTable("gbp_locations", {
+  id: int("id").autoincrement().primaryKey(),
+  apiLocationName: varchar("apiLocationName", { length: 255 }).notNull().unique(),
+  accountName: varchar("accountName", { length: 255 }),
+  title: text("title").notNull(),
+  storeCode: varchar("storeCode", { length: 128 }),
+  websiteUri: text("websiteUri"),
+  addressJson: json("addressJson"),
+  listingState: varchar("listingState", { length: 64 }),
+  verificationState: varchar("verificationState", { length: 64 }),
+  territoryId: varchar("territoryId", { length: 64 }),
+  mappingStatus: mysqlEnum("mappingStatus", ["ready", "review_required", "excluded", "unmapped"]).notNull(),
+  mappingRationale: text("mappingRationale"),
+  firstSeenAt: timestamp("firstSeenAt").defaultNow().notNull(),
+  lastSeenAt: timestamp("lastSeenAt").defaultNow().notNull(),
+  lastInventoryRunId: int("lastInventoryRunId"),
+}, (table) => ({
+  territoryMappingIdx: index("gbp_locations_territory_mapping_idx").on(
+    table.territoryId,
+    table.mappingStatus,
+  ),
+  storeCodeIdx: index("gbp_locations_store_code_idx").on(table.storeCode),
+}));
+
+export type GBPLocation = typeof gbpLocations.$inferSelect;
+export type InsertGBPLocation = typeof gbpLocations.$inferInsert;
+
+/** Audit trail for each inventory or monthly metric import attempt. */
+export const gbpImportRuns = mysqlTable("gbp_import_runs", {
+  id: int("id").autoincrement().primaryKey(),
+  importKind: mysqlEnum("importKind", ["inventory", "metrics"]).notNull(),
+  territoryId: varchar("territoryId", { length: 64 }),
+  sourceStartDate: varchar("sourceStartDate", { length: 10 }),
+  sourceEndDate: varchar("sourceEndDate", { length: 10 }),
+  status: mysqlEnum("status", ["complete", "partial", "failed"]).notNull(),
+  locationsExpected: int("locationsExpected").notNull().default(0),
+  locationsSucceeded: int("locationsSucceeded").notNull().default(0),
+  skippedLocationsJson: longtext("skippedLocationsJson"),
+  failedLocationsJson: longtext("failedLocationsJson"),
+  errorMessage: text("errorMessage"),
+  startedAt: timestamp("startedAt").defaultNow().notNull(),
+  completedAt: timestamp("completedAt"),
+}, (table) => ({
+  territoryPeriodIdx: index("gbp_import_runs_territory_period_idx").on(
+    table.territoryId,
+    table.sourceStartDate,
+    table.sourceEndDate,
+    table.startedAt,
+  ),
+}));
+
+export type GBPImportRun = typeof gbpImportRuns.$inferSelect;
+export type InsertGBPImportRun = typeof gbpImportRuns.$inferInsert;
+
+/**
+ * Raw daily values returned by the Performance API. The metric enum and
+ * metric date are retained exactly; no missing date is represented as zero.
+ */
+export const gbpDailyMetrics = mysqlTable("gbp_daily_metrics", {
+  id: int("id").autoincrement().primaryKey(),
+  gbpLocationId: int("gbpLocationId").notNull(),
+  metricType: varchar("metricType", { length: 96 }).notNull(),
+  metricDate: varchar("metricDate", { length: 10 }).notNull(),
+  value: int("value").notNull(),
+  sourceStartDate: varchar("sourceStartDate", { length: 10 }).notNull(),
+  sourceEndDate: varchar("sourceEndDate", { length: 10 }).notNull(),
+  importRunId: int("importRunId").notNull(),
+  importedAt: timestamp("importedAt").defaultNow().notNull(),
+}, (table) => ({
+  locationMetricDateIdx: uniqueIndex("gbp_daily_metrics_location_metric_date_idx").on(
+    table.gbpLocationId,
+    table.metricType,
+    table.metricDate,
+  ),
+  importRunIdx: index("gbp_daily_metrics_import_run_idx").on(table.importRunId),
+}));
+
+export type GBPDailyMetric = typeof gbpDailyMetrics.$inferSelect;
+export type InsertGBPDailyMetric = typeof gbpDailyMetrics.$inferInsert;
+
+/**
+ * Territory rollups constructed from the raw daily table. Partial data may be
+ * stored only with an explicit `partial` coverage state; dashboard precedence
+ * must use only `complete` records as live GBP totals.
+ */
+export const gbpTerritoryMonthly = mysqlTable("gbp_territory_monthly", {
+  id: int("id").autoincrement().primaryKey(),
+  territoryId: varchar("territoryId", { length: 64 }).notNull(),
+  year: int("year").notNull(),
+  month: int("month").notNull(),
+  metricType: varchar("metricType", { length: 96 }).notNull(),
+  value: int("value").notNull(),
+  coverageStatus: mysqlEnum("coverageStatus", ["complete", "partial"]).notNull(),
+  locationsExpected: int("locationsExpected").notNull(),
+  locationsSucceeded: int("locationsSucceeded").notNull(),
+  sourceStartDate: varchar("sourceStartDate", { length: 10 }).notNull(),
+  sourceEndDate: varchar("sourceEndDate", { length: 10 }).notNull(),
+  importRunId: int("importRunId").notNull(),
+  importedAt: timestamp("importedAt").defaultNow().notNull(),
+}, (table) => ({
+  territoryPeriodMetricIdx: uniqueIndex("gbp_territory_monthly_period_metric_idx").on(
+    table.territoryId,
+    table.year,
+    table.month,
+    table.metricType,
+  ),
+  territoryCoverageIdx: index("gbp_territory_monthly_coverage_idx").on(
+    table.territoryId,
+    table.coverageStatus,
+    table.year,
+    table.month,
+  ),
+  importRunIdx: index("gbp_territory_monthly_import_run_idx").on(table.importRunId),
+}));
+
+export type GBPTerritoryMonthly = typeof gbpTerritoryMonthly.$inferSelect;
+export type InsertGBPTerritoryMonthly = typeof gbpTerritoryMonthly.$inferInsert;
+
+/**
  * Search Console page performance imported from the single domain property.
  * Each import is already restricted to an approved territory URL prefix.
  */

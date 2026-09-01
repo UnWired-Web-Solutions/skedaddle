@@ -25,4 +25,11 @@ describe("custom local authentication compatibility", () => {
     const result = await analyticsRouter.createCaller(localAdminContext).getTerritories();
     expect(result.territories.length).toBeGreaterThan(0);
   });
+
+  it("keeps GBP readiness visible without a Manus OAuth session and without claiming live data", async () => {
+    const result = await analyticsRouter.createCaller(localAdminContext).getGBPIntegrationStatus();
+    expect(result.liveDataActive).toBe(false);
+    expect(result.approval.status).toBe("pending_google_allowlist_review");
+    expect(result.mapping.totalCandidates).toBe(32);
+  });
 });

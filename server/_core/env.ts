@@ -18,4 +18,9 @@ export const ENV = {
   sonarApiKey: process.env.SONAR_API_KEY ?? "",
   // Google Search Console read-only service-account credential
   gscServiceAccountJson: process.env.GSC_SERVICE_ACCOUNT_JSON ?? "",
+  // Google Business Profile requires a UWS user OAuth refresh token; do not use the GSC service account.
+  gbpOAuthClientId: process.env.GBP_OAUTH_CLIENT_ID ?? "",
+  gbpOAuthClientSecret: process.env.GBP_OAUTH_CLIENT_SECRET ?? "",
+  gbpOAuthRefreshToken: process.env.GBP_OAUTH_REFRESH_TOKEN ?? "",
+  gbpOAuthRedirectUri: process.env.GBP_OAUTH_REDIRECT_URI ?? "https://skedaddle.manus.space/api/gbp/oauth/callback",
 };

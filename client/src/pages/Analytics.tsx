@@ -277,6 +277,7 @@ export default function Analytics() {
     endYear: selectedYear,
     dataSource: "gbp",
   });
+  const { data: gbpIntegrationStatus } = trpc.analytics.getGBPIntegrationStatus.useQuery();
 
   // Fetch YoY comparison
   const { data: yoyData } = trpc.analytics.getYoYComparison.useQuery({
@@ -971,8 +972,12 @@ export default function Analytics() {
             </ResponsiveContainer>
           )}
           <div style={{ marginTop: 12, padding: "10px 14px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 6, fontSize: 11, color: "#92400e", display: "flex", alignItems: "flex-start", gap: 8 }}>
-            <span style={{ fontWeight: 700, flexShrink: 0 }}>⚠ Note:</span>
-            <span>GBP data is available for select territories only. Territories without a connected Google Business Profile listing will show no data. Coverage: Hamilton, Kitchener/Waterloo, Durham, Ottawa, Belleville, Peterborough, London, Windsor, Montreal, Milwaukee, Minneapolis.</span>
+            <span style={{ fontWeight: 700, flexShrink: 0 }}>Data status:</span>
+            <span>
+              {gbpIntegrationStatus
+                ? `Current GBP chart values are retained legacy spreadsheet records, not a live API feed. Google’s Business Profile Performance API access review is pending under case ${gbpIntegrationStatus.approval.caseId}; ${gbpIntegrationStatus.mapping.ready} explicitly mapped candidate profile${gbpIntegrationStatus.mapping.ready === 1 ? " is" : "s are"} awaiting authoritative API reconciliation. OAuth authorization and one fully reconciled import are still required before live figures replace any period.`
+                : "Current GBP chart values are retained legacy spreadsheet records, not a live API feed. Live connection status is loading."}
+            </span>
           </div>
         </div>
 
@@ -1034,7 +1039,7 @@ export default function Analytics() {
 
         {/* ─── Data Source Note ─────────────────────────────────────────────────── */}
         <div style={{ padding: "14px 18px", background: CREAM, borderRadius: 8, border: `1px solid ${MIST}`, fontSize: 12, color: "#666" }}>
-          <strong style={{ color: SAGE }}>Data Sources:</strong> GA4 sessions, Google Business Profile metrics stored by month for long-term YoY reporting, and Search Console pages/queries from the main domain property when a territory-scoped import is available.
+          <strong style={{ color: SAGE }}>Data Sources:</strong> GA4 sessions, legacy Google Business Profile spreadsheet metrics pending live API approval, and Search Console pages/queries from the main domain property when a territory-scoped import is available.
         </div>
       </div>
     </PortalLayout>
