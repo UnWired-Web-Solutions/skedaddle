@@ -19,3 +19,11 @@ The remaining non-ranked territory has no accepted active-workbook aggregate and
 ## Initial production rollout check
 
 After checkpoint `70d43482`, the authenticated production Network page still displayed the former static **Market Rankings by Currency — T12 Revenue** table and its Salesforce T12 claim. This is a stale deployment artifact, not a verification pass. The new active-workbook network contract was not yet present in the rendered production page, so no production source, currency, or partial-state claim is made at this stage.
+
+## Retry status
+
+After rollout-evidence checkpoint `66b481f4`, the authenticated production Network page still displayed the same former static table. The corresponding production `salesforceWorkbook.getNetworkPerformance` endpoint returned HTTP 404, confirming that this is not merely a browser-cache issue: the live server is also still serving the prior release. The production-log service was unavailable (`cloudrun service not found`), so it supplied no additional deployment diagnosis. A further publication retry may be used without changing source code or workbook data.
+
+## Successful published leaderboard verification
+
+After allowing the automatic queue additional time, the authenticated production page loaded the new client and then resolved its workbook query. The rendered table was titled **Active Workbook Territory Summary by Currency** and displayed the explicit active `partial` source disclosure with 48,524 excluded source rows. It showed separate USD and CAD ranks, the safe work-order/invoice-row/recorded-pre-tax-invoice-value fields, and the conversion-unavailable note. The former `T12 Revenue`, average-job, top-species, and Salesforce-API wording was absent from the active ranking panel.

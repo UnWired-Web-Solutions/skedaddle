@@ -250,8 +250,8 @@
 - [ ] Fix Ottawa missing from GA4 session rankings
 - [ ] Fix Denver (Colorado) missing from session rankings
 - [ ] Reconcile direct GA4 mapping, durable coverage, and ranking inputs for Ottawa, Denver, Hamilton, and Milwaukee before changing any displayed territory ranking
-- [ ] Replace the Network page’s static Salesforce revenue leaderboard with active Drive-workbook aggregates, split by verified currency and labelled partial when coverage is incomplete
-- [ ] Add a public aggregate-only workbook network-performance contract for the active run, excluding customer-level fields and unapproved conversion/status semantics
+- [x] Replace the Network page’s static Salesforce revenue leaderboard with active Drive-workbook aggregates, split by verified currency and labelled partial when coverage is incomplete — production now renders the active partial workbook summary, separate CAD/USD ranks, and explicit exclusions without a T12 claim
+- [x] Add a public aggregate-only workbook network-performance contract for the active run, excluding customer-level fields and unapproved conversion/status semantics — `salesforceWorkbook.getNetworkPerformance` production contract and rendered table were verified with no raw source fields or conversion claim
 - [x] Flag GBP data as incomplete for multi-GBP territories (GBP disclaimer note added to Analytics.tsx)
 - [ ] Fix GBP post volume: 20-25 posts/month per sub-location for large territories
 - [ ] Add corporate vs franchise distinction to territory data
