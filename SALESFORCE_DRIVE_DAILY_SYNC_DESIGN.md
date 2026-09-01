@@ -38,19 +38,21 @@ The workbook contains Canadian and United States territories but has no currency
 
 ## Daily deterministic execution
 
-The approved daily refresh is a server job, not an AI task. A project-owned scheduled trigger will POST to `/api/scheduled/salesforce-workbook-refresh`. The handler must authenticate the schedule identity, locate the configured workbook source by the persisted schedule task UID, acquire an import lock, and return a 2xx skipped result for an unchanged source or already-running job.
+The approved daily refresh is a server job, not an AI task. The enabled project-owned Heartbeat `Z6dZYQPbtPVyjCJxhFrwQ3` runs at `0 0 19 * * *` UTC, which is **3:00 PM Eastern** during daylight saving time. It POSTs to `/api/scheduled/salesforce-workbook-refresh`; the handler authenticates the schedule identity, finds the workbook configuration by its persisted task UID, acquires an import lock, and returns a 2xx skipped result for an unchanged source or an already-running job.
 
-The handler will read `Sheet1!A:N` in bounded row ranges through the read-only Sheets API. It will validate the header, every required ID, duplicate IDs, dates, numeric invoice values, exact territory labels, and exact status values while building aggregate records. It will not persist raw addresses or salesperson names.
+Before reading the large sheet, the handler uses the read-only Drive API to validate workbook ID, title, MIME type, version, modification time, and non-trashed state. An unchanged verified revision skips the full source download. Changed revisions are read as bounded 50,000-row `Sheet1!A:N` ranges and fed directly to the stateful parser, so the server does not retain the full raw workbook in its heap.
 
-Each run records source workbook ID, source sheet/range, source row count, maximum source `LastModifiedDate`, deterministic content fingerprint, expected/processed/rejected row counts, duplicate and blank-ID counts, unknown territory/status counts, run state, start/completion timestamps, and a redacted error message if the run fails.
+The parser validates the header, every required ID, duplicate IDs, dates, numeric invoice values, exact territory labels, and exact status values while building aggregates. It does not persist raw addresses, work-order IDs, postal codes, lead source, or salesperson names.
 
-The import uses staged records and a single database transaction. A failed validation or read leaves the previously successful portal dataset active. A new successful dataset becomes active only after all ranges are processed and reconciliation checks pass.
+Each run records source workbook identity and Drive revision, source sheet/range, source row count, maximum source `LastModifiedDate`, deterministic content fingerprint, expected/processed/rejected row counts, duplicate and blank-ID counts, unknown territory/status counts, run state, start/completion timestamps, and a redacted error message if the run fails.
+
+The import uses staged records and a single database transaction. A failed validation, read, or write leaves the previously successful portal dataset active. A new successful dataset becomes active only after all ranges are processed and reconciliation checks pass. A stale lock older than fifteen minutes is recovered by marking its prior unfinished audit row failed with a redacted execution-window message before a new run proceeds.
 
 ## Initial output policy
 
 Until UWS confirms the ambiguous completed-like status definitions, the first daily release can safely publish descriptive aggregates such as record counts, exact status counts, invoice-row/revenue measures by mapped territory and source period, and species/city summaries. It must not publish a territory close rate, inspection-to-sale rate, or derived completed-job total from unconfirmed status semantics.
 
-The daily run time should occur after the workbook's upstream refresh is normally complete. One observed modification time is not enough to establish that pattern, so the production schedule time remains pending until UWS confirms the expected source refresh window or several modification timestamps have been observed.
+The selected 3:00 PM Eastern refresh follows the observed source update window and will be reviewed after further workbook revisions are observed. The current visible Drive revision was timestamped `2026-09-01T15:57:16.897Z` (11:57 AM Eastern), giving the selected run more than three hours for that observed update to settle. Drive retained only the current revision in this view, so this is a cautious operational window rather than a claimed historical export cadence. The final authenticated production schedule test completed on September 1, 2026 in **1.557 seconds** as an `unchanged_revision` skip against Drive version 133. It did not download or replace the active aggregate snapshot.
 
 ## Activation gates
 
@@ -59,7 +61,7 @@ The daily run time should occur after the workbook's upstream refresh is normall
 3. A manual full read reconciles row count, unique IDs, exact status counts, exact territory counts, and source maximum modification time before scheduling.
 4. Portal status and reports identify the data as a Google Drive Salesforce-derived workbook snapshot with source and import times.
 5. A deployed schedule callback passes authentication, idempotency, lock, failure, and unchanged-source checks.
-6. The first scheduled run is inspected before the workflow is considered active.
+6. The first scheduled run is inspected before the workflow is considered active. **Completed:** the production job returned HTTP 200 with the redacted `unchanged_revision` result in 1.557 seconds and the next run remains scheduled for 19:00 UTC.
 
 ## References
 

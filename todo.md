@@ -445,15 +445,15 @@
 - [x] Mark Salesforce Connected App/API work as superseded by the approved Drive workbook workflow; active API router, OAuth callback, setup page, navigation entry, and environment contract retired while historical task records remain
 - [x] Define source provenance, explicit territory mapping, status-preservation, currency, duplicate-ID, incomplete-period, sensitive-field, and missing-value safeguards with deterministic parser tests
 - [x] Implement an auditable workbook import path that preserves source timestamps and never estimates missing Salesforce values — bounded read-only client, deterministic parser, atomic lock, unchanged-source skip, retained prior successful run, transactional aggregates, and failure audit complete
-- [ ] Run the approved Salesforce Drive workbook import automatically once per day with deterministic locking, change detection, failure auditing, and no AI-generated data — authenticated idempotent callback complete; deployed Heartbeat creation pending
-- [ ] Keep the daily workbook callback within the platform execution deadline — first run timed out at 30 seconds and retry completed in 29.767 seconds; header plus six bounded ranges now use one read-only batch request pending a final production retest with adequate margin
-- [ ] Fix the production changed-workbook import memory path — the single-batch 270,112-row Sheets response exhausted the deployed Node heap; the changed-revision path now parses bounded 50,000-row Sheets ranges incrementally and requires production verification
-- [ ] Add a Drive-revision metadata preflight so unchanged daily runs skip before downloading 270,112 rows and stale deployment-interrupted runs are reconciled explicitly
-- [ ] Enable the Google Drive API in `uws-gbp-analytics` with explicit approval, then verify read-only workbook revision metadata access
+- [x] Run the approved Salesforce Drive workbook import automatically once per day with deterministic locking, change detection, failure auditing, and no AI-generated data — production Heartbeat `Z6dZYQPbtPVyjCJxhFrwQ3` enabled at `0 0 19 * * *` UTC (daily 3:00 PM Eastern)
+- [x] Keep the daily workbook callback within the platform execution deadline — final authenticated production verification completed as an unchanged-revision skip in 1.557 seconds
+- [x] Fix the production changed-workbook import memory path — the single-batch 270,112-row response exhausted the deployed heap; changed revisions now parse sequential 50,000-row Sheets ranges incrementally, while unchanged revisions skip before download
+- [x] Add a Drive-revision metadata preflight so unchanged daily runs skip before downloading 270,112 rows and stale deployment-interrupted runs are reconciled explicitly
+- [x] Enable the Google Drive API in `uws-gbp-analytics` with explicit approval, then verify read-only workbook revision metadata access
 - [x] Verify the deployed read-only Google service identity can access the approved workbook independently of the interactive UWS Drive session — exact workbook title, Sheet1, and 14-field header contract returned successfully
 - [x] Enable the Google Sheets API in `uws-gbp-analytics` with explicit approval, then re-run the service-identity workbook access check — enabled and verified read-only on September 1, 2026
-- [ ] Select and document the daily Eastern-time execution window after confirming the workbook’s observed update pattern
-- [ ] Update portal and report source disclosures to identify the Drive workbook rather than a live Salesforce API
-- [ ] Add read-only portal status and territory-period procedures for the active workbook run without exposing raw addresses, IDs, or salesperson fields — procedures implemented; endpoint/UI verification pending
+- [x] Select and document the daily Eastern-time execution window — 3:00 PM Eastern; the current visible Drive revision was 11:57 AM Eastern, giving a cautious three-hour settlement window (recheck if UWS changes export cadence)
+- [ ] Update portal and report source disclosures to identify the Drive workbook rather than a live Salesforce API — Analytics disclosure implemented; report integration and verification pending
+- [ ] Add read-only portal status and territory-period procedures for the active workbook run without exposing raw addresses, IDs, or salesperson fields — active-run status and Analytics disclosure implemented; endpoint/UI verification pending
 - [ ] Verify database reconciliation, endpoints, authenticated UI, reports, tests, and production build before activation
 - [ ] Checkpoint the verified workbook workflow, push canonical GitHub `main`, and update session memory

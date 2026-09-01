@@ -278,6 +278,7 @@ export default function Analytics() {
     dataSource: "gbp",
   });
   const { data: gbpIntegrationStatus } = trpc.analytics.getGBPIntegrationStatus.useQuery();
+  const { data: salesforceWorkbookStatus } = trpc.salesforceWorkbook.getStatus.useQuery();
 
   // Fetch YoY comparison
   const { data: yoyData } = trpc.analytics.getYoYComparison.useQuery({
@@ -636,10 +637,27 @@ export default function Analytics() {
             Analytics Dashboard
           </h1>
           <p style={{ fontSize: 13, color: "#666", marginTop: 6 }}>
-            GA4, Google Business Profile, and territory-filtered Search Console performance.
+            GA4, Google Business Profile, Search Console, and verified Salesforce-derived workbook status.
           </p>
           <div style={{ marginTop: 10, borderTop: `2px solid ${SKEDADDLE_GREEN}`, width: 48 }} />
         </div>
+
+        {salesforceWorkbookStatus?.configured && (
+          <div style={{ marginBottom: 24, padding: "14px 16px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, color: "#1e3a5f" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 5 }}>
+              <Info size={16} color="#2563eb" />
+              <strong style={{ fontSize: 13 }}>Salesforce-derived data source: Google Drive workbook</strong>
+              <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", padding: "3px 7px", borderRadius: 999, background: salesforceWorkbookStatus.activeRun?.status === "partial" ? "#fef3c7" : "#dcfce7", color: salesforceWorkbookStatus.activeRun?.status === "partial" ? "#92400e" : "#166534" }}>
+                {salesforceWorkbookStatus.activeRun?.status ?? "Unavailable"}
+              </span>
+            </div>
+            <p style={{ fontSize: 12, lineHeight: 1.5, margin: 0 }}>
+              {salesforceWorkbookStatus.source.title} · {salesforceWorkbookStatus.source.sheetName}. The active snapshot is {salesforceWorkbookStatus.activeRun?.status ?? "unavailable"}; it is imported from the approved Drive workbook, not Salesforce API access.
+              {salesforceWorkbookStatus.activeRun && ` ${salesforceWorkbookStatus.activeRun.rowsProcessed.toLocaleString()} source rows were included and ${salesforceWorkbookStatus.activeRun.rowsRejected.toLocaleString()} were explicitly excluded from canonical territory aggregates.`}
+              {salesforceWorkbookStatus.source.scheduleEnabled ? " A daily read-only refresh is enabled; unchanged workbook revisions are checked without reimporting the full sheet." : " The daily refresh is not enabled."}
+            </p>
+          </div>
+        )}
 
         {/* ─── Filters Bar ─────────────────────────────────────────────────────── */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 24, padding: "16px 20px", background: "#fff", borderRadius: 10, border: `1px solid ${MIST}` }}>

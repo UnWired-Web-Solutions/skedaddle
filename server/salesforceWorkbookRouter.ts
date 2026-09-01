@@ -33,6 +33,11 @@ export const salesforceWorkbookRouter = router({
       .orderBy(desc(salesforceWorkbookImportRuns.startedAt))
       .limit(1);
     const latestRun = runs[0] ?? null;
+    const activeRunRows = source.lastSuccessfulRunId
+      ? await db.select().from(salesforceWorkbookImportRuns)
+        .where(eq(salesforceWorkbookImportRuns.id, source.lastSuccessfulRunId)).limit(1)
+      : [];
+    const activeRun = activeRunRows[0] ?? null;
     return {
       configured: true as const,
       source: {
@@ -60,6 +65,15 @@ export const salesforceWorkbookRouter = router({
         startedAt: latestRun.startedAt,
         completedAt: latestRun.completedAt,
         activatedAt: latestRun.activatedAt,
+      } : null,
+      activeRun: activeRun ? {
+        id: activeRun.id,
+        status: activeRun.status,
+        sourceRowCount: activeRun.sourceRowCount,
+        rowsProcessed: activeRun.rowsProcessed,
+        rowsRejected: activeRun.rowsRejected,
+        maxSourceModifiedAt: activeRun.maxSourceModifiedAt,
+        activatedAt: activeRun.activatedAt,
       } : null,
     };
   }),
