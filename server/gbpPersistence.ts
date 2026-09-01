@@ -5,7 +5,7 @@
  */
 import { and, eq, gte, lte } from "drizzle-orm";
 import { gbpDailyMetrics, gbpImportRuns, gbpTerritoryMonthly } from "../drizzle/schema";
-import { getCompleteCalendarMonthRange } from "../shared/gbpDataSafety";
+import { getCompleteCalendarMonthRange, isISODate } from "../shared/gbpDataSafety";
 import type { GBPMonthlyMetricSnapshot } from "./googleBusinessProfileImporter";
 import { getDb } from "./db";
 
@@ -65,11 +65,18 @@ export function buildGBPPersistencePlan(input: {
       throw new Error("GBP snapshot contains an invalid successful location count.");
     }
     const successfulLocationIds = Array.from(new Set(snapshot.successfulLocationIds));
+    const failedLocationIds = Array.from(new Set(snapshot.failedLocationIds));
     if (successfulLocationIds.length !== snapshot.locationsSucceeded) {
       throw new Error("GBP snapshot successful location identities do not match its coverage count.");
     }
+    if (successfulLocationIds.some(locationId => failedLocationIds.includes(locationId))) {
+      throw new Error("A GBP location cannot be both successful and failed for the same metric snapshot.");
+    }
+    if (successfulLocationIds.length + failedLocationIds.length !== snapshot.locationsExpected) {
+      throw new Error("GBP snapshot location identities do not match its expected coverage count.");
+    }
     successfulLocationIds.forEach(locationId => assertPositiveInteger(locationId, "GBP location ID"));
-    snapshot.failedLocationIds.forEach(locationId => {
+    failedLocationIds.forEach(locationId => {
       assertPositiveInteger(locationId, "GBP location ID");
       failedLocations.push({ locationId, metricType: snapshot.metricType });
     });
@@ -91,7 +98,13 @@ export function buildGBPPersistencePlan(input: {
       if (!successfulLocationIds.includes(row.locationId)) {
         throw new Error("GBP raw values may only be persisted for successfully fetched locations.");
       }
-      if (row.date < expectedRange.startDate || row.date > expectedRange.endDate || !Number.isFinite(row.value)) {
+      if (
+        !isISODate(row.date) ||
+        row.date < expectedRange.startDate ||
+        row.date > expectedRange.endDate ||
+        !Number.isSafeInteger(row.value) ||
+        row.value < 0
+      ) {
         throw new Error("GBP raw value is outside the requested calendar month or is invalid.");
       }
       const key = `${row.locationId}|${snapshot.metricType}|${row.date}`;

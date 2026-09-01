@@ -26,6 +26,22 @@ export interface GBPLocationRegistryEntry {
 }
 
 /**
+ * An import-authoritative binding created only after the live API inventory has
+ * been manually reconciled. Store codes are candidate evidence, not identity:
+ * Google guarantees them only within an account.
+ */
+export interface GBPApprovedLocationBinding {
+  accountName: string;
+  apiLocationName: string;
+  shopCode: string;
+  territoryId: string;
+  approvedBy: string;
+  approvedAt: string;
+}
+
+export const GBP_APPROVED_LOCATION_BINDINGS: readonly GBPApprovedLocationBinding[] = [];
+
+/**
  * Initial registry. It intentionally keeps ambiguous or blank-shop-code
  * profiles out of territory aggregation. The live location sync must compare
  * API resource names and store codes to these entries before it can import.
@@ -65,17 +81,37 @@ export const GBP_LOCATION_REGISTRY: readonly GBPLocationRegistryEntry[] = [
   { shopCode: "16834354687722739934", coverageLabel: "Minneapolis / Anoka / Orono and surrounding areas", operationalStatus: "verified", territoryId: "minneapolis", mappingStatus: "ready", rationale: "Explicit Minneapolis territory candidate." },
 ];
 
-export function findGBPLocationRegistryEntry(shopCode: string | null | undefined): GBPLocationRegistryEntry | null {
+/** Candidate-only lookup for the reconciliation UI; never authorizes import. */
+export function findGBPLocationCandidateByShopCode(shopCode: string | null | undefined): GBPLocationRegistryEntry | null {
   if (!shopCode) return null;
   return GBP_LOCATION_REGISTRY.find(entry => entry.shopCode === shopCode) ?? null;
 }
 
-export function getGBPReadyLocationMappings(territoryId?: string): GBPLocationRegistryEntry[] {
+export function getGBPReadyLocationCandidates(territoryId?: string): GBPLocationRegistryEntry[] {
   return GBP_LOCATION_REGISTRY.filter(entry =>
     entry.mappingStatus === "ready" &&
     entry.operationalStatus === "verified" &&
     (!territoryId || entry.territoryId === territoryId),
   );
+}
+
+export function findApprovedGBPLocationBinding(input: {
+  accountName: string;
+  apiLocationName: string;
+  shopCode: string | null | undefined;
+}): GBPApprovedLocationBinding | null {
+  if (!/^accounts\/(?!-$)[^/]+$/.test(input.accountName)) return null;
+  if (!/^locations\/[^/]+$/.test(input.apiLocationName)) return null;
+  if (!input.shopCode) return null;
+  return GBP_APPROVED_LOCATION_BINDINGS.find(binding =>
+    binding.accountName === input.accountName &&
+    binding.apiLocationName === input.apiLocationName &&
+    binding.shopCode === input.shopCode,
+  ) ?? null;
+}
+
+export function getGBPImportEligibleBindings(territoryId?: string): GBPApprovedLocationBinding[] {
+  return GBP_APPROVED_LOCATION_BINDINGS.filter(binding => !territoryId || binding.territoryId === territoryId);
 }
 
 export function getGBPMappingSummary() {
@@ -86,6 +122,7 @@ export function getGBPMappingSummary() {
     reviewRequired: count("review_required"),
     excluded: count("excluded"),
     unmapped: count("unmapped"),
-    territoriesReady: Array.from(new Set(getGBPReadyLocationMappings().map(entry => entry.territoryId))).filter(Boolean).sort(),
+    importEligible: getGBPImportEligibleBindings().length,
+    territoriesReady: Array.from(new Set(getGBPReadyLocationCandidates().map(entry => entry.territoryId))).filter(Boolean).sort(),
   };
 }

@@ -42,7 +42,7 @@ Each raw and aggregate row must preserve its source period and import timestamp.
 
 ## Location-mapping safeguards
 
-The live inventory will be matched using Google’s **location resource name** and `storeCode`, not a display-name guess. The initial 32-profile Business Profile Manager inventory supplies grounded matching candidates, but no location becomes importable until its API resource has been returned and matched explicitly.
+The live inventory will be matched using Google’s **account resource name**, **location resource name**, and `storeCode`, not a display-name guess. Google guarantees a store code only within an account, so store code alone is never import authorization. The initial 32-profile Business Profile Manager inventory supplies grounded matching candidates, but no location becomes importable until its account and location resources have been returned and an exact binding has been explicitly approved.
 
 | Mapping state | Meaning | Import behavior |
 |---|---|---|

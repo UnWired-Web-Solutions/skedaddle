@@ -4,7 +4,7 @@
  * OAuth credentials have been verified.
  */
 
-import { getCompleteCalendarMonthRange } from "../shared/gbpDataSafety";
+import { getCompleteCalendarMonthRange, isISODate } from "../shared/gbpDataSafety";
 
 export type GBPMetricFetchResult = {
   locationId: number;
@@ -62,15 +62,23 @@ export function buildGBPMonthlyMetricSnapshots(input: {
 
   return uniqueMetricTypes.map(metricType => {
     const relevant = input.results.filter(result => result.metricType === metricType && uniqueLocationIds.includes(result.locationId));
-    const successful = relevant.filter(result => result.success);
+    const successful = relevant.filter(result => result.success).map(result => {
+      const rows = result.rows.filter(row => row.date >= startDate && row.date <= endDate);
+      for (const row of rows) {
+        if (!isISODate(row.date) || !Number.isSafeInteger(row.value) || row.value < 0) {
+          throw new Error(`GBP returned an invalid daily value for ${metricType} at location ${result.locationId}.`);
+        }
+      }
+      return { ...result, rows };
+    });
     const successfulLocationIds = uniqueLocationIds.filter(locationId =>
-      successful.some(result => result.locationId === locationId),
+      successful.some(result => result.locationId === locationId && result.rows.length > 0),
     );
     const failedLocationIds = uniqueLocationIds.filter(locationId =>
       !successfulLocationIds.includes(locationId),
     );
     const rows = successful.flatMap(result => result.rows
-      .filter(row => row.date >= startDate && row.date <= endDate)
+      .filter(() => successfulLocationIds.includes(result.locationId))
       .map(row => ({ locationId: result.locationId, date: row.date, value: row.value })),
     );
     const locationsSucceeded = uniqueLocationIds.length - failedLocationIds.length;

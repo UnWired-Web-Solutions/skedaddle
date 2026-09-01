@@ -10,15 +10,34 @@ import {
 import { dedicatedSuburbHubMatchesPage } from "../shared/ga4PageClassifier";
 import {
   INITIAL_SALES_REPORT_WINDOW,
+  isMonthInWindow,
   reportingMonthIso,
   reportingWindowLabel,
   type ReportingWindow,
 } from "../shared/reportingPeriod";
 import { getDb } from "./db";
+import { loadResolvedGBPMonthly } from "./gbpReportingData";
+import type { ResolvedGBPMonthlyMetric } from "./gbpMetricSourceResolver";
+
+export type ReportingGBPMonth = {
+  month: string;
+  searches: number | null;
+  calls: number | null;
+  website_clicks: number | null;
+  directions: number | null;
+  bookings: number | null;
+  sources: string[];
+  incompleteMetrics: string[];
+};
 
 export type ReportingAnalyticsSnapshot = {
   window: ReportingWindow;
   periodLabel: string;
+  gbp: {
+    monthly: ReportingGBPMonth[];
+    sources: string[];
+    incompletePeriods: string[];
+  };
   ga4: {
     monthly: Array<{
       year: number;
@@ -53,6 +72,40 @@ export type ReportingAnalyticsSnapshot = {
   };
 };
 
+/** Converts metric-level source decisions into a report-safe monthly table. */
+export function groupResolvedGBPForReporting(
+  rows: ResolvedGBPMonthlyMetric[],
+  window: ReportingWindow,
+): ReportingGBPMonth[] {
+  const grouped = new Map<string, ReportingGBPMonth>();
+  const reportMetricTypes = new Set(["searches", "calls", "website_clicks", "directions", "bookings"]);
+  for (const row of rows) {
+    if (!isMonthInWindow(row.year, row.month, window)) continue;
+    const month = reportingMonthIso(row);
+    const current = grouped.get(month) ?? {
+      month,
+      searches: null,
+      calls: null,
+      website_clicks: null,
+      directions: null,
+      bookings: null,
+      sources: [],
+      incompleteMetrics: [],
+    };
+    const isHeadlineEligible = row.source === "persisted_business_profile_api"
+      || row.source === "legacy_spreadsheet";
+    if (reportMetricTypes.has(row.metricType) && row.value !== null && isHeadlineEligible) {
+      current[row.metricType as "searches" | "calls" | "website_clicks" | "directions" | "bookings"] = row.value;
+    }
+    if (!current.sources.includes(row.source)) current.sources.push(row.source);
+    if (!isHeadlineEligible && !current.incompleteMetrics.includes(row.metricType)) {
+      current.incompleteMetrics.push(row.metricType);
+    }
+    grouped.set(month, current);
+  }
+  return Array.from(grouped.values()).sort((a, b) => a.month.localeCompare(b.month));
+}
+
 function inWindowSql(yearColumn: unknown, monthColumn: unknown, window: ReportingWindow) {
   const start = window.start.year * 100 + window.start.month;
   const end = window.end.year * 100 + window.end.month;
@@ -83,7 +136,7 @@ export async function loadTerritoryReportingAnalytics(
   if (!db) return null;
   try {
     const period = (yearColumn: unknown, monthColumn: unknown) => inWindowSql(yearColumn, monthColumn, window);
-    const [ga4MonthlyRows, ga4PageRows, latestRuns, gscMonthlyRows, gscTopPages, gscTopQueries] = await Promise.all([
+    const [ga4MonthlyRows, ga4PageRows, latestRuns, gscMonthlyRows, gscTopPages, gscTopQueries, resolvedGBP] = await Promise.all([
       db.select().from(ga4TerritoryMonthly)
         .where(and(eq(ga4TerritoryMonthly.territoryId, territoryId), period(ga4TerritoryMonthly.year, ga4TerritoryMonthly.month)))
         .orderBy(ga4TerritoryMonthly.year, ga4TerritoryMonthly.month),
@@ -132,6 +185,12 @@ export async function loadTerritoryReportingAnalytics(
         .groupBy(gscQueryMetrics.query)
         .orderBy(desc(sql`SUM(${gscQueryMetrics.clicks})`))
         .limit(25),
+      loadResolvedGBPMonthly({
+        db,
+        territoryId,
+        startYear: window.start.year,
+        endYear: window.end.year,
+      }),
     ]);
 
     const run = latestRuns[0] ?? null;
@@ -147,6 +206,7 @@ export async function loadTerritoryReportingAnalytics(
     }));
     const completeGa4 = ga4Monthly.filter(row => row.complete);
     const completePeriods = new Set(completeGa4.map(reportingMonthIso));
+    const gbpMonthly = groupResolvedGBPForReporting(resolvedGBP, window);
     const gscMonthly = gscMonthlyRows.map(row => {
       const impressions = Number(row.impressions);
       return {
@@ -160,6 +220,13 @@ export async function loadTerritoryReportingAnalytics(
     return {
       window,
       periodLabel: reportingWindowLabel(window),
+      gbp: {
+        monthly: gbpMonthly,
+        sources: Array.from(new Set(gbpMonthly.flatMap(row => row.sources))),
+        incompletePeriods: gbpMonthly
+          .filter(row => row.incompleteMetrics.length > 0)
+          .map(row => row.month),
+      },
       ga4: {
         monthly: ga4Monthly,
         totalSessions: completeGa4.reduce((sum, row) => sum + row.sessions, 0),

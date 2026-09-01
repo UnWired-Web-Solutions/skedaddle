@@ -12,6 +12,15 @@ describe("GBP monthly source precedence", () => {
     expect(resolved).toMatchObject({ value: 14, source: "persisted_business_profile_api" });
   });
 
+  it("maps Google metric enums onto legacy reporting keys before applying source precedence", () => {
+    const resolved = resolveGBPMonthlyMetricSources({
+      legacy,
+      persisted: [{ year: 2026, month: 8, metricType: "CALL_CLICKS", value: 14, coverageStatus: "complete", locationsExpected: 2, locationsSucceeded: 2 }],
+    });
+    expect(resolved).toHaveLength(1);
+    expect(resolved[0]).toMatchObject({ metricType: "calls", value: 14, source: "persisted_business_profile_api" });
+  });
+
   it("keeps partial API data visible rather than silently using legacy values", () => {
     const [resolved] = resolveGBPMonthlyMetricSources({
       legacy,

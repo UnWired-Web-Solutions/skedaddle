@@ -3,6 +3,7 @@ import {
   buildGBPDailyMetricUrl,
   hasGBPAuthConfiguration,
   hasGBPOAuthClientConfiguration,
+  listGBPLocations,
   validateGBPOAuthClientCredentials,
 } from "./googleBusinessProfileClient";
 
@@ -22,11 +23,17 @@ describe("Google Business Profile client", () => {
     expect(() => buildGBPDailyMetricUrl("locations/123", "CALL_CLICKS", "2026-02-30", "2026-07-31")).toThrow("Invalid ISO date");
   });
 
+  it("requires an explicit account resource before listing locations", async () => {
+    await expect(listGBPLocations("accounts/-")).rejects.toThrow("accounts/{accountId}");
+    await expect(listGBPLocations("not-an-account")).rejects.toThrow("accounts/{accountId}");
+  });
+
   it("does not claim configured live access unless all OAuth secrets are present", () => {
     expect(typeof hasGBPAuthConfiguration()).toBe("boolean");
   });
 
-  it.runIf(hasGBPOAuthClientConfiguration())("validates the configured client ID and secret with Google without accessing GBP data", async () => {
+  it.runIf(process.env.RUN_LIVE_API_TESTS === "1")("validates the configured client ID and secret with Google without accessing GBP data", async () => {
+    expect(hasGBPOAuthClientConfiguration()).toBe(true);
     await expect(validateGBPOAuthClientCredentials()).resolves.toEqual({ accepted: true });
   });
 });
