@@ -45,6 +45,8 @@
 - [x] Add GSC monthly trend line chart to Analytics page (clicks + impressions over time)
 - [ ] Add GSC YoY comparison to the existing YoY detail table
 - [ ] Audit and implement a territory-scope-aware GSC YoY detail table that marks unmatched or unavailable source months rather than estimating changes
+- [ ] Repair the production static client-bundle publication path so checkpointed Analytics interface changes deploy alongside their updated server contract
+- [ ] Ensure the production build starts from a clean distribution directory and verify the generated HTML references the current Analytics client asset
 - [x] Build GA4 client code (ready for when access is granted) — googleAnalyticsClient.ts with verifyGA4Access, fetchGA4SessionsByPage, fetchGA4TopCities, fetchGA4ChannelBreakdown
 - [x] Add GA4 connection status procedure to analytics router (getGA4ConnectionStatus)
 - [x] Enable guarded live Search Console imports for verified ready territories only — July 2026 data imported for Minneapolis, Montreal, Madison, Maryland Central, Columbus, and Pittsburgh; dashboard refresh control blocks ambiguous territories and incomplete months
