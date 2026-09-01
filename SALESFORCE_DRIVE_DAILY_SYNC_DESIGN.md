@@ -63,6 +63,24 @@ The selected 3:00 PM Eastern refresh follows the observed source update window a
 5. A deployed schedule callback passes authentication, idempotency, lock, failure, and unchanged-source checks.
 6. The first scheduled run is inspected before the workflow is considered active. **Completed:** the production job returned HTTP 200 with the redacted `unchanged_revision` result in 1.557 seconds and the next run remains scheduled for 19:00 UTC.
 
+## Pending production UI verification
+
+The authenticated Analytics page was opened on production after checkpoint `b553888b`. An initial cached page load showed the prior source description, but a cache-bypassed status endpoint returned the active-run contract and a clean subsequent production load rendered the workbook provenance card correctly. The card identified `Salesforce Data · Sheet1`, labelled the active snapshot `partial`, showed **221,635** included and **48,477** explicitly excluded rows, and confirmed daily read-only refresh. It did not expose raw work-order IDs, addresses, postal codes, salesperson names, or lead-source fields. The browser console showed no runtime errors.
+
+## Dashboard and strategy-report provenance retirement — local verification
+
+The active territory dashboard now reads only the public, read-only `salesforceWorkbook.getTerritoryPerformance` contract for Salesforce-derived operational aggregates. The response identifies `salesforce_drive_workbook`, exposes the active partial-run metadata and bounded monthly, species, and city aggregates, and returns `unavailable_pending_status_definition` for conversion. The dashboard presents work orders, recorded pre-tax invoice-value context, species, and city aggregates with source labels; it displays inspection definition, closed-job definition, close rate, and network conversion as unavailable. Aggregate rows are formatted with their own verified currency code, so a row cannot inherit another currency’s label.
+
+The historical `salesforcePerformanceSnapshots` table remains as retained history but is no longer queried by the active analytics router, dashboard, or strategy-report conversion path. The former `analytics.getTerritoryCloseRate` procedure was removed. Existing historical revenue, job, species, and city material in strategy reports remains explicitly labelled **Historical Sales Snapshot** and cannot be described as current Google Drive workbook data.
+
+An exact fresh Ottawa strategy-report draft was generated and exported without regenerating content during PDF export. The final 14-page Letter PDF was visually reviewed page by page. It distinguishes the legacy historical snapshot from the current Drive workbook partial feed, includes the `Work-Order Data Status` disclosure with **221,635** included and **48,477** explicitly excluded rows, and omits the retired inspection-to-sale and network close-rate tables. A parser defect that incorrectly split a 90-day-plan task at an ordinary `GBP` mention was reproduced in the export, fixed with line-start category parsing, and protected by a regression test before the final PDF review.
+
+Local release verification after the final parser correction passed TypeScript, **164** Vitest tests with **11** intentional skips, the production build, `git diff --check`, direct active-run and Hamilton territory-performance endpoint checks, authenticated Hamilton dashboard review, fresh Ottawa draft generation, and exact-PDF visual inspection. The uncheckpointed release still requires post-checkpoint production endpoint and authenticated UI verification.
+
+## Changed-revision production-import limitation
+
+The daily schedule’s fast unchanged-revision production path is verified. The low-memory changed-revision branch uses bounded sequential Sheets ranges, but it has not yet completed a definitive production import of a naturally changed Drive revision. Do not modify the source workbook merely to force that test, and do not claim changed-revision production verification until an ordinary source revision can be observed and audited.
+
 ## References
 
 [1]: https://docs.google.com/spreadsheets/d/1WUAlglCwg85OrH_Dqqqw7zRZNGKxOlBPwzHF5cqD6sQ/edit "UWS Salesforce Data workbook"

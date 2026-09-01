@@ -16,7 +16,6 @@ import {
   gbpTerritoryMonthly,
   gscPageMetrics,
   gscQueryMetrics,
-  salesforcePerformanceSnapshots,
 } from "../drizzle/schema";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import { TERRITORY_GROUPS, UNMAPPED_GA4, UNMAPPED_GBP, getSubLocations } from "../shared/territoryMapping";
@@ -837,45 +836,6 @@ export const analyticsRouter = router({
         topQueries: queries.sort((a, b) => Number(b.clicks) - Number(a.clicks)).slice(0, 25).map(mapRow),
         sourceProperty: pages[0]?.sourceProperty || queries[0]?.sourceProperty || null,
         pathPrefix: pages[0]?.pathPrefix || queries[0]?.pathPrefix || null,
-      };
-    }),
-
-  /** Latest verified Salesforce inspection-to-sale snapshot for a territory. */
-  getTerritoryCloseRate: publicProcedure
-    .input(z.object({ territoryId: z.string() }))
-    .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) return null;
-
-      const [latest] = await db
-        .select({ periodEnd: sql<string>`MAX(${salesforcePerformanceSnapshots.periodEnd})` })
-        .from(salesforcePerformanceSnapshots)
-        .where(eq(salesforcePerformanceSnapshots.territoryId, input.territoryId));
-      if (!latest?.periodEnd) return null;
-
-      const rows = await db
-        .select()
-        .from(salesforcePerformanceSnapshots)
-        .where(and(
-          eq(salesforcePerformanceSnapshots.territoryId, input.territoryId),
-          eq(salesforcePerformanceSnapshots.periodEnd, latest.periodEnd),
-        ));
-      const total = rows.find(row => row.species === "__ALL__");
-      if (!total) return null;
-
-      const toResult = (row: (typeof rows)[number]) => ({
-        species: row.species,
-        inspections: Number(row.inspections),
-        closedJobs: Number(row.closedJobs),
-        closeRate: Number(row.inspections) > 0 ? Number(row.closedJobs) / Number(row.inspections) * 100 : null,
-      });
-
-      return {
-        periodStart: total.periodStart,
-        periodEnd: total.periodEnd,
-        sourceLabel: total.sourceLabel,
-        total: toResult(total),
-        species: rows.filter(row => row.species !== "__ALL__").map(toResult),
       };
     }),
 

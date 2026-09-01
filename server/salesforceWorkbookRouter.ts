@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
   salesforceWorkbookAggregates,
@@ -121,6 +121,94 @@ export const salesforceWorkbookRouter = router({
           rowsRejected: run.rowsRejected,
         },
         months: rows.sort((a, b) => a.year - b.year || a.month - b.month),
+      };
+    }),
+
+  getTerritoryPerformance: publicProcedure
+    .input(z.object({ territoryId: z.string().min(1).max(64) }))
+    .query(async ({ input }) => {
+      const unavailable = { source: "unavailable" as const, activeRun: null, months: [], species: [], cities: [], conversionMetric: "unavailable_pending_status_definition" as const };
+      const db = await getDb();
+      if (!db) return unavailable;
+      const sourceRows = await db.select().from(salesforceWorkbookSources).orderBy(desc(salesforceWorkbookSources.updatedAt)).limit(1);
+      const source = sourceRows[0];
+      if (!source?.lastSuccessfulRunId) return unavailable;
+      const runRows = await db.select().from(salesforceWorkbookImportRuns).where(eq(salesforceWorkbookImportRuns.id, source.lastSuccessfulRunId)).limit(1);
+      const run = runRows[0];
+      if (!run || (run.status !== "complete" && run.status !== "partial")) return unavailable;
+
+      const baseFilters = [
+        eq(salesforceWorkbookAggregates.importRunId, run.id),
+        eq(salesforceWorkbookAggregates.territoryId, input.territoryId),
+      ];
+      const aggregateSelection = {
+        label: salesforceWorkbookAggregates.speciesLabel,
+        city: salesforceWorkbookAggregates.cityLabel,
+        year: salesforceWorkbookAggregates.periodYear,
+        month: salesforceWorkbookAggregates.periodMonth,
+        currencyCode: salesforceWorkbookAggregates.currencyCode,
+        workOrders: sql<number>`SUM(${salesforceWorkbookAggregates.recordCount})`,
+        invoiceValueRows: sql<number>`SUM(${salesforceWorkbookAggregates.invoiceValueCount})`,
+        invoicePreTaxAmount: sql<string>`SUM(${salesforceWorkbookAggregates.invoicePreTaxAmount})`,
+      };
+      const [months, speciesRows, cityRows] = await Promise.all([
+        db.select(aggregateSelection).from(salesforceWorkbookAggregates).where(and(
+          ...baseFilters,
+          eq(salesforceWorkbookAggregates.statusLabel, "__ALL__"),
+          eq(salesforceWorkbookAggregates.speciesLabel, "__ALL__"),
+          eq(salesforceWorkbookAggregates.cityLabel, "__ALL__"),
+        )).groupBy(
+          salesforceWorkbookAggregates.speciesLabel,
+          salesforceWorkbookAggregates.cityLabel,
+          salesforceWorkbookAggregates.periodYear,
+          salesforceWorkbookAggregates.periodMonth,
+          salesforceWorkbookAggregates.currencyCode,
+        ),
+        db.select(aggregateSelection).from(salesforceWorkbookAggregates).where(and(
+          ...baseFilters,
+          eq(salesforceWorkbookAggregates.statusLabel, "__ALL__"),
+          eq(salesforceWorkbookAggregates.cityLabel, "__ALL__"),
+          ne(salesforceWorkbookAggregates.speciesLabel, "__ALL__"),
+        )).groupBy(
+          salesforceWorkbookAggregates.speciesLabel,
+          salesforceWorkbookAggregates.cityLabel,
+          salesforceWorkbookAggregates.periodYear,
+          salesforceWorkbookAggregates.periodMonth,
+          salesforceWorkbookAggregates.currencyCode,
+        ),
+        db.select(aggregateSelection).from(salesforceWorkbookAggregates).where(and(
+          ...baseFilters,
+          eq(salesforceWorkbookAggregates.statusLabel, "__ALL__"),
+          eq(salesforceWorkbookAggregates.speciesLabel, "__ALL__"),
+          ne(salesforceWorkbookAggregates.cityLabel, "__ALL__"),
+        )).groupBy(
+          salesforceWorkbookAggregates.speciesLabel,
+          salesforceWorkbookAggregates.cityLabel,
+          salesforceWorkbookAggregates.periodYear,
+          salesforceWorkbookAggregates.periodMonth,
+          salesforceWorkbookAggregates.currencyCode,
+        ),
+      ]);
+      const summarize = (rows: typeof speciesRows, field: "label" | "city") => {
+        const totals = new Map<string, { label: string; currencyCode: string; workOrders: number; invoiceValueRows: number; invoicePreTaxAmount: number }>();
+        for (const row of rows) {
+          const label = row[field];
+          const key = `${row.currencyCode}\u0000${label}`;
+          const current = totals.get(key) ?? { label, currencyCode: row.currencyCode, workOrders: 0, invoiceValueRows: 0, invoicePreTaxAmount: 0 };
+          current.workOrders += Number(row.workOrders);
+          current.invoiceValueRows += Number(row.invoiceValueRows);
+          current.invoicePreTaxAmount += Number(row.invoicePreTaxAmount);
+          totals.set(key, current);
+        }
+        return Array.from(totals.values()).sort((a, b) => b.workOrders - a.workOrders || b.invoicePreTaxAmount - a.invoicePreTaxAmount).slice(0, 20);
+      };
+      return {
+        source: "salesforce_drive_workbook" as const,
+        activeRun: { id: run.id, status: run.status, rowsRejected: run.rowsRejected, activatedAt: run.activatedAt, maxSourceModifiedAt: run.maxSourceModifiedAt },
+        months: months.map(row => ({ year: row.year, month: row.month, currencyCode: row.currencyCode, workOrders: Number(row.workOrders), invoiceValueRows: Number(row.invoiceValueRows), invoicePreTaxAmount: Number(row.invoicePreTaxAmount) })).sort((a, b) => a.year - b.year || a.month - b.month),
+        species: summarize(speciesRows, "label"),
+        cities: summarize(cityRows, "city"),
+        conversionMetric: "unavailable_pending_status_definition" as const,
       };
     }),
 });

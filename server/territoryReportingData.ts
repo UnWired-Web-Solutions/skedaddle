@@ -5,7 +5,8 @@ import {
   ga4TerritoryPages,
   gscPageMetrics,
   gscQueryMetrics,
-  salesforcePerformanceSnapshots,
+  salesforceWorkbookImportRuns,
+  salesforceWorkbookSources,
 } from "../drizzle/schema";
 import { dedicatedSuburbHubMatchesPage } from "../shared/ga4PageClassifier";
 import {
@@ -257,43 +258,25 @@ export async function loadTerritoryReportingAnalytics(
   }
 }
 
-export async function loadTerritoryCloseRate(territoryId: string) {
+export async function loadTerritoryWorkbookSourceStatus() {
   const db = await getDb();
   if (!db) return null;
-  const rows = await db.select().from(salesforcePerformanceSnapshots).where(and(
-    eq(salesforcePerformanceSnapshots.territoryId, territoryId),
-    eq(salesforcePerformanceSnapshots.species, "__ALL__"),
-  )).orderBy(desc(salesforcePerformanceSnapshots.importedAt)).limit(1);
-  const row = rows[0];
-  if (!row) return null;
-  const networkRows = await db.select({
-    territoryId: salesforcePerformanceSnapshots.territoryId,
-    inspections: salesforcePerformanceSnapshots.inspections,
-    closedJobs: salesforcePerformanceSnapshots.closedJobs,
-    importedAt: salesforcePerformanceSnapshots.importedAt,
-  }).from(salesforcePerformanceSnapshots).where(and(
-    eq(salesforcePerformanceSnapshots.species, "__ALL__"),
-    eq(salesforcePerformanceSnapshots.periodStart, row.periodStart),
-    eq(salesforcePerformanceSnapshots.periodEnd, row.periodEnd),
-  ));
-  const latestByTerritory = new Map<string, (typeof networkRows)[number]>();
-  for (const item of networkRows) {
-    const prior = latestByTerritory.get(item.territoryId);
-    if (!prior || item.importedAt > prior.importedAt) latestByTerritory.set(item.territoryId, item);
-  }
-  const latestNetworkRows = Array.from(latestByTerritory.values());
-  const networkInspections = latestNetworkRows.reduce((sum, item) => sum + Number(item.inspections), 0);
-  const networkClosedJobs = latestNetworkRows.reduce((sum, item) => sum + Number(item.closedJobs), 0);
+  const [source] = await db.select().from(salesforceWorkbookSources)
+    .orderBy(desc(salesforceWorkbookSources.updatedAt)).limit(1);
+  if (!source?.lastSuccessfulRunId) return null;
+  const [run] = await db.select().from(salesforceWorkbookImportRuns)
+    .where(eq(salesforceWorkbookImportRuns.id, source.lastSuccessfulRunId)).limit(1);
+  if (!run || (run.status !== "complete" && run.status !== "partial")) return null;
   return {
-    inspections: Number(row.inspections),
-    closedJobs: Number(row.closedJobs),
-    closeRate: Number(row.inspections) > 0 ? Number(row.closedJobs) / Number(row.inspections) * 100 : null,
-    periodStart: row.periodStart,
-    periodEnd: row.periodEnd,
-    sourceLabel: row.sourceLabel,
-    networkInspections,
-    networkClosedJobs,
-    networkCloseRate: networkInspections > 0 ? networkClosedJobs / networkInspections * 100 : null,
+    source: "salesforce_drive_workbook" as const,
+    workbookTitle: source.workbookTitle,
+    sheetName: source.sheetName,
+    status: run.status,
+    rowsProcessed: run.rowsProcessed,
+    rowsRejected: run.rowsRejected,
+    activatedAt: run.activatedAt,
+    maxSourceModifiedAt: run.maxSourceModifiedAt,
+    conversionMetric: "unavailable_pending_status_definition" as const,
   };
 }
 

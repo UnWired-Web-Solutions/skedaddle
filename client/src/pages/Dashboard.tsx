@@ -1,18 +1,17 @@
 /**
  * Dashboard.tsx — Full in-portal strategy dashboard
  * Design: Skedaddle Field Operations Manual — dark forest green + warm cream
- * Shows real Salesforce + GSC + GBP data for each franchise location
+ * Shows workbook-backed work-order aggregates alongside separately labelled GSC and GBP data.
  */
 
 import { useParams, Link } from "wouter";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  LineChart, Line, Legend, PieChart, Pie, Cell
+  LineChart, Line, Legend
 } from "recharts";
 import { DASHBOARD_DATA } from "@/data/dashboardData";
 import { trpc } from "@/lib/trpc";
 import PortalLayout from "@/components/PortalLayout";
-import { NETWORK_OVERALL_CLOSE_RATE, getNetworkBenchmark } from "@shared/closeRateData";
 import { ArrowLeft, TrendingUp, DollarSign, Users, Search, Phone, MousePointer, MapPin, AlertCircle } from "lucide-react";
 
 // ─── colour palette ───────────────────────────────────────────────────────────
@@ -92,7 +91,7 @@ export default function Dashboard() {
   const params = useParams<{ id: string }>();
   const id = params.id?.toLowerCase() || "";
   const data = DASHBOARD_DATA[id];
-  const { data: closeRateSnapshot } = trpc.analytics.getTerritoryCloseRate.useQuery(
+  const { data: workbookPerformance } = trpc.salesforceWorkbook.getTerritoryPerformance.useQuery(
     { territoryId: id },
     { enabled: Boolean(data) },
   );
@@ -110,8 +109,18 @@ export default function Dashboard() {
     );
   }
 
-  const topSpecies = data.species[0];
-  const topSuburb  = data.suburbs[0];
+  const workbookMonths = workbookPerformance?.months.slice(-12) ?? [];
+  const workbookSpecies = workbookPerformance?.species ?? [];
+  const workbookCities = workbookPerformance?.cities ?? [];
+  const workbookCurrencies = Array.from(new Set(workbookMonths.map(row => row.currencyCode)));
+  const workbookCurrency = workbookCurrencies.length === 1 ? workbookCurrencies[0] : null;
+  const totalWorkbookJobs = workbookMonths.reduce((sum, row) => sum + row.workOrders, 0);
+  const totalWorkbookInvoiceValue = workbookMonths.reduce((sum, row) => sum + row.invoicePreTaxAmount, 0);
+  const totalWorkbookInvoiceRows = workbookMonths.reduce((sum, row) => sum + row.invoiceValueRows, 0);
+  const formatWorkbookMoney = (value: number, currencyCode: string | null = workbookCurrency) =>
+    currencyCode === "CAD" || currencyCode === "USD"
+    ? new Intl.NumberFormat("en-US", { style: "currency", currency: currencyCode, maximumFractionDigits: 0 }).format(value)
+    : "Unavailable";
   const hasGsc     = data.gsc.monthly.length > 0;
   const latestGsc  = hasGsc ? data.gsc.monthly[data.gsc.monthly.length - 1] : null;
   const gscTrend   = data.gsc.monthly.length >= 2
@@ -121,12 +130,6 @@ export default function Dashboard() {
   const gbpPeriod = hasGbp
     ? `${data.gbp.monthly[0].month} to ${data.gbp.monthly[data.gbp.monthly.length - 1].month}`
     : "No GBP data";
-
-  // Pie chart data — top 6 species
-  const pieData = data.species.slice(0, 6).map(s => ({
-    name: s.species,
-    value: s.total_revenue,
-  }));
 
   // GBP monthly for chart — last 12 months
   const gbpChart = data.gbp.monthly.slice(-12);
@@ -140,58 +143,40 @@ export default function Dashboard() {
             <ArrowLeft size={14} /> Back to {data.name}
           </Link>
           <span style={{ color: "#888", fontSize: 11 }}>
-            Salesforce snapshot: Jul 24, 2026{hasGsc ? " · GSC connected" : ""}{hasGbp ? " · GBP connected" : ""}
+            Salesforce-derived source: Google Drive workbook{workbookPerformance?.activeRun ? ` · active ${workbookPerformance.activeRun.status} snapshot` : " · no active canonical snapshot"}{hasGsc ? " · GSC connected" : ""}{hasGbp ? " · GBP connected" : ""}
           </span>
         </div>
 
         {/* ── KPI Strip ── */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 40 }}>
-          <KpiCard icon={DollarSign} label={`Total Revenue (${data.currency})`} value={fmt$(data.total_revenue, data.currency)} sub="Trailing 12 months" color={SAGE} />
-          <KpiCard icon={Users} label="Total Jobs" value={`${data.total_jobs}`} sub="Completed service calls" color={SAGE} />
-          <KpiCard icon={TrendingUp} label="Top Species" value={topSpecies?.species || "—"} sub={topSpecies ? fmt$(topSpecies.total_revenue, data.currency) : ""} color={GOLD} />
-          <KpiCard icon={MapPin} label="Top Suburb" value={topSuburb?.suburb || "—"} sub={topSuburb ? fmt$(topSuburb.revenue, data.currency) : ""} color={GOLD} />
+          <KpiCard icon={DollarSign} label={workbookCurrency ? `Recorded Invoice Value (${workbookCurrency})` : "Recorded Invoice Value"} value={totalWorkbookInvoiceRows > 0 ? formatWorkbookMoney(totalWorkbookInvoiceValue) : "Pending"} sub={totalWorkbookInvoiceRows > 0 ? "Workbook pre-tax amounts; not Salesforce API" : "No canonical workbook amount available"} color={SAGE} />
+          <KpiCard icon={Users} label="Workbook Work Orders" value={workbookMonths.length ? totalWorkbookJobs.toLocaleString() : "Pending"} sub={workbookMonths.length ? "Last 12 source months; all statuses" : "No canonical workbook snapshot available"} color={SAGE} />
+          <KpiCard icon={TrendingUp} label="Top Species" value={workbookSpecies[0]?.label || "Pending"} sub={workbookSpecies[0] ? `${workbookSpecies[0].workOrders.toLocaleString()} recorded work orders` : "Workbook aggregate unavailable"} color={GOLD} />
+          <KpiCard icon={MapPin} label="Top City" value={workbookCities[0]?.label || "Pending"} sub={workbookCities[0] ? `${workbookCities[0].workOrders.toLocaleString()} recorded work orders` : "Workbook aggregate unavailable"} color={GOLD} />
           {hasGsc && <KpiCard icon={Search} label="GSC Clicks" value={fmtN(data.gsc.total_clicks)} sub={`${gscTrend >= 0 ? "+" : ""}${gscTrend} vs prev month`} color={RUST} />}
           <KpiCard icon={Phone} label="GBP Calls" value={fmtN(data.gbp.total_calls)} sub={`${fmtN(data.gbp.total_searches)} searches`} color={RUST} />
         </div>
 
-        {/* ── Species Revenue Breakdown (pie chart — Dave's preference) ── */}
+        {/* ── Workbook species breakdown ── */}
         <div style={{ background: CREAM, borderRadius: 10, padding: 24, border: `1px solid ${MIST}`, marginBottom: 32 }}>
-          <SectionHeader title={`Revenue by Species (${data.currency})`} subtitle="Top 6 species — trailing 12 months" />
-          <div style={{ display: "flex", alignItems: "center", gap: 40 }}>
-            <ResponsiveContainer width="50%" height={240}>
-              <PieChart>
-                <Pie data={pieData} cx="50%" cy="50%" outerRadius={100} dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={{ stroke: "#999" }}>
-                  {pieData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
-                </Pie>
-                <Tooltip content={<ChartTooltip formatter={fmt$} />} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div style={{ flex: 1 }}>
-              {pieData.map((d, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, fontSize: 13 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: 2, background: CHART_COLORS[i], flexShrink: 0 }} />
-                  <span style={{ color: FOREST, flex: 1 }}>{d.name}</span>
-                  <span style={{ color: "#666", fontWeight: 600 }}>{fmt$(d.value, data.currency)}</span>
-                </div>
-              ))}
-          </div>
-        </div>
+          <SectionHeader title="Work Orders by Species" subtitle="Active Google Drive workbook snapshot; all statuses retained" />
+          {workbookSpecies.length ? <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}><thead><tr style={{ borderBottom: `2px solid ${MIST}` }}><th style={{ textAlign: "left", padding: "8px 12px", color: "#888", fontSize: 11 }}>SPECIES</th><th style={{ textAlign: "right", padding: "8px 12px", color: "#888", fontSize: 11 }}>WORK ORDERS</th><th style={{ textAlign: "right", padding: "8px 12px", color: "#888", fontSize: 11 }}>RECORDED INVOICE VALUE</th></tr></thead><tbody>{workbookSpecies.map((item, index) => <tr key={`${item.currencyCode}-${item.label}`} style={{ borderBottom: `1px solid ${MIST}` }}><td style={{ padding: "10px 12px", color: FOREST, fontWeight: index < 3 ? 600 : 400 }}>{item.label}</td><td style={{ padding: "10px 12px", textAlign: "right", color: "#666" }}>{item.workOrders.toLocaleString()}</td><td style={{ padding: "10px 12px", textAlign: "right", color: FOREST, fontWeight: 600 }}>{item.invoiceValueRows ? formatWorkbookMoney(item.invoicePreTaxAmount, item.currencyCode) : "Unavailable"}</td></tr>)}</tbody></table></div> : <p style={{ color: "#777", fontSize: 13, margin: 0 }}>Species aggregates are unavailable until a canonical workbook snapshot is active for this territory.</p>}
         </div>
 
-        {/* ── Territory vs network close rate ── */}
+        {/* ── Workbook conversion status ── */}
         <div style={{ background: CREAM, borderRadius: 10, padding: 24, border: `1px solid ${MIST}`, marginBottom: 32 }}>
           <SectionHeader
-            title="Inspection-to-Sale Performance"
-            subtitle={closeRateSnapshot
-              ? `${closeRateSnapshot.periodStart} to ${closeRateSnapshot.periodEnd} · ${closeRateSnapshot.sourceLabel}`
-              : "Territory inspections are pending a verified Salesforce performance import; network rates remain visible as context."}
+            title="Salesforce-derived Work-Order Status"
+            subtitle={workbookPerformance?.activeRun
+              ? `Google Drive workbook · ${workbookPerformance.activeRun.status} snapshot · ${workbookPerformance.activeRun.rowsRejected.toLocaleString()} source rows explicitly excluded from canonical territory aggregates`
+              : "No active canonical workbook snapshot is available for this territory."}
           />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 18 }}>
             {[
-              { label: "Territory Inspections", value: closeRateSnapshot?.total.inspections.toLocaleString() || "Pending" },
-              { label: "Territory Closed Jobs", value: closeRateSnapshot?.total.closedJobs.toLocaleString() || "Pending" },
-              { label: "Territory Close Rate", value: closeRateSnapshot?.total.closeRate == null ? "Pending" : `${closeRateSnapshot.total.closeRate.toFixed(1)}%` },
-              { label: "Network Close Rate", value: `${NETWORK_OVERALL_CLOSE_RATE.toFixed(1)}%` },
+              { label: "Work Orders", value: workbookMonths.length ? totalWorkbookJobs.toLocaleString() : "Pending" },
+              { label: "Invoice Amount Rows", value: workbookMonths.length ? totalWorkbookInvoiceRows.toLocaleString() : "Pending" },
+              { label: "Inspection Definition", value: "Unavailable" },
+              { label: "Closed-Job Definition", value: "Unavailable" },
             ].map(item => (
               <div key={item.label} style={{ background: "#fff", border: `1px solid ${MIST}`, borderRadius: 6, padding: "12px 14px" }}>
                 <div style={{ fontSize: 10, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em" }}>{item.label}</div>
@@ -199,84 +184,35 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-              <thead>
-                <tr style={{ borderBottom: `2px solid ${MIST}` }}>
-                  <th style={{ textAlign: "left", padding: "8px 12px", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Species</th>
-                  <th style={{ textAlign: "right", padding: "8px 12px", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Territory Revenue</th>
-                  <th style={{ textAlign: "right", padding: "8px 12px", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Inspections</th>
-                  <th style={{ textAlign: "right", padding: "8px 12px", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Closed Jobs</th>
-                  <th style={{ textAlign: "right", padding: "8px 12px", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Territory Close Rate</th>
-                  <th style={{ textAlign: "right", padding: "8px 12px", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Network Close Rate</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.species.map((s, i) => {
-                  const benchmark = getNetworkBenchmark(s.species);
-                  const territory = closeRateSnapshot?.species.find(row => row.species.toLowerCase() === s.species.toLowerCase());
-                  return (
-                    <tr key={i} style={{ borderBottom: `1px solid ${MIST}`, background: i % 2 === 0 ? "transparent" : "#faf8f4" }}>
-                      <td style={{ padding: "10px 12px", color: FOREST, fontWeight: i < 3 ? 600 : 400 }}>
-                        {i < 3 && <span style={{ color: GOLD, marginRight: 6, fontSize: 11 }}>★</span>}
-                        {s.species}
-                      </td>
-                      <td style={{ padding: "10px 12px", textAlign: "right", color: FOREST, fontWeight: 600 }}>{fmt$(s.total_revenue, data.currency)}</td>
-                      <td style={{ padding: "10px 12px", textAlign: "right", color: "#666" }}>{territory?.inspections.toLocaleString() || "—"}</td>
-                      <td style={{ padding: "10px 12px", textAlign: "right", color: "#666" }}>{territory?.closedJobs.toLocaleString() || s.total_jobs.toLocaleString()}</td>
-                      <td style={{ padding: "10px 12px", textAlign: "right", color: FOREST, fontWeight: 700 }}>
-                        {territory?.closeRate == null ? "—" : `${territory.closeRate.toFixed(1)}%`}
-                      </td>
-                      <td style={{ padding: "10px 12px", textAlign: "right" }}>
-                        {benchmark !== null ? (
-                          <span style={{
-                            fontWeight: 700,
-                            color: benchmark >= 55 ? SAGE : benchmark >= 45 ? GOLD : RUST,
-                          }}>
-                            {benchmark.toFixed(1)}%
-                          </span>
-                        ) : (
-                          <span style={{ color: "#bbb", fontSize: 11 }}>No data</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
           <div style={{ marginTop: 12, fontSize: 11, color: "#999", display: "flex", gap: 16 }}>
-            <span>Inspections are Salesforce Primary Actions Sought (PAS). Blank territory cells mean the verified import does not include that species; no values are inferred from revenue.</span>
+            <span>The approved workbook preserves exact source statuses, but UWS has not approved a status-to-inspection or status-to-closed-job definition. Close rates and network benchmarks are intentionally unavailable; none are inferred from recorded invoice values.</span>
           </div>
         </div>
 
-        {/* ── Row 2: Top Suburbs table ── */}
+        {/* ── Workbook city table ── */}
         <div style={{ background: CREAM, borderRadius: 10, padding: 24, border: `1px solid ${MIST}`, marginBottom: 32 }}>
-            <SectionHeader title={`Revenue by Suburb (${data.currency})`} subtitle="Top 20 suburbs — sorted by total revenue" />
+            <SectionHeader title="Work Orders by City" subtitle="Active Google Drive workbook snapshot; not a suburb-page opportunity ranking" />
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: `2px solid ${MIST}` }}>
-                  <th style={{ textAlign: "left", padding: "8px 12px", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Suburb</th>
-                  <th style={{ textAlign: "right", padding: "8px 12px", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Revenue</th>
-                  <th style={{ textAlign: "right", padding: "8px 12px", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Jobs</th>
-                  <th style={{ textAlign: "right", padding: "8px 12px", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Avg/Job</th>
-                  <th style={{ textAlign: "left", padding: "8px 12px", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Revenue Bar</th>
+                  <th style={{ textAlign: "left", padding: "8px 12px", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>City</th>
+                  <th style={{ textAlign: "right", padding: "8px 12px", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Recorded Work Orders</th>
+                  <th style={{ textAlign: "right", padding: "8px 12px", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Recorded Invoice Value</th>
+                  <th style={{ textAlign: "left", padding: "8px 12px", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Work-Order Share</th>
                 </tr>
               </thead>
               <tbody>
-                {data.suburbs.map((s, i) => {
-                  const pct = (s.revenue / data.suburbs[0].revenue) * 100;
-                  const avgJob = s.jobs > 0 ? s.revenue / s.jobs : 0;
+                {workbookCities.map((s, i) => {
+                  const pct = workbookCities[0] ? (s.workOrders / workbookCities[0].workOrders) * 100 : 0;
                   return (
                     <tr key={i} style={{ borderBottom: `1px solid ${MIST}`, background: i % 2 === 0 ? "transparent" : "#faf8f4" }}>
                       <td style={{ padding: "10px 12px", color: FOREST, fontWeight: i < 3 ? 600 : 400 }}>
                         {i < 3 && <span style={{ color: GOLD, marginRight: 6, fontSize: 11 }}>★</span>}
-                        {s.suburb}
+                        {s.label}
                       </td>
-                      <td style={{ padding: "10px 12px", textAlign: "right", color: FOREST, fontWeight: 600 }}>{fmt$(s.revenue, data.currency)}</td>
-                      <td style={{ padding: "10px 12px", textAlign: "right", color: "#666" }}>{s.jobs}</td>
-                      <td style={{ padding: "10px 12px", textAlign: "right", color: "#666" }}>{avgJob > 0 ? fmt$(avgJob, data.currency) : "—"}</td>
+                      <td style={{ padding: "10px 12px", textAlign: "right", color: "#666" }}>{s.workOrders.toLocaleString()}</td>
+                      <td style={{ padding: "10px 12px", textAlign: "right", color: FOREST, fontWeight: 600 }}>{s.invoiceValueRows ? formatWorkbookMoney(s.invoicePreTaxAmount, s.currencyCode) : "Unavailable"}</td>
                       <td style={{ padding: "10px 12px" }}>
                         <div style={{ background: MIST, borderRadius: 3, height: 8, width: "100%" }}>
                           <div style={{ background: CHART_COLORS[i % 3], borderRadius: 3, height: 8, width: `${pct}%`, transition: "width 0.5s ease" }} />

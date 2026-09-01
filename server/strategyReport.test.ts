@@ -1,4 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 // Mock the env module
 vi.mock("./_core/env", () => ({
@@ -184,5 +186,24 @@ describe("Strategy Report Router", { timeout: 15_000 }, () => {
     const { strategyReportRouter } = await import("./strategyReportRouter");
     expect(strategyReportRouter).toBeDefined();
     expect((strategyReportRouter as any)._def.procedures.exportPdf).toBeDefined();
+  });
+
+  it("keeps the Drive workbook provenance and conversion-unavailability disclosure in the report source", () => {
+    const source = readFileSync(resolve(process.cwd(), "server/strategyReportRouter.ts"), "utf8");
+    expect(source).toContain("Work-Order Data Status");
+    expect(source).toContain("unavailable pending an approved status definition");
+    expect(source).toContain("historical sales snapshot");
+    expect(source).not.toContain("Use closed revenue, jobs, inspections, close rate");
+    expect(source).not.toContain("<strong>Data Sources:</strong> Salesforce CRM");
+    expect(source).toContain("Historical Revenue Snapshot");
+  });
+
+  it("does not split a 90-day task at an ordinary GBP mention", async () => {
+    const { formatNinetyDayPlanHtml } = await import("./strategyReportRouter");
+    const html = formatNinetyDayPlanHtml(
+      "Month 1 — Foundation\nPriorities: Analytics owner — verify GA4, Search Console, GBP, and Salesforce coverage — produce an approved baseline; Content lead — audit dedicated hubs — document confirmed gaps",
+    );
+    expect(html).toContain("Analytics owner — verify GA4, Search Console, GBP, and Salesforce coverage");
+    expect(html).not.toContain("<li>, and Salesforce coverage");
   });
 });

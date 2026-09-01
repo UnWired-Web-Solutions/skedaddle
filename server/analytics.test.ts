@@ -75,9 +75,9 @@ describe("analyticsRouter", () => {
     expect(page).toContain("unavailable rather than estimated");
   });
 
-  it("should expose verified territory close-rate snapshots", async () => {
+  it("retires the legacy territory close-rate procedure", async () => {
     const mod = await import("./analyticsRouter");
-    expect(mod.analyticsRouter._def.procedures.getTerritoryCloseRate).toBeDefined();
+    expect(mod.analyticsRouter._def.procedures.getTerritoryCloseRate).toBeUndefined();
   });
 
   it("should define durable GSC, GA4, and Salesforce performance tables", async () => {
@@ -88,6 +88,9 @@ describe("analyticsRouter", () => {
     expect(schema.ga4TerritoryPages).toBeDefined();
     expect(schema.ga4ImportRuns).toBeDefined();
     expect(schema.salesforcePerformanceSnapshots).toBeDefined();
+    expect(schema.salesforceWorkbookSources).toBeDefined();
+    expect(schema.salesforceWorkbookImportRuns).toBeDefined();
+    expect(schema.salesforceWorkbookAggregates).toBeDefined();
     expect(schema.reportDrafts).toBeDefined();
   });
 
@@ -117,5 +120,6 @@ describe("analyticsRouter", () => {
     const mod = await import("./routers");
     // tRPC v11 nested routers are accessible via record key
     expect(mod.appRouter._def.record.analytics).toBeDefined();
+    expect(mod.appRouter._def.record.salesforceWorkbook).toBeDefined();
   });
 });

@@ -5,8 +5,8 @@ import { ENV } from "./_core/env";
 import { storagePut } from "./storage";
 import puppeteer from "puppeteer";
 import {
-  loadTerritoryCloseRate,
   loadTerritoryReportingAnalytics,
+  loadTerritoryWorkbookSourceStatus,
   matchedMonthComparison,
 } from "./territoryReportingData";
 import { dedicatedSuburbHubMatchesPage } from "../shared/ga4PageClassifier";
@@ -126,16 +126,16 @@ export interface TerritoryDataObject {
     ga4: { current: number; previous: number } | null;
     gsc: { current: number; previous: number } | null;
   } | null;
-  closeRate: {
-    inspections: number;
-    closedJobs: number;
-    closeRate: number | null;
-    periodStart: string;
-    periodEnd: string;
-    sourceLabel: string;
-    networkInspections: number;
-    networkClosedJobs: number;
-    networkCloseRate: number | null;
+  salesforceWorkbook: {
+    source: "salesforce_drive_workbook";
+    workbookTitle: string;
+    sheetName: string;
+    status: "complete" | "partial";
+    rowsProcessed: number;
+    rowsRejected: number;
+    activatedAt: Date | null;
+    maxSourceModifiedAt: string | null;
+    conversionMetric: "unavailable_pending_status_definition";
   } | null;
   seasonalTiming: string;
   topSpeciesNames: string[];
@@ -274,10 +274,10 @@ export async function buildTerritoryData(
 
   const dashData = DASHBOARD_DATA[territoryId];
   if (!dashData) throw new Error(`No dashboard data for: ${territoryId}`);
-  const [reportingAnalytics, priorYearAnalytics, closeRate] = await Promise.all([
+  const [reportingAnalytics, priorYearAnalytics, salesforceWorkbook] = await Promise.all([
     loadTerritoryReportingAnalytics(territoryId, INITIAL_SALES_REPORT_WINDOW),
     loadTerritoryReportingAnalytics(territoryId, previousYearWindow(INITIAL_SALES_REPORT_WINDOW)),
-    loadTerritoryCloseRate(territoryId),
+    loadTerritoryWorkbookSourceStatus(),
   ]);
   const yoy = matchedMonthComparison(reportingAnalytics, priorYearAnalytics);
 
@@ -453,7 +453,7 @@ export async function buildTerritoryData(
       label: reportingWindowLabel(INITIAL_SALES_REPORT_WINDOW),
     },
     yoy,
-    closeRate,
+    salesforceWorkbook,
     seasonalTiming: SEASONAL_DATA[location.state] || SEASONAL_DATA["default"],
     topSpeciesNames: species.slice(0, 5).map((s: any) => s.species),
     topSuburbNames: suburbs.slice(0, 8).map((s: any) => s.suburb),
@@ -631,8 +631,8 @@ async function generateExecutiveSummary(data: TerritoryDataObject): Promise<stri
   const prompt = `You are writing the Executive Summary section of a franchise digital marketing strategy document for Skedaddle Humane Wildlife Control — the "${data.name}" territory (${data.city}, ${data.state}, ${data.country}).
 
 TERRITORY DATA:
-- Total closed revenue (${data.reportingPeriod.label}): ${formatCurrency(data.totalRevenue, data.currencySymbol)}
-- Total closed jobs: ${formatNumber(data.totalJobs)}
+- Historical revenue snapshot (${data.reportingPeriod.label}): ${formatCurrency(data.totalRevenue, data.currencySymbol)}
+- Historical jobs snapshot: ${formatNumber(data.totalJobs)}
 - Average job value: ${formatCurrency(data.avgJobValue, data.currencySymbol)}
 - Top species by revenue: ${data.topSpeciesNames.join(", ")}
 - Top suburbs/cities by revenue: ${data.topSuburbNames.slice(0, 6).join(", ")}
@@ -667,7 +667,7 @@ Return ONLY the paragraph text (no headings, no HTML tags, no markdown). Use pla
   console.warn(`Executive Summary AI returned empty for ${data.name} — using data-driven fallback`);
   const topSpecies = data.topSpeciesNames.slice(0, 3).join(", ");
   const topSuburbs = data.topSuburbNames.slice(0, 3).join(", ");
-  return `<p class="narrative">${data.name} is a ${data.totalRevenue > 1000000 ? "proven" : "developing"} Skedaddle market generating ${formatCurrency(data.totalRevenue, data.currencySymbol)} from ${data.reportingPeriod.label} across ${formatNumber(data.totalJobs)} closed jobs, with an average ticket of ${formatCurrency(data.avgJobValue, data.currencySymbol)}. The territory's top revenue species are ${topSpecies}.</p>
+  return `<p class="narrative">The historical sales snapshot for ${data.name} records ${formatCurrency(data.totalRevenue, data.currencySymbol)} for ${data.reportingPeriod.label} across ${formatNumber(data.totalJobs)} jobs, with an average ticket of ${formatCurrency(data.avgJobValue, data.currencySymbol)}. These figures are used only as historical context; they are not current Google Drive workbook results. The territory's top revenue species in that snapshot are ${topSpecies}.</p>
 <p class="narrative">The available ${gbpSourceLabel(data.analyticsSource.gbp)} recorded ${formatNumber(data.gbp.totalCalls)} calls and ${formatNumber(data.gbp.totalClicks)} website clicks.${data.gbp.incompletePeriods.length ? ` Incomplete live periods excluded from these headline values: ${data.gbp.incompletePeriods.join(", ")}.` : ""}${data.gsc.monthly.length ? ` The available ${data.analyticsSource.gsc === "persisted_search_console" ? "persisted Search Console import" : "historical Search Console snapshot"} recorded ${formatNumber(data.gsc.totalClicks)} organic clicks.` : " No Search Console history is available for this report."}${data.ga4.monthly.length ? ` Persisted GA4 imports recorded ${formatNumber(data.ga4.totalPriorityPageSessions)} species and location-page sessions.` : ""} Geographically, the primary markets are ${topSuburbs}.</p>
 <p class="narrative">This report outlines a structured digital marketing program built around local SEO, hub-and-spoke content architecture, and species-specific suburb pages to grow organic visibility and lead volume across the territory.</p>`;
 }
@@ -936,7 +936,7 @@ Write exactly 8 numbered recommendations that summarize the entire strategy. Eac
 5. Capitalize on seasonal species momentum
 6. Align GBP post timing to species calendar
 7. Build static page layer first, blog second
-8. Use closed-business data as ongoing content compass
+8. Use verified work-order and invoice aggregates, together with matched-month digital evidence, to set the next priorities; do not calculate conversion metrics until status definitions are approved
 
 STYLE: Concise, direct, data-backed. Each recommendation should feel like a clear directive, not a suggestion.
 
@@ -945,7 +945,7 @@ Return as numbered list (1. ... 2. ... etc.) with no other formatting.`;
   const text = await callClaude(prompt, "claude-opus-5", 1500);
   if (text.trim().length > 50) return text;
   console.warn(`AI section returned near-empty for ${data.name}`);
-  return `1. Audit dedicated suburb hubs in revenue order, beginning with ${data.topSuburbNames.slice(0, 3).join(", ")}, before approving new pages.\n2. Establish the measurement baseline using only complete GA4 months and territory-filtered Search Console data.\n3. Keep the ${data.name} territory page as the central search and GBP destination.\n4. Weight approved content toward ${data.topSpeciesNames.slice(0, 2).join(" and ")}, the leading revenue species.\n5. Recheck seasonal demand monthly before changing the production calendar.\n6. Set GBP volume from approved capacity and rotate verified suburb and species themes.\n7. Build approved permanent suburb hubs before species-by-suburb pages or supporting articles.\n8. Use closed revenue, jobs, inspections, close rate, and matched-month digital evidence to set the next priorities.`;
+  return `1. Audit dedicated suburb hubs in revenue order, beginning with ${data.topSuburbNames.slice(0, 3).join(", ")}, before approving new pages.\n2. Establish the measurement baseline using only complete GA4 months and territory-filtered Search Console data.\n3. Keep the ${data.name} territory page as the central search and GBP destination.\n4. Weight approved content toward ${data.topSpeciesNames.slice(0, 2).join(" and ")}, the leading historical revenue species.\n5. Recheck seasonal demand monthly before changing the production calendar.\n6. Set GBP volume from approved capacity and rotate verified suburb and species themes.\n7. Build approved permanent suburb hubs before species-by-suburb pages or supporting articles.\n8. Use verified Google Drive workbook work-order and invoice aggregates, together with matched-month digital evidence, to set the next priorities. Inspection, closed-job, and close-rate metrics remain unavailable pending an approved status definition.`;
 }
 
 // ─── Deterministic Template Sections ─────────────────────────────────────────
@@ -1042,8 +1042,8 @@ function buildSpeciesTableHtml(data: TerritoryDataObject): string {
       <thead>
         <tr>
           <th>Species</th>
-          <th>Closed Jobs</th>
-          <th>Closed Revenue</th>
+          <th>Historical Jobs</th>
+          <th>Historical Revenue</th>
           <th>% of Total</th>
           <th>Avg Job Value</th>
         </tr>
@@ -1087,8 +1087,8 @@ function buildSuburbTableHtml(data: TerritoryDataObject): string {
       <thead>
         <tr>
           <th>City / Suburb</th>
-          <th>Closed Revenue</th>
-          <th>Jobs</th>
+          <th>Historical Revenue</th>
+          <th>Historical Jobs</th>
           <th>Avg Job Value</th>
           <th>% of Total</th>
           <th>Dedicated Page</th>
@@ -1178,8 +1178,8 @@ function buildOrganicAnalyticsHtml(data: TerritoryDataObject): string {
         ${ga4Rows}
       </tbody>
     </table>
-    <h3>Inspection-to-Sale Performance</h3>
-    ${data.closeRate ? `<table class="data-table"><thead><tr><th>Inspections</th><th>Closed Jobs</th><th>Territory Close Rate</th><th>Network Close Rate</th><th>Period / Source</th></tr></thead><tbody><tr><td class="num">${formatNumber(data.closeRate.inspections)}</td><td class="num">${formatNumber(data.closeRate.closedJobs)}</td><td class="num">${data.closeRate.closeRate === null ? "Unavailable" : formatPct(data.closeRate.closeRate)}</td><td class="num">${data.closeRate.networkCloseRate === null ? "Unavailable" : formatPct(data.closeRate.networkCloseRate)}</td><td>${escapeHtml(data.closeRate.periodStart)} to ${escapeHtml(data.closeRate.periodEnd)} · ${escapeHtml(data.closeRate.sourceLabel)}</td></tr></tbody></table>` : `<p class="narrative">Territory inspection and close-rate data is unavailable for this report.</p>`}
+    <h3>Work-Order Data Status</h3>
+    ${data.salesforceWorkbook ? `<p class="narrative">Source: ${escapeHtml(data.salesforceWorkbook.workbookTitle)} · ${escapeHtml(data.salesforceWorkbook.sheetName)} (Google Drive workbook, not Salesforce API). The active import is <strong>${escapeHtml(data.salesforceWorkbook.status)}</strong>: ${formatNumber(data.salesforceWorkbook.rowsProcessed)} source rows included and ${formatNumber(data.salesforceWorkbook.rowsRejected)} explicitly excluded from canonical territory aggregates. Inspection, closed-job, and close-rate metrics are unavailable pending an approved status definition.</p>` : `<p class="narrative">No active Google Drive workbook snapshot is available. Inspection, closed-job, and close-rate metrics are unavailable.</p>`}
     <h3>Matched-Month Year-over-Year</h3>
     ${yoyRows ? `<p class="narrative">Comparison uses only complete months present in both years: ${data.yoy!.months.map(month => new Date(2026, month - 1, 1).toLocaleDateString("en-US", { month: "short" })).join(", ")}.</p><table class="data-table"><thead><tr><th>Metric</th><th>Current</th><th>Prior Year</th><th>YoY Change</th></tr></thead><tbody>${yoyRows}</tbody></table>` : `<p class="narrative">Matched-month YoY is unavailable because no comparable complete current/prior-year months were imported.</p>`}
     ${topPageRows ? `<h3>Top 25 Imported GA4 Pages (Complete Months Only)</h3><table class="data-table"><thead><tr><th>Page</th><th>Type</th><th>Sessions</th></tr></thead><tbody>${topPageRows}</tbody></table>` : `<p class="narrative">No complete-month GA4 page import is available. GA4 page claims are intentionally omitted.</p>`}
@@ -1621,9 +1621,9 @@ function buildFullReportHtml(data: TerritoryDataObject, sections: SectionResult[
     <strong>Prepared by:</strong> Unwired Web Solutions<br>
     <strong>Generated:</strong> ${dateStr}<br>
     <strong>Reporting period:</strong> ${data.reportingPeriod.start} through ${data.reportingPeriod.end}<br>
-    <strong>Territory Revenue:</strong> ${formatCurrency(data.totalRevenue, data.currencySymbol)}<br>
-    <strong>Closed Jobs:</strong> ${formatNumber(data.totalJobs)}<br>
-    <strong>Data Sources:</strong> Salesforce CRM, ${gbpSourceLabel(data.analyticsSource.gbp)}${data.gsc.monthly.length > 0 ? data.analyticsSource.gsc === "persisted_search_console" ? ", persisted Google Search Console import" : ", historical Google Search Console snapshot" : ""}${data.ga4.monthly.length > 0 ? ", persisted Google Analytics 4 Data API import" : ""}
+    <strong>Historical Revenue Snapshot:</strong> ${formatCurrency(data.totalRevenue, data.currencySymbol)}<br>
+    <strong>Historical Jobs Snapshot:</strong> ${formatNumber(data.totalJobs)}<br>
+    <strong>Data Sources:</strong> legacy historical sales snapshot; ${data.salesforceWorkbook ? `current Google Drive workbook (${escapeHtml(data.salesforceWorkbook.status)}; conversion metrics unavailable)` : "current Google Drive workbook snapshot unavailable"}, ${gbpSourceLabel(data.analyticsSource.gbp)}${data.gsc.monthly.length > 0 ? data.analyticsSource.gsc === "persisted_search_console" ? ", persisted Google Search Console import" : ", historical Google Search Console snapshot" : ""}${data.ga4.monthly.length > 0 ? ", persisted Google Analytics 4 Data API import" : ""}
   </div>
 </div>
 
@@ -1647,7 +1647,7 @@ function buildFullReportHtml(data: TerritoryDataObject, sections: SectionResult[
 
 // ─── 90-Day Plan HTML formatter ──────────────────────────────────────────────
 
-function formatNinetyDayPlanHtml(rawText: string): string {
+export function formatNinetyDayPlanHtml(rawText: string): string {
   // Parse the raw text into structured months
   const months = rawText.split(/Month \d/i).filter(m => m.trim());
   let html = "";
@@ -1659,7 +1659,7 @@ function formatNinetyDayPlanHtml(rawText: string): string {
     html += `<div class="action-plan-month"><h3>${monthTitles[i] || `Month ${i + 1}`}</h3>`;
 
     // Try to split by categories
-    const categories = monthContent.split(/(?:Content & SEO|GBP|Local SEO|Conversion|Sales Enablement)[:\s]*/i);
+    const categories = monthContent.split(/(?:^|\n)\s*(?:Content & SEO|GBP|Local SEO|Conversion|Sales Enablement)\s*:\s*/i);
     const categoryNames = ["Content & SEO", "GBP", "Local SEO / Technical", "Conversion & Sales Enablement"];
 
     if (categories.length > 1) {
@@ -1754,7 +1754,8 @@ export async function generateStrategyReport(
   const speciesTableHtml = buildSpeciesTableHtml(data);
   const topSpecies = data.species[0];
   const secondSpecies = data.species[1];
-  const speciesNarrative = `<p class="narrative">${topSpecies?.species || "Primary species"} leads with ${formatCurrency(topSpecies?.total_revenue || 0, data.currencySymbol)} in closed revenue (${formatPct(topSpecies?.pctRevenue || 0)} of total), followed by ${secondSpecies?.species || "secondary species"} at ${formatCurrency(secondSpecies?.total_revenue || 0, data.currencySymbol)}. The top ${Math.min(data.species.length, 3)} species account for ${formatPct(data.species.slice(0, 3).reduce((sum, s) => sum + s.pctRevenue, 0))} of closed revenue, so content prioritization should follow this territory demand mix. Average job value is shown descriptively in ${data.currency}; it is not used as a close-rate proxy or compared across currencies.</p>`;
+  const historicalSalesDisclosure = `<p class="data-note">Historical revenue, jobs, species, and city values in this report come from a prior sales snapshot and are not current Google Drive workbook values. The current work-order feed is ${data.salesforceWorkbook ? `${escapeHtml(data.salesforceWorkbook.status)} with ${formatNumber(data.salesforceWorkbook.rowsRejected)} explicit exclusions` : "unavailable"}; inspection, closed-job, and close-rate measures are unavailable pending an approved status definition.</p>`;
+  const speciesNarrative = `${historicalSalesDisclosure}<p class="narrative">In the historical snapshot, ${topSpecies?.species || "Primary species"} leads with ${formatCurrency(topSpecies?.total_revenue || 0, data.currencySymbol)} in recorded revenue (${formatPct(topSpecies?.pctRevenue || 0)} of the snapshot), followed by ${secondSpecies?.species || "secondary species"} at ${formatCurrency(secondSpecies?.total_revenue || 0, data.currencySymbol)}. The top ${Math.min(data.species.length, 3)} species account for ${formatPct(data.species.slice(0, 3).reduce((sum, s) => sum + s.pctRevenue, 0))} of recorded snapshot revenue, so content prioritization should follow this historical demand mix. Average job value is shown descriptively in ${data.currency}; it is not a conversion proxy and is not compared across currencies.</p>`;
 
   onProgress?.("Building Suburb Revenue Analysis...", 32);
   const suburbTableHtml = buildSuburbTableHtml(data);
@@ -1763,12 +1764,12 @@ export async function generateStrategyReport(
   let suburbNarrativeText: string;
   if (data.suburbPageStatus === "validated" || data.suburbPageStatus === "partial") {
     if (confirmedNoPage.length > 0) {
-      suburbNarrativeText = `${data.suburbs[0]?.suburb || "Primary market"} leads with ${formatCurrency(data.suburbs[0]?.revenue || 0, data.currencySymbol)} in closed revenue across ${data.suburbs[0]?.jobs || 0} jobs. The top 5 suburbs account for ${formatPct(data.suburbs.slice(0, 5).reduce((sum, s) => sum + s.pctRevenue, 0))} of total territory revenue. ${confirmedHasPage.length} suburbs have confirmed dedicated pages (${confirmedHasPage.map(s => s.suburb).join(", ")}), while ${confirmedNoPage.length} revenue-generating suburbs (${confirmedNoPage.map(s => s.suburb).join(", ")}) have no dedicated page — representing a clear content gap.`;
+      suburbNarrativeText = `In the historical snapshot, ${data.suburbs[0]?.suburb || "Primary market"} leads with ${formatCurrency(data.suburbs[0]?.revenue || 0, data.currencySymbol)} in recorded revenue across ${data.suburbs[0]?.jobs || 0} jobs. The top 5 cities account for ${formatPct(data.suburbs.slice(0, 5).reduce((sum, s) => sum + s.pctRevenue, 0))} of snapshot territory revenue. ${confirmedHasPage.length} cities have confirmed dedicated pages (${confirmedHasPage.map(s => s.suburb).join(", ")}), while ${confirmedNoPage.length} recorded-revenue cities (${confirmedNoPage.map(s => s.suburb).join(", ")}) have no dedicated page — representing a clear content gap.`;
     } else {
-      suburbNarrativeText = `${data.suburbs[0]?.suburb || "Primary market"} leads with ${formatCurrency(data.suburbs[0]?.revenue || 0, data.currencySymbol)} in closed revenue across ${data.suburbs[0]?.jobs || 0} jobs. The top 5 suburbs account for ${formatPct(data.suburbs.slice(0, 5).reduce((sum, s) => sum + s.pctRevenue, 0))} of total territory revenue. All audited suburbs have confirmed dedicated pages — the focus should shift to content quality and optimization.`;
+      suburbNarrativeText = `In the historical snapshot, ${data.suburbs[0]?.suburb || "Primary market"} leads with ${formatCurrency(data.suburbs[0]?.revenue || 0, data.currencySymbol)} in recorded revenue across ${data.suburbs[0]?.jobs || 0} jobs. The top 5 cities account for ${formatPct(data.suburbs.slice(0, 5).reduce((sum, s) => sum + s.pctRevenue, 0))} of snapshot territory revenue. All audited cities have confirmed dedicated pages — the focus should shift to content quality and optimization.`;
     }
   } else {
-    suburbNarrativeText = `${data.suburbs[0]?.suburb || "Primary market"} leads with ${formatCurrency(data.suburbs[0]?.revenue || 0, data.currencySymbol)} in closed revenue across ${data.suburbs[0]?.jobs || 0} jobs. The top 5 suburbs account for ${formatPct(data.suburbs.slice(0, 5).reduce((sum, s) => sum + s.pctRevenue, 0))} of total territory revenue. Page coverage for these suburbs has not yet been audited — a content audit is recommended to identify which revenue-generating suburbs lack dedicated pages.`;
+    suburbNarrativeText = `In the historical snapshot, ${data.suburbs[0]?.suburb || "Primary market"} leads with ${formatCurrency(data.suburbs[0]?.revenue || 0, data.currencySymbol)} in recorded revenue across ${data.suburbs[0]?.jobs || 0} jobs. The top 5 cities account for ${formatPct(data.suburbs.slice(0, 5).reduce((sum, s) => sum + s.pctRevenue, 0))} of snapshot territory revenue. Page coverage for these cities has not yet been audited — a content audit is recommended to identify which recorded-revenue cities lack dedicated pages.`;
   }
   const suburbNarrative = `<p class="narrative">${suburbNarrativeText}</p>`;
   const pageGapContext = data.suburbPageStatus === "unknown"
@@ -1809,8 +1810,8 @@ export async function generateStrategyReport(
   const sections: SectionResult[] = [
     { id: "executive_summary", title: "Executive Summary", html: execSummaryHtml, isAiGenerated: true },
     { id: "current_campaign", title: "What's Running Now — Current Campaign", html: currentCampaignHtml, isAiGenerated: false },
-    { id: "species_analysis", title: "Sales & Species Analysis — Revenue by Species", html: speciesTableHtml + speciesNarrative, isAiGenerated: false },
-    { id: "suburb_revenue", title: "Revenue by City — Top Markets", html: suburbTableHtml + suburbNarrative, isAiGenerated: false },
+    { id: "species_analysis", title: "Historical Sales Snapshot — Revenue by Species", html: speciesTableHtml + speciesNarrative, isAiGenerated: false },
+    { id: "suburb_revenue", title: "Historical Sales Snapshot — Revenue by City", html: suburbTableHtml + historicalSalesDisclosure + suburbNarrative, isAiGenerated: false },
     { id: "data_foundation", title: "Digital Performance — GBP, Search Console & GA4", html: performanceHtml, isAiGenerated: false },
     { id: "gap_analysis", title: "Content Architecture Gap — The Opportunity", html: gapHtml, isAiGenerated: true },
     { id: "proposed_program", title: "Proposed Program — Full Build", html: proposedHtml, isAiGenerated: true },
