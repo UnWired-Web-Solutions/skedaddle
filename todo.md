@@ -34,7 +34,8 @@
 - [x] Fetch and persist read-only GA4 property creation metadata so each historical month counts only properties that existed during that month — 103 mapped properties were reconciled through the Admin API with no deletions reported
 - [x] Create a bounded, redacted GA4 completed-month range backfill runner that skips pre-creation months as unavailable and exits cleanly — sequential runner completed the direct historical coverage window with aggregate-only output
 - [x] Correct GA4 import-status ordering and distinguish the active durable snapshot from a later non-applied partial attempt in Analytics — status now orders by reporting period and separates the latest attempt from the active persisted snapshot
-- [ ] Checkpoint and deploy the GA4 import-status interface update, then verify published Analytics shows the active August 2026 snapshot and preserves retained-snapshot messaging without client errors
+- [x] Checkpoint and deploy the GA4 import-status interface update, then verify published Analytics shows the active August 2026 snapshot and preserves retained-snapshot messaging without client errors — checkpoint `efb8a190` deployed; authenticated Analytics rendered Active persisted import: August 2026 · 5/5 properties · complete; conditional retained-snapshot state is covered without creating a synthetic partial production fetch
+- [ ] Observe the conditional GA4 retained-snapshot notice only when a genuine later partial attempt occurs; do not induce a source failure or fabricate an audit state
 
 ## DashThis Replacement — GSC Enhancements (Aug 19, 2026)
 - [x] Add getSearchConsoleYTD procedure — YTD clicks/impressions with same-period-last-year comparison
@@ -43,6 +44,7 @@
 - [x] Add GSC YTD KPI cards to Analytics page (organic clicks, impressions, avg CTR with YoY delta)
 - [x] Add GSC monthly trend line chart to Analytics page (clicks + impressions over time)
 - [ ] Add GSC YoY comparison to the existing YoY detail table
+- [ ] Audit and implement a territory-scope-aware GSC YoY detail table that marks unmatched or unavailable source months rather than estimating changes
 - [x] Build GA4 client code (ready for when access is granted) — googleAnalyticsClient.ts with verifyGA4Access, fetchGA4SessionsByPage, fetchGA4TopCities, fetchGA4ChannelBreakdown
 - [x] Add GA4 connection status procedure to analytics router (getGA4ConnectionStatus)
 - [x] Enable guarded live Search Console imports for verified ready territories only — July 2026 data imported for Minneapolis, Montreal, Madison, Maryland Central, Columbus, and Pittsburgh; dashboard refresh control blocks ambiguous territories and incomplete months

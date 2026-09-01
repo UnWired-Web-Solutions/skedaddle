@@ -80,6 +80,15 @@ describe("analyticsRouter", () => {
     expect(page).toContain("unavailable rather than estimated");
   });
 
+  it("keeps Search Console YoY detail tied to persisted territory-scoped months", () => {
+    const routerSource = readFileSync(resolve(process.cwd(), "server/analyticsRouter.ts"), "utf8");
+    const page = readFileSync(resolve(process.cwd(), "client/src/pages/Analytics.tsx"), "utf8");
+    expect(routerSource).toContain("persisted_territory_scoped_search_console");
+    expect(routerSource).toContain("gscComparisonEligible");
+    expect(page).toContain("lack persisted data from the verified territory scope");
+    expect(page).toContain("Organic Search Clicks");
+  });
+
   it("retires the legacy territory close-rate procedure", async () => {
     const mod = await import("./analyticsRouter");
     expect(mod.analyticsRouter._def.procedures.getTerritoryCloseRate).toBeUndefined();

@@ -34,3 +34,9 @@ Checkpoint `cdcf3082` was created after local validation. The first production A
 A cache-bypassed production call to `analytics.getGA4ImportStatus` returned the old flat response shape (`year`, `month`, and `status`) and no `activeSnapshot` or `latestAttempt` keys. It returned 2024-12, matching the stale UI label. The configured static version path did not expose a deployment version marker and instead fell through to the application HTML shell. This confirms that the issue is deployment propagation or routing, rather than a browser-only render defect in the checkpointed local implementation.
 
 The alternate configured production domain was checked after its data requests settled and showed the same old flat GA4 response/UI label. Both configured domains therefore remained behind checkpoint `cdcf3082`; no published-interface verification is claimed yet.
+
+## 2026-09-01 — Successful Published UI Verification
+
+The follow-up deployment checkpoint `efb8a190` completed successfully. The authenticated primary production Analytics page then rendered **Active persisted import: August 2026 · 5/5 properties · complete** for Hamilton. Its GA4 2025–2026 chart rendered normally and no client-side status-contract failure appeared. This confirms the published frontend consumes the deployed `activeSnapshot` contract rather than the stale import-time ordering.
+
+The retained-complete-snapshot notice is intentionally conditional: it appears only if an audited latest attempt differs from the active snapshot. No synthetic partial production fetch was created merely to force that state. Importer regression coverage verifies the retention decision, while the successful complete snapshot remains the active production case.

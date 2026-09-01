@@ -686,6 +686,49 @@ export const analyticsRouter = router({
         )),
       ]));
 
+      // Search Console only contributes a matched-month comparison when both
+      // months have persisted, territory-scoped page rows from the approved
+      // registry. An absent row is unavailable, never an inferred zero.
+      const gscScope = getGscTerritoryScope(territoryId);
+      const loadGscPeriod = async (reportYear: number) => {
+        const [summary] = await db.select({
+          pageRows: sql<number>`COUNT(*)`,
+          clicks: sql<number>`COALESCE(SUM(${gscPageMetrics.clicks}), 0)`,
+          impressions: sql<number>`COALESCE(SUM(${gscPageMetrics.impressions}), 0)`,
+          weightedPosition: sql<number>`COALESCE(SUM(${gscPageMetrics.positionHundredths} * ${gscPageMetrics.impressions}), 0)`,
+          sourceProperties: sql<number>`COUNT(DISTINCT ${gscPageMetrics.sourceProperty})`,
+          pathPrefixes: sql<number>`COUNT(DISTINCT ${gscPageMetrics.pathPrefix})`,
+        }).from(gscPageMetrics).where(and(
+          eq(gscPageMetrics.territoryId, territoryId),
+          eq(gscPageMetrics.year, reportYear),
+          eq(gscPageMetrics.month, month),
+        ));
+        const pageRows = Number(summary?.pageRows || 0);
+        if (pageRows === 0) return null;
+        const clicks = Number(summary?.clicks || 0);
+        const impressions = Number(summary?.impressions || 0);
+        return {
+          clicks,
+          impressions,
+          ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+          averagePosition: impressions > 0 ? Number(summary?.weightedPosition || 0) / impressions / 100 : null,
+          pageRows,
+          sourceProperties: Number(summary?.sourceProperties || 0),
+          pathPrefixes: Number(summary?.pathPrefixes || 0),
+        };
+      };
+      const [currentGsc, previousGsc] = await Promise.all([
+        loadGscPeriod(year),
+        loadGscPeriod(prevYear),
+      ]);
+      const gscComparisonEligible = Boolean(
+        gscScope?.status === "ready"
+        && currentGsc
+        && previousGsc
+        && currentGsc.sourceProperties === 1
+        && previousGsc.sourceProperties === 1,
+      );
+
       return {
         ga4: { current: currentGA4, previous: prevGA4 },
         ga4Coverage: {
@@ -699,6 +742,13 @@ export const analyticsRouter = router({
           } : null,
         },
         gbp: { current: currentGBP, previous: prevGBP, comparisonEligibility: gbpComparisonEligibility },
+        gsc: {
+          current: currentGsc,
+          previous: previousGsc,
+          comparisonEligible: gscComparisonEligible,
+          scopeStatus: gscScope?.status ?? "unmapped",
+          source: "persisted_territory_scoped_search_console" as const,
+        },
         year,
         prevYear,
         month,

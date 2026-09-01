@@ -549,11 +549,33 @@ export default function Analytics() {
     const currentSessions = getSum(yoyData.ga4.current, ["species_pages", "location_page"]);
     const prevSessions = getSum(yoyData.ga4.previous, ["species_pages", "location_page"]);
 
+    const getGscComparison = (metric: "clicks" | "impressions" | "ctr", label: string, valueFormat: "number" | "percent") => {
+      const current = yoyData.gsc?.current?.[metric];
+      const previous = yoyData.gsc?.previous?.[metric];
+      const eligible = yoyData.gsc?.comparisonEligible === true;
+      return {
+        label,
+        current: typeof current === "number" ? current : null,
+        previous: typeof previous === "number" ? previous : null,
+        eligible,
+        valueFormat,
+        sourceStatus: eligible
+          ? "Search Console — verified territory scope"
+          : "Search Console — unavailable or unmatched source month",
+        delta: eligible && typeof current === "number" && typeof previous === "number"
+          ? formatDelta(current, previous)
+          : undefined,
+      };
+    };
+
     return {
       calls: getGBPComparison("calls"),
       clicks: getGBPComparison("website_clicks"),
       directions: getGBPComparison("directions"),
       sessions: { current: currentSessions, previous: prevSessions, delta: formatDelta(currentSessions, prevSessions) },
+      organicClicks: getGscComparison("clicks", "Organic Search Clicks", "number"),
+      organicImpressions: getGscComparison("impressions", "Organic Search Impressions", "number"),
+      organicCtr: getGscComparison("ctr", "Organic Search CTR", "percent"),
     };
   }, [yoyData]);
 
@@ -561,13 +583,17 @@ export default function Analytics() {
   const handleExportYoY = useCallback(() => {
     if (!yoyKPIs) return;
     const headers = ["Metric", `${MONTHS[comparisonMonth - 1]} ${selectedYear - 1}`, `${MONTHS[comparisonMonth - 1]} ${selectedYear}`, "Change %"];
-    const rows = Object.entries(yoyKPIs).map(([key, data]) => [
-      key === "clicks" ? "Website Clicks" : key.charAt(0).toUpperCase() + key.slice(1),
-      data.previous === null ? "Unavailable" : String(data.previous),
-      data.current === null ? "Unavailable" : String(data.current),
+    const formatExportValue = (data: any, value: number | null) => value === null
+      ? "Unavailable"
+      : data.valueFormat === "percent" ? `${value.toFixed(2)}%` : String(value);
+    const rows = Object.entries(yoyKPIs).map(([key, data]: [string, any]) => [
+      data.label || (key === "clicks" ? "Website Clicks" : key.charAt(0).toUpperCase() + key.slice(1)),
+      formatExportValue(data, data.previous),
+      formatExportValue(data, data.current),
       data.delta?.text || "Not comparable",
+      data.sourceStatus || "",
     ]);
-    downloadCSV(`yoy_${selectedTerritoryName}_${MONTHS[comparisonMonth - 1]}_${selectedYear}.csv`, headers, rows);
+    downloadCSV(`yoy_${selectedTerritoryName}_${MONTHS[comparisonMonth - 1]}_${selectedYear}.csv`, [...headers, "Source status"], rows);
   }, [yoyKPIs, selectedTerritoryName, selectedYear, comparisonMonth]);
 
   const handleExportGA4 = useCallback(() => {
@@ -865,6 +891,11 @@ export default function Analytics() {
               GA4 property coverage is partial for one or both comparison months. Treat the session comparison as directional until those months are re-imported completely.
             </div>
           )}
+          {yoyData?.gsc && !yoyData.gsc.comparisonEligible && (
+            <div style={{ marginBottom: 12, padding: "9px 12px", borderRadius: 7, background: "#fffbeb", border: "1px solid #fde68a", color: "#92400e", fontSize: 12 }}>
+              Search Console year-over-year detail is unavailable because one or both matched months lack persisted data from the verified territory scope. No zero value or estimated change is shown.
+            </div>
+          )}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
             <KpiCard
               icon={Activity}
@@ -1087,17 +1118,19 @@ export default function Analytics() {
                   <th style={{ textAlign: "right", padding: "8px 12px", fontWeight: 600, color: "#666", fontSize: 11, textTransform: "uppercase" }}>{MONTHS[comparisonMonth - 1]} {selectedYear - 1}</th>
                   <th style={{ textAlign: "right", padding: "8px 12px", fontWeight: 600, color: "#666", fontSize: 11, textTransform: "uppercase" }}>{MONTHS[comparisonMonth - 1]} {selectedYear}</th>
                   <th style={{ textAlign: "right", padding: "8px 12px", fontWeight: 600, color: "#666", fontSize: 11, textTransform: "uppercase" }}>Change</th>
+                  <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600, color: "#666", fontSize: 11, textTransform: "uppercase" }}>Source status</th>
                 </tr>
               </thead>
               <tbody>
                 {yoyKPIs && Object.entries(yoyKPIs).map(([key, data]: [string, any]) => (
                   <tr key={key} style={{ borderBottom: `1px solid ${MIST}` }}>
-                    <td style={{ padding: "10px 12px", fontWeight: 500, color: FOREST, textTransform: "capitalize" }}>{key === "clicks" ? "Website Clicks" : key}</td>
-                    <td style={{ padding: "10px 12px", textAlign: "right", color: "#666" }}>{data.previous === null ? "Unavailable" : data.previous.toLocaleString()}</td>
-                    <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600, color: FOREST }}>{data.current === null ? "Unavailable" : data.current.toLocaleString()}</td>
+                    <td style={{ padding: "10px 12px", fontWeight: 500, color: FOREST }}>{data.label || (key === "clicks" ? "Website Clicks" : key)}</td>
+                    <td style={{ padding: "10px 12px", textAlign: "right", color: "#666" }}>{data.previous === null ? "Unavailable" : data.valueFormat === "percent" ? `${data.previous.toFixed(2)}%` : data.previous.toLocaleString()}</td>
+                    <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600, color: FOREST }}>{data.current === null ? "Unavailable" : data.valueFormat === "percent" ? `${data.current.toFixed(2)}%` : data.current.toLocaleString()}</td>
                     <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600, color: data.delta?.color || "#888", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
                       {data.delta ? <><DeltaIcon direction={data.delta.direction} />{data.delta.text}</> : "Not comparable"}
                     </td>
+                    <td style={{ padding: "10px 12px", color: "#666", fontSize: 11 }}>{data.sourceStatus || "—"}</td>
                   </tr>
                 ))}
               </tbody>
