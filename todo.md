@@ -413,6 +413,8 @@
 - [x] Correct the Analytics GBP disclosure to identify current values as legacy spreadsheet data rather than a live connection
 - [x] Add a public, read-only GBP readiness endpoint and dashboard status that exposes the pending case, OAuth readiness, and safe mapping counts without querying GBP or enabling refresh
 - [x] Create and configure the UWS Google OAuth web client with the approved production GBP callback; protected client credentials were validated with Google without requesting GBP data
+- [x] Add signed, short-lived GBP OAuth-state safeguards and disabled production start/callback routes; no authorization code can be read, logged, or exchanged before approval
+- [ ] Enable the prebuilt GBP OAuth flow only after Google approves access and a UWS operator explicitly authorizes the connection
 - [ ] Obtain and securely store a UWS `business.manage` refresh authorization only after Google approves Performance API access; do not request GBP data before approval
 - [ ] Build the authenticated GBP client and territory-safe historical importer
 - [ ] Replace static GBP dashboard snapshots with persisted live metrics and visible coverage states

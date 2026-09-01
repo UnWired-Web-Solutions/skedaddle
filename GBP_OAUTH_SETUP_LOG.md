@@ -25,6 +25,7 @@
 - Google confirmed that the production Web application OAuth client was created. Its access is restricted to users within the UWS organization because the consent configuration is internal. No client identifier, client secret, refresh token, or Business Profile data is stored in this log or repository.
 - Google Cloud confirms that the client record exists and displays its client identifier. The existing client secret is masked, and this interface offers no download or reveal control for it. Google’s client-secret guidance indicates that a new secret must be created when a one-time secret was not retained.
 - A new client secret was created after explicit confirmation. The OAuth client identifier and new one-time secret were stored directly in the protected project-secret store, and a targeted validation made a deliberately invalid refresh-token grant to Google. Google accepted the client credentials (`invalid_grant`, not `invalid_client`); the check did not obtain a token or access Business Profile data. The refresh authorization remains intentionally absent.
+- The production callback path is now registered in the portal but returns a deliberate `503 disabled_pending_google_approval` response for both start and callback requests. It does not read, log, or exchange any code. Signed short-lived state primitives have been unit tested, but they are not used to initiate OAuth until Google approves Performance API access and a UWS operator explicitly authorizes activation.
 
 ## Guardrails retained
 
