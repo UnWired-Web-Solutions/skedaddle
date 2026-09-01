@@ -18,6 +18,8 @@ The portal’s 19 mapped territory records remain only as naming, geography, and
 
 The focused source-presentation regression prevents reintroduction of static Home, Location Detail, and action-plan terms. It passed alongside strict TypeScript and the full suite: 173 tests passed with 11 intentional skips. The clean production build passed. Authenticated local visual review confirmed the Home overview and Milwaukee detail page render the source-aware content and the revised action plan.
 
+The first production review after checkpoint `c7ef987c` still served the earlier static Home asset, including its T12/job/species/trend cards and dashboard-completeness claim. This is a stale client-artifact deployment state, not a successful published verification. The active Home, Location Detail, and action-plan source code remain verified locally; a clean publication retry is required before this update is treated as live.
+
 ## Ownership-context limitation
 
 The approved territory mapping identifies 19 franchise reporting territories. It separately identifies certain unmapped network, corporate, or sub-brand records outside active territorial aggregations. It does **not** provide an authoritative legal owner or corporate/franchise classification for every source record. The active portal therefore states `Franchise reporting territory` for the territory context but deliberately does not make a corporate ownership assertion.

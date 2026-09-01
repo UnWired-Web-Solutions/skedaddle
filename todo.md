@@ -262,6 +262,7 @@
 - [x] Add a regression test that prevents the active Home and Location Detail views from restoring static T12, job, species, trend, or completion claims — focused test passed
 - [x] Retire static T12 demand-ranking wording from active 90-day action plans unless a current source-aware reporting view supplies the prioritization context — local Milwaukee plan verified without static demand rankings
 - [x] Extend the source-presentation regression to prevent active action plans from importing static dashboard data or reintroducing T12 and closed-job wording — focused test passed with three safeguards
+- [ ] Verify the checkpointed Home, Location Detail, and 90-day action-plan source-aware presentation on production; initial checkpoint `c7ef987c` served the prior static client artifact
 - [x] Remove hard-coded custom local-auth credential material from source control; retain only non-secret role and territory authorization mapping in code — frontend registry removed; server-only source scan passed
 - [x] Generate and set one new temporary shared local-auth password in managed server configuration, retaining all approved usernames and territory assignments — user-approved managed registry configured; no value committed or documented
 - [x] Checkpoint and deploy the local-auth remediation, then verify successful and rejected published sign-in flows without displaying the shared credential — checkpoint `df660789` production procedure accepted the managed account and returned `invalid_credentials` for a rejected password without outputting credentials
