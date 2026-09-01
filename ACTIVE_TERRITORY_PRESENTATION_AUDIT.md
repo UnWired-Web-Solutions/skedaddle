@@ -20,6 +20,8 @@ The focused source-presentation regression prevents reintroduction of static Hom
 
 The first production review after checkpoint `c7ef987c` still served the earlier static Home asset, including its T12/job/species/trend cards and dashboard-completeness claim. This is a stale client-artifact deployment state, not a successful published verification. The active Home, Location Detail, and action-plan source code remain verified locally; a clean publication retry is required before this update is treated as live.
 
+The publication retry checkpoint `327e9f97` subsequently propagated a fresh production client asset. The authenticated production overview rendered 19 mapped territories, source-aware dashboard links, and the unavailable-not-zero source note without any static T12/job/species/trend/rank/completeness presentation. The published Milwaukee detail rendered the verified franchise-territory context, the non-assertion of corporate classification, and all eight source-aware action-plan tasks without static T12-demand or closed-job claims.
+
 ## Ownership-context limitation
 
 The approved territory mapping identifies 19 franchise reporting territories. It separately identifies certain unmapped network, corporate, or sub-brand records outside active territorial aggregations. It does **not** provide an authoritative legal owner or corporate/franchise classification for every source record. The active portal therefore states `Franchise reporting territory` for the territory context but deliberately does not make a corporate ownership assertion.
