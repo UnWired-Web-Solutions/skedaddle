@@ -14,3 +14,7 @@ The page-performance expansion is deliberately limited to standard **direct** GA
 | Regression and build | Strict TypeScript, the focused GA4 importer regression, the full suite (167 passed; 11 intentional skips), and the clean production build passed. |
 
 The direct top-pages query remains paginated at 25,000 rows per property. The durable backfill does not yet persist engagement metrics, so historical trend and YoY data remains sessions-only and source-labelled. Key events remain unavailable until UWS approves a single network-wide event-definition policy and counting basis.
+
+## Initial production rollout check — pending client asset
+
+Checkpoint `c7cb8918` published the updated backend state, but the first primary-domain browser check still referenced the prior `index-RTGO-mnp.js` asset and displayed the old `Live GA4: Top Pages by Sessions` heading. The page did not yet contain the new direct-engagement label. This is treated as a static-client rollout delay, not as successful production verification; no metric, source mapping, or data was modified while recording the discrepancy.
