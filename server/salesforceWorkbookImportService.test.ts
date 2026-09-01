@@ -40,6 +40,15 @@ describe("Salesforce workbook import execution", () => {
     expect(repo.markFailed).not.toHaveBeenCalled();
   });
 
+  it("invokes an injected deterministic workbook reader exactly once", async () => {
+    const repo = repository();
+    const reader = vi.fn().mockResolvedValue(workbook("id-one-call"));
+    await executeSalesforceWorkbookImport({
+      source: { id: 1, status: "ready" }, triggerType: "manual", reader, metadataReader, repository: repo,
+    });
+    expect(reader).toHaveBeenCalledOnce();
+  });
+
   it("passes rejected-row coverage to activation instead of hiding exclusions", async () => {
     const repo = repository();
     const result = await executeSalesforceWorkbookImport({

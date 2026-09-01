@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   readSalesforceWorkbook,
+  readSalesforceWorkbookIncrementally,
   readSalesforceWorkbookDriveMetadata,
   SALESFORCE_WORKBOOK_TITLE,
 } from "./googleSalesforceWorkbookClient";
@@ -65,5 +66,19 @@ describe("Google Salesforce workbook client", () => {
   it("redacts Drive metadata failures", async () => {
     const client = { files: { get: vi.fn().mockRejectedValue({ code: 403, message: "private Drive detail" }) } } as never;
     await expect(readSalesforceWorkbookDriveMetadata(client)).rejects.toThrow("Google Drive workbook metadata read failed (status 403)");
+  });
+
+  it("processes each bounded range incrementally without retaining a raw workbook array", async () => {
+    const header = ["Id", "Status", "SchedStartTime", "LastModifiedDate", "CreatedDate", "Street", "City", "PostalCode", "Work_Type__c", "Reporting_Primary_Territory__c", "Contact.Account.Lead_Source__c", "salesperson_new__c", "Species__c", "Invoice_pre_tax_amount__c"];
+    const getMetadata = vi.fn().mockResolvedValue({
+      data: { properties: { title: SALESFORCE_WORKBOOK_TITLE }, sheets: [{ properties: { title: "Sheet1", gridProperties: { rowCount: 2 } } }] },
+    });
+    const getValues = vi.fn()
+      .mockResolvedValueOnce({ data: { values: [header] } })
+      .mockResolvedValueOnce({ data: { values: [["id-1", "Completed", "2026-08-01T12:00:00.000+0000", "2026-09-01T12:00:00.000+0000", "", "private", "Hamilton", "private", "PA", "Hamilton", "Organic", "private", "Raccoons", "10.00"]] } });
+    const client = { spreadsheets: { get: getMetadata, values: { get: getValues } } } as never;
+    const parsed = await readSalesforceWorkbookIncrementally(client);
+    expect(parsed).toMatchObject({ sourceRowCount: 1, rowsProcessed: 1 });
+    expect(getValues.mock.calls[1]?.[0]).toMatchObject({ range: "Sheet1!A2:N2" });
   });
 });

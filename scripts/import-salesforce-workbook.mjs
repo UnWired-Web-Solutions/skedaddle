@@ -50,3 +50,4 @@ const summary = "parsed" in result && result.parsed
   : result;
 
 console.log(JSON.stringify(summary, null, 2));
+process.exit(process.exitCode ?? 0);

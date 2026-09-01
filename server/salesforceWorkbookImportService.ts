@@ -13,6 +13,7 @@ import {
   SALESFORCE_WORKBOOK_SHEET,
   SALESFORCE_WORKBOOK_SOURCE_RANGE,
   SALESFORCE_WORKBOOK_TITLE,
+  readSalesforceWorkbookIncrementally,
   readSalesforceWorkbookDriveMetadata,
   type SalesforceWorkbookDriveMetadata,
   type SalesforceWorkbookRead,
@@ -283,6 +284,7 @@ export async function executeSalesforceWorkbookImport(input: {
   source: Pick<SalesforceWorkbookSource, "id" | "status"> & { lastDriveVersion?: string | null };
   triggerType: SalesforceWorkbookTrigger;
   reader?: () => Promise<SalesforceWorkbookRead>;
+  streamingParser?: () => Promise<SalesforceWorkbookParseResult>;
   metadataReader?: () => Promise<SalesforceWorkbookDriveMetadata>;
   repository?: SalesforceWorkbookImportRepository;
 }) {
@@ -300,8 +302,15 @@ export async function executeSalesforceWorkbookImport(input: {
       await repository.markUnchangedRevision(runId, input.source.id, lockToken, driveMetadata);
       return { ok: true as const, skipped: "unchanged_revision" as const, runId, driveMetadata };
     }
-    const workbook = await (input.reader ?? readSalesforceWorkbook)();
-    const parsed = parseSalesforceWorkbookRows(workbook.header, workbook.rows);
+    let parsed: SalesforceWorkbookParseResult;
+    if (input.streamingParser) {
+      parsed = await input.streamingParser();
+    } else if (input.reader) {
+      const workbook = await input.reader();
+      parsed = parseSalesforceWorkbookRows(workbook.header, workbook.rows);
+    } else {
+      parsed = await readSalesforceWorkbookIncrementally();
+    }
     const previousRunId = await repository.findCompletedFingerprint(input.source.id, parsed.sourceFingerprint);
     if (previousRunId) {
       await repository.markSkipped(runId, input.source.id, lockToken, parsed, driveMetadata);

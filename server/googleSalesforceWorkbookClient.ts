@@ -1,5 +1,6 @@
 import { google, type drive_v3, type sheets_v4 } from "googleapis";
 import { ENV } from "./_core/env";
+import { SalesforceWorkbookRowAccumulator, type SalesforceWorkbookParseResult } from "./salesforceWorkbookParser";
 
 export const SALESFORCE_WORKBOOK_ID = "1WUAlglCwg85OrH_Dqqqw7zRZNGKxOlBPwzHF5cqD6sQ";
 export const SALESFORCE_WORKBOOK_TITLE = "Salesforce Data";
@@ -47,6 +48,15 @@ export function getSalesforceWorkbookDriveClient() {
   const auth = new google.auth.GoogleAuth({
     credentials: getCredential(),
     scopes: ["https://www.googleapis.com/auth/drive.metadata.readonly"],
+  });
+  return google.drive({ version: "v3", auth });
+}
+
+/** Separate content client used only after a changed revision requires an XLSX export. */
+export function getSalesforceWorkbookDriveContentClient() {
+  const auth = new google.auth.GoogleAuth({
+    credentials: getCredential(),
+    scopes: ["https://www.googleapis.com/auth/drive.readonly"],
   });
   return google.drive({ version: "v3", auth });
 }
@@ -135,6 +145,48 @@ export async function readSalesforceWorkbook(
     return { title, sheetName: SALESFORCE_WORKBOOK_SHEET, configuredRowCount, header, rows };
   } catch (error) {
     if (error instanceof Error && error.message.startsWith("Google Sheets workbook read failed")) throw error;
+    throw safeSheetsError(error);
+  }
+}
+
+/**
+ * Reads only one bounded Sheets range at a time and feeds it directly into the
+ * parser. This is the production changed-revision path: no 270k-row response
+ * or raw source-row array is retained after each range has been processed.
+ */
+export async function readSalesforceWorkbookIncrementally(
+  client: sheets_v4.Sheets = getSalesforceWorkbookSheetsClient(),
+): Promise<SalesforceWorkbookParseResult> {
+  try {
+    const metadata = await client.spreadsheets.get({ spreadsheetId: SALESFORCE_WORKBOOK_ID, includeGridData: false });
+    const title = metadata.data.properties?.title ?? "";
+    const sheet = metadata.data.sheets?.find(entry => entry.properties?.title === SALESFORCE_WORKBOOK_SHEET);
+    const configuredRowCount = sheet?.properties?.gridProperties?.rowCount ?? 0;
+    if (title !== SALESFORCE_WORKBOOK_TITLE || !sheet || configuredRowCount < 1) throw new Error("unexpected workbook metadata");
+    const headerResponse = await client.spreadsheets.values.get({
+      spreadsheetId: SALESFORCE_WORKBOOK_ID,
+      range: `${SALESFORCE_WORKBOOK_SHEET}!A1:N1`,
+      majorDimension: "ROWS",
+      valueRenderOption: "UNFORMATTED_VALUE",
+      dateTimeRenderOption: "FORMATTED_STRING",
+    });
+    const accumulator = new SalesforceWorkbookRowAccumulator();
+    accumulator.begin(headerResponse.data.values?.[0] ?? []);
+    for (let start = 2; start <= configuredRowCount; start += BATCH_SIZE) {
+      const end = Math.min(start + BATCH_SIZE - 1, configuredRowCount);
+      const response = await client.spreadsheets.values.get({
+        spreadsheetId: SALESFORCE_WORKBOOK_ID,
+        range: `${SALESFORCE_WORKBOOK_SHEET}!A${start}:N${end}`,
+        majorDimension: "ROWS",
+        valueRenderOption: "UNFORMATTED_VALUE",
+        dateTimeRenderOption: "FORMATTED_STRING",
+      });
+      for (const row of response.data.values ?? []) accumulator.addRow(row);
+      if ((response.data.values?.length ?? 0) < BATCH_SIZE) break;
+    }
+    return accumulator.finish();
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("Salesforce Drive workbook")) throw error;
     throw safeSheetsError(error);
   }
 }
