@@ -58,6 +58,14 @@ The definitive confirmed-deployment run still returned the same HTML-for-JSON er
 
 The concurrency regression was tightened and failed against the four-worker implementation (`4` tasks started versus `8` required). The generator now starts all eight independent narrative calls in one wave, limits direct Anthropic attempts to a shared 65-second budget, and limits the forge fallback to 25 seconds before each section uses its existing deterministic fallback. The tightened regression passed, TypeScript passed, the complete suite passed again (**139 tests; 11 intentional skips**), and the production build succeeded. A second clean production draft/PDF run remained required after deployment.
 
+After the second recovery rollout window, production returned HTTP 200, the authenticated report page loaded normally, and Ottawa was selected again with zero/unprovided campaign scope for the final test.
+
+The definitive Ottawa production preview completed successfully in approximately 94 seconds on the one-wave/deadline release, below the previous failure window. The client received valid tRPC JSON and displayed the auditable report preview with both exact-draft PDF export controls. Exact PDF export and page-by-page visual review remained required before final approval.
+
+The first exact-draft PDF export attempt then failed with Puppeteer/browser context error: `Execution context is not available in detached frame or worker "about:blank"`. The saved HTML preview remained visible, so the failure is isolated to the server-side PDF rendering/export path and remains a release blocker.
+
+A deterministic rendering-boundary regression reproduced that exact detached `about:blank` failure. The PDF renderer now retries once only for that specific transient execution-context error and launches a fresh Chromium browser for the retry; unrelated rendering or storage failures are not retried. The regression failed before the fix and passed afterward. The complete strategy report test file passed, TypeScript passed, the full suite passed (**141 tests; 11 intentional skips**), and the production build passed. Final live export and page-by-page PDF inspection remained required after rollout.
+
 ## Preliminary verdict
 
 **Corrections applied; final approval pending full-suite, build, endpoint, and visual verification.** The branch’s architecture was retained without enabling OAuth, live imports, or listing changes.

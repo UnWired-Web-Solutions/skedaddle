@@ -31,6 +31,30 @@ describe("Strategy Report Router", { timeout: 15_000 }, () => {
     ]);
   });
 
+  it("retries one transient detached-frame failure when rendering the exact draft PDF", async () => {
+    const { runStrategyPdfRenderAttempt } = await import("./strategyReportRouter");
+    let attempts = 0;
+    const rendered = await runStrategyPdfRenderAttempt(async () => {
+      attempts += 1;
+      if (attempts === 1) {
+        throw new Error('Execution context is not available in detached frame or worker "about:blank"');
+      }
+      return Buffer.from("verified-pdf");
+    });
+    expect(attempts).toBe(2);
+    expect(rendered.toString()).toBe("verified-pdf");
+  });
+
+  it("does not retry unrelated PDF rendering failures", async () => {
+    const { runStrategyPdfRenderAttempt } = await import("./strategyReportRouter");
+    let attempts = 0;
+    await expect(runStrategyPdfRenderAttempt(async () => {
+      attempts += 1;
+      throw new Error("PDF storage permission denied");
+    })).rejects.toThrow("PDF storage permission denied");
+    expect(attempts).toBe(1);
+  });
+
   it("should export buildTerritoryData function", async () => {
     const { buildTerritoryData } = await import("./strategyReportRouter");
     expect(buildTerritoryData).toBeDefined();

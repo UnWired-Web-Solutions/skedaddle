@@ -1831,27 +1831,44 @@ export async function generateStrategyReport(
 
 // ─── PDF Generation ──────────────────────────────────────────────────────────
 
-async function generatePdf(html: string): Promise<Buffer> {
-  const browser = await puppeteer.launch({
-    headless: true,
-    ...(process.env.PUPPETEER_EXECUTABLE_PATH ? { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH } : {}),
-    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
-  });
-
-  try {
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "domcontentloaded", timeout: 60000 });
-    // Allow fonts to load
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    const pdf = await page.pdf({
-      format: "Letter",
-      printBackground: true,
-      margin: { top: "0", right: "0", bottom: "0", left: "0" },
-    });
-    return Buffer.from(pdf);
-  } finally {
-    await browser.close();
+export async function runStrategyPdfRenderAttempt<T>(render: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      return await render();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const detachedExecutionContext =
+        message.includes("Execution context is not available in detached frame") &&
+        message.includes('"about:blank"');
+      if (!detachedExecutionContext || attempt === 1) throw error;
+    }
   }
+  throw new Error("Strategy PDF rendering exhausted its retry budget.");
+}
+
+async function generatePdf(html: string): Promise<Buffer> {
+  return runStrategyPdfRenderAttempt(async () => {
+    const browser = await puppeteer.launch({
+      headless: true,
+      ...(process.env.PUPPETEER_EXECUTABLE_PATH ? { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH } : {}),
+      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+    });
+
+    try {
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: "domcontentloaded", timeout: 60000 });
+      // Allow fonts to load
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      const pdf = await page.pdf({
+        format: "Letter",
+        printBackground: true,
+        margin: { top: "0", right: "0", bottom: "0", left: "0" },
+      });
+      return Buffer.from(pdf);
+    } finally {
+      await browser.close();
+    }
+  });
 }
 
 // ─── tRPC Router ─────────────────────────────────────────────────────────────
