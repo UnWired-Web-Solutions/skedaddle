@@ -437,4 +437,4 @@
 - [x] Diagnose and fix the production Ottawa strategy-report failure that returned an HTML response where the client expected JSON during fresh post-Codex verification
 - [x] Diagnose and fix the production exact-draft PDF export failure: Puppeteer reports a detached `about:blank` execution context after the report preview succeeds
 - [x] Run TypeScript, full Vitest, production build, relevant endpoint checks, and visual verification before publishing
-- [ ] Checkpoint the verified result, push canonical GitHub `main`, and update session memory
+- [x] Checkpoint the verified result, push canonical GitHub `main`, and update session memory — checkpoint `41023153`; local and remote `main` matched at `41023153170e60914bed4725b83a980ca059d7ae`
