@@ -211,4 +211,53 @@ export const salesforceWorkbookRouter = router({
         conversionMetric: "unavailable_pending_status_definition" as const,
       };
     }),
+
+  getNetworkPerformance: publicProcedure.query(async () => {
+    const unavailable = { source: "unavailable" as const, activeRun: null, territories: [] };
+    const db = await getDb();
+    if (!db) return unavailable;
+    const sourceRows = await db.select().from(salesforceWorkbookSources).orderBy(desc(salesforceWorkbookSources.updatedAt)).limit(1);
+    const source = sourceRows[0];
+    if (!source?.lastSuccessfulRunId) return unavailable;
+    const runRows = await db.select().from(salesforceWorkbookImportRuns)
+      .where(eq(salesforceWorkbookImportRuns.id, source.lastSuccessfulRunId)).limit(1);
+    const run = runRows[0];
+    if (!run || (run.status !== "complete" && run.status !== "partial")) return unavailable;
+
+    const rows = await db.select({
+      territoryId: salesforceWorkbookAggregates.territoryId,
+      currencyCode: salesforceWorkbookAggregates.currencyCode,
+      workOrders: sql<number>`SUM(${salesforceWorkbookAggregates.recordCount})`,
+      invoiceValueRows: sql<number>`SUM(${salesforceWorkbookAggregates.invoiceValueCount})`,
+      invoicePreTaxAmount: sql<string>`SUM(${salesforceWorkbookAggregates.invoicePreTaxAmount})`,
+    }).from(salesforceWorkbookAggregates).where(and(
+      eq(salesforceWorkbookAggregates.importRunId, run.id),
+      eq(salesforceWorkbookAggregates.statusLabel, "__ALL__"),
+      eq(salesforceWorkbookAggregates.speciesLabel, "__ALL__"),
+      eq(salesforceWorkbookAggregates.cityLabel, "__ALL__"),
+    )).groupBy(
+      salesforceWorkbookAggregates.territoryId,
+      salesforceWorkbookAggregates.currencyCode,
+    );
+
+    return {
+      source: "salesforce_drive_workbook" as const,
+      activeRun: {
+        id: run.id,
+        status: run.status,
+        sourceRowCount: run.sourceRowCount,
+        rowsProcessed: run.rowsProcessed,
+        rowsRejected: run.rowsRejected,
+        activatedAt: run.activatedAt,
+        maxSourceModifiedAt: run.maxSourceModifiedAt,
+      },
+      territories: rows.map(row => ({
+        territoryId: row.territoryId,
+        currencyCode: row.currencyCode,
+        workOrders: Number(row.workOrders),
+        invoiceValueRows: Number(row.invoiceValueRows),
+        invoicePreTaxAmount: Number(row.invoicePreTaxAmount),
+      })),
+    };
+  }),
 });
