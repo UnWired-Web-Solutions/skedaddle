@@ -71,28 +71,22 @@ export async function readSalesforceWorkbook(
       throw new Error("unexpected workbook metadata");
     }
 
-    const headerResponse = await client.spreadsheets.values.get({
+    const ranges = [`${SALESFORCE_WORKBOOK_SHEET}!A1:N1`];
+    for (let start = 2; start <= configuredRowCount; start += BATCH_SIZE) {
+      const end = Math.min(start + BATCH_SIZE - 1, configuredRowCount);
+      ranges.push(`${SALESFORCE_WORKBOOK_SHEET}!A${start}:N${end}`);
+    }
+    const response = await client.spreadsheets.values.batchGet({
       spreadsheetId: SALESFORCE_WORKBOOK_ID,
-      range: `${SALESFORCE_WORKBOOK_SHEET}!A1:N1`,
+      ranges,
       majorDimension: "ROWS",
       valueRenderOption: "UNFORMATTED_VALUE",
       dateTimeRenderOption: "FORMATTED_STRING",
     });
-    const header = headerResponse.data.values?.[0] ?? [];
+    const [headerRange, ...dataRanges] = response.data.valueRanges ?? [];
+    const header = headerRange?.values?.[0] ?? [];
     const rows: unknown[][] = [];
-    for (let start = 2; start <= configuredRowCount; start += BATCH_SIZE) {
-      const end = Math.min(start + BATCH_SIZE - 1, configuredRowCount);
-      const response = await client.spreadsheets.values.get({
-        spreadsheetId: SALESFORCE_WORKBOOK_ID,
-        range: `${SALESFORCE_WORKBOOK_SHEET}!A${start}:N${end}`,
-        majorDimension: "ROWS",
-        valueRenderOption: "UNFORMATTED_VALUE",
-        dateTimeRenderOption: "FORMATTED_STRING",
-      });
-      const batch = response.data.values ?? [];
-      rows.push(...batch);
-      if (batch.length < BATCH_SIZE) break;
-    }
+    for (const range of dataRanges) rows.push(...(range.values ?? []));
     return { title, sheetName: SALESFORCE_WORKBOOK_SHEET, configuredRowCount, header, rows };
   } catch (error) {
     if (error instanceof Error && error.message.startsWith("Google Sheets workbook read failed")) throw error;
