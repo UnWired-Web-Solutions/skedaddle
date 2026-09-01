@@ -416,6 +416,7 @@
 - [x] Add signed, short-lived GBP OAuth-state safeguards and disabled production start/callback routes; no authorization code can be read, logged, or exchanged before approval
 - [ ] Enable the prebuilt GBP OAuth flow only after Google approves access and a UWS operator explicitly authorizes the connection
 - [ ] Obtain and securely store a UWS `business.manage` refresh authorization only after Google approves Performance API access; do not request GBP data before approval
+- [x] Add non-network GBP persistence helpers that atomically record raw daily values, month rollups, and import-run coverage only from an explicitly validated plan; inventory persistence remains pending authoritative API access
 - [ ] Build the authenticated GBP client and territory-safe historical importer
 - [ ] Replace static GBP dashboard snapshots with persisted live metrics and visible coverage states
 - [ ] Add manual refresh controls for verified territories; do not schedule recurring imports until the live flow is validated

@@ -20,6 +20,7 @@ export type GBPMonthlyMetricSnapshot = {
   coverageStatus: "complete" | "partial" | "unavailable";
   locationsExpected: number;
   locationsSucceeded: number;
+  successfulLocationIds: number[];
   sourceStartDate: string;
   sourceEndDate: string;
   rows: Array<{ locationId: number; date: string; value: number }>;
@@ -62,8 +63,11 @@ export function buildGBPMonthlyMetricSnapshots(input: {
   return uniqueMetricTypes.map(metricType => {
     const relevant = input.results.filter(result => result.metricType === metricType && uniqueLocationIds.includes(result.locationId));
     const successful = relevant.filter(result => result.success);
+    const successfulLocationIds = uniqueLocationIds.filter(locationId =>
+      successful.some(result => result.locationId === locationId),
+    );
     const failedLocationIds = uniqueLocationIds.filter(locationId =>
-      !successful.some(result => result.locationId === locationId),
+      !successfulLocationIds.includes(locationId),
     );
     const rows = successful.flatMap(result => result.rows
       .filter(row => row.date >= startDate && row.date <= endDate)
@@ -81,6 +85,7 @@ export function buildGBPMonthlyMetricSnapshots(input: {
       coverageStatus,
       locationsExpected: uniqueLocationIds.length,
       locationsSucceeded,
+      successfulLocationIds,
       sourceStartDate: startDate,
       sourceEndDate: endDate,
       rows,
