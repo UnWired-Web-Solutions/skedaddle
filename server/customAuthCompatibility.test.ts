@@ -31,5 +31,7 @@ describe("custom local authentication compatibility", () => {
     expect(result.liveDataActive).toBe(false);
     expect(result.approval.status).toBe("pending_google_allowlist_review");
     expect(result.mapping.totalCandidates).toBe(32);
+    expect(result.oauthClientConfigured).toBe(true);
+    expect(result.oauthRefreshAuthorizationConfigured).toBe(false);
   });
 });

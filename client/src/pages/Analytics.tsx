@@ -975,7 +975,7 @@ export default function Analytics() {
             <span style={{ fontWeight: 700, flexShrink: 0 }}>Data status:</span>
             <span>
               {gbpIntegrationStatus
-                ? `Current GBP chart values are retained legacy spreadsheet records, not a live API feed. Google’s Business Profile Performance API access review is pending under case ${gbpIntegrationStatus.approval.caseId}; ${gbpIntegrationStatus.mapping.ready} explicitly mapped candidate profile${gbpIntegrationStatus.mapping.ready === 1 ? " is" : "s are"} awaiting authoritative API reconciliation. OAuth authorization and one fully reconciled import are still required before live figures replace any period.`
+                ? `Current GBP chart values are retained legacy spreadsheet records, not a live API feed. Google’s Business Profile Performance API access review is pending under case ${gbpIntegrationStatus.approval.caseId}; ${gbpIntegrationStatus.mapping.ready} explicitly mapped candidate profile${gbpIntegrationStatus.mapping.ready === 1 ? " is" : "s are"} awaiting authoritative API reconciliation. ${gbpIntegrationStatus.oauthClientConfigured ? "The protected OAuth client is configured, but" : "OAuth client configuration and"} a UWS Business Profile authorization plus one fully reconciled import are still required before live figures replace any period.`
                 : "Current GBP chart values are retained legacy spreadsheet records, not a live API feed. Live connection status is loading."}
             </span>
           </div>

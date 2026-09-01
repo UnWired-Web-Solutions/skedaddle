@@ -28,7 +28,7 @@ import { getGscTerritoryScope } from "../shared/gscTerritoryPaths";
 import { GSC_TERRITORY_SCOPES } from "../shared/gscTerritoryPaths";
 import { getGA4MappingSummary } from "../shared/ga4TerritoryProperties";
 import { getGBPMappingSummary } from "../shared/gbpLocationRegistry";
-import { hasGBPAuthConfiguration } from "./googleBusinessProfileClient";
+import { hasGBPAuthConfiguration, hasGBPOAuthClientConfiguration } from "./googleBusinessProfileClient";
 
 // ─── Procedures ──────────────────────────────────────────────────────────────
 
@@ -118,7 +118,8 @@ export const analyticsRouter = router({
       statedReviewWindow: "approximately 7–10 business days",
       performanceQuotaLastVerified: 0,
     },
-    oauthConfigured: hasGBPAuthConfiguration(),
+    oauthClientConfigured: hasGBPOAuthClientConfiguration(),
+    oauthRefreshAuthorizationConfigured: hasGBPAuthConfiguration(),
     mapping: getGBPMappingSummary(),
     nextRequirements: [
       "Google must approve Business Profile Performance API access and assign a nonzero quota.",

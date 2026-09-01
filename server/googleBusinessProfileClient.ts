@@ -29,6 +29,41 @@ export function hasGBPAuthConfiguration(): boolean {
   return Boolean(ENV.gbpOAuthClientId && ENV.gbpOAuthClientSecret && ENV.gbpOAuthRefreshToken);
 }
 
+/** True when the OAuth client pair is present, even before a user refresh token is obtained. */
+export function hasGBPOAuthClientConfiguration(): boolean {
+  return Boolean(ENV.gbpOAuthClientId && ENV.gbpOAuthClientSecret);
+}
+
+/**
+ * Confirms Google accepts the configured client pair. The deliberately invalid
+ * refresh-token grant cannot retrieve user data; a Google `invalid_grant`
+ * response proves the client ID/secret were accepted rather than rejected as
+ * `invalid_client`.
+ */
+export async function validateGBPOAuthClientCredentials(): Promise<{ accepted: true }> {
+  if (!hasGBPOAuthClientConfiguration()) {
+    throw new Error("GBP OAuth client credentials are not configured.");
+  }
+  const body = new URLSearchParams({
+    client_id: ENV.gbpOAuthClientId,
+    client_secret: ENV.gbpOAuthClientSecret,
+    grant_type: "refresh_token",
+    refresh_token: "gbp-client-credential-validation-no-token",
+  });
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+    signal: AbortSignal.timeout(15_000),
+  });
+  const payload = await response.json().catch(() => ({})) as { error?: string };
+  if (payload.error === "invalid_grant") return { accepted: true };
+  if (payload.error === "invalid_client" || response.status === 401) {
+    throw new Error("Google rejected the configured GBP OAuth client credentials.");
+  }
+  throw new Error(`Unexpected Google OAuth credential validation response (${response.status}).`);
+}
+
 export function getGBPOAuthClient() {
   if (!hasGBPAuthConfiguration()) {
     throw new Error("GBP OAuth is not configured. Add GBP_OAUTH_CLIENT_ID, GBP_OAUTH_CLIENT_SECRET, and GBP_OAUTH_REFRESH_TOKEN through project secrets before attempting a live import.");

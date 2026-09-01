@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildGBPDailyMetricUrl, hasGBPAuthConfiguration } from "./googleBusinessProfileClient";
+import {
+  buildGBPDailyMetricUrl,
+  hasGBPAuthConfiguration,
+  hasGBPOAuthClientConfiguration,
+  validateGBPOAuthClientCredentials,
+} from "./googleBusinessProfileClient";
 
 describe("Google Business Profile client", () => {
   it("constructs a documented daily-metric request without exposing credentials", () => {
@@ -19,5 +24,9 @@ describe("Google Business Profile client", () => {
 
   it("does not claim configured live access unless all OAuth secrets are present", () => {
     expect(typeof hasGBPAuthConfiguration()).toBe("boolean");
+  });
+
+  it.runIf(hasGBPOAuthClientConfiguration())("validates the configured client ID and secret with Google without accessing GBP data", async () => {
+    await expect(validateGBPOAuthClientCredentials()).resolves.toEqual({ accepted: true });
   });
 });
