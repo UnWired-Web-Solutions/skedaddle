@@ -79,9 +79,13 @@ Local release verification after the final parser correction passed TypeScript, 
 
 Post-checkpoint production verification completed after checkpoint `e08d9b68` rolled out. The authenticated Hamilton dashboard rendered the workbook-backed partial interface rather than the retired inspection-to-sale panel. The production territory-performance response returned `source = salesforce_drive_workbook`, status `partial`, 39 monthly, 20 species, and 20 city aggregates, and `unavailable_pending_status_definition`; the retired `analytics.getTerritoryCloseRate` route returned HTTP 404. The authenticated Analytics page rendered the workbook provenance card with its partial coverage disclosure and no raw source fields. Canonical GitHub `main` was normally pushed and its full hash matched `e08d9b68bcdd35ab9d07fc4327e43a20345bd0d2`.
 
-## Changed-revision production-import limitation
+## Changed-revision production-import verification
 
-The daily schedule’s fast unchanged-revision production path is verified. The low-memory changed-revision branch uses bounded sequential Sheets ranges, but it has not yet completed a definitive production import of a naturally changed Drive revision. Do not modify the source workbook merely to force that test, and do not claim changed-revision production verification until an ordinary source revision can be observed and audited.
+The low-memory changed-revision branch is now verified in production without modifying the source workbook for test purposes. A natural Drive revision triggered scheduled import run `930004` at 19:19:40 UTC on September 1, 2026. The callback completed successfully in 26.745 seconds, below the two-minute execution limit, and atomically activated a `partial` snapshot at 19:20:01 UTC. It audited 270,272 source rows, processed 221,748 canonical-territory rows, and explicitly rejected 48,524 rows. The run contained no reported error, blank ID, or duplicate ID.
+
+The active source row subsequently showed no import lock, no last error, `lastSuccessfulRunId = 930004`, and the expected daily 19:00 UTC schedule remained enabled. Later Drive metadata revisions were safely preflighted and recorded as skipped when no new active snapshot was warranted. No schedule was created, modified, paused, or duplicated during this verification.
+
+Aggregate safety was checked only at the privacy-conscious aggregate layer. At the canonical `__ALL__` status/species/city grain, the aggregate work-order count reconciled exactly to the run’s 221,748 processed rows and no aggregate had a negative count. CAD and USD were stored and queried separately. The parser deliberately stores four independent roll-up projections (overall, status, species, and city), so summing *all* aggregate rows would correctly overcount the underlying work orders and must not be used as a reconciliation method. Signed invoice pre-tax amounts remain preserved as source values, including any source credit adjustments; they are not treated as negative work-order counts or inferred business statuses.
 
 ## References
 
