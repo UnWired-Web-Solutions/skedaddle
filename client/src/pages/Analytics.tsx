@@ -55,6 +55,17 @@ function formatDelta(current: number, previous: number): { text: string; directi
   };
 }
 
+function formatEngagementDuration(totalSeconds: number): string {
+  const seconds = Math.max(0, Math.round(totalSeconds));
+  if (seconds === 0) return "No duration recorded";
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainder = seconds % 60;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m ${remainder}s`;
+  return `${remainder}s`;
+}
+
 function DeltaIcon({ direction }: { direction: "up" | "down" | "flat" }) {
   if (direction === "up") return <ArrowUpRight size={14} />;
   if (direction === "down") return <ArrowDownRight size={14} />;
@@ -1173,10 +1184,13 @@ function GA4LiveTopPages({ territoryId, year }: { territoryId: string; year: num
   return (
     <div style={{ background: "#fff", borderRadius: 10, border: `1px solid ${MIST}`, padding: "24px 20px", marginBottom: 28 }}>
       <h2 style={{ fontSize: 15, fontWeight: 700, color: FOREST, marginBottom: 4, fontFamily: "'Playfair Display', serif", display: "flex", alignItems: "center", gap: 8 }}>
-        <Globe size={16} color={SAGE} /> Live GA4: Top Pages by Sessions
+        <Globe size={16} color={SAGE} /> Direct GA4: Top Page Performance
       </h2>
-      <p style={{ fontSize: 12, color: "#888", marginBottom: 16 }}>Real-time data from Google Analytics 4 — {year} YTD</p>
+      <p style={{ fontSize: 12, color: "#888", marginBottom: 16 }}>Direct Google Analytics Data API query — {year} year to date</p>
       <GA4CoverageNotice coverage={data?.coverage} />
+      <div style={{ marginBottom: 12, padding: "9px 12px", borderRadius: 7, background: "#f8fafc", border: "1px solid #dbe4ed", color: "#4b5563", fontSize: 11, lineHeight: 1.5 }}>
+        Engagement metrics are direct GA4 totals for the selected query and have the same property-coverage status shown above. “No duration recorded” means GA4 returned zero recorded engagement duration for that page, not an inferred value. Key-event counts are unavailable: mapped properties do not yet have a network-wide approved, comparable key-event definition, so no lead or conversion claim is inferred.
+      </div>
       {isLoading ? (
         <div style={{ height: 120, display: "flex", alignItems: "center", justifyContent: "center", color: "#aaa" }}>Loading live GA4 data...</div>
       ) : !data || data.rows.length === 0 ? (
@@ -1190,6 +1204,9 @@ function GA4LiveTopPages({ territoryId, year }: { territoryId: string; year: num
                 <th style={{ textAlign: "left", padding: "8px 10px", color: SAGE, fontWeight: 700 }}>Page Path</th>
                 <th style={{ textAlign: "right", padding: "8px 10px", color: SAGE, fontWeight: 700 }}>Sessions</th>
                 <th style={{ textAlign: "right", padding: "8px 10px", color: SAGE, fontWeight: 700 }}>Users</th>
+                <th style={{ textAlign: "right", padding: "8px 10px", color: SAGE, fontWeight: 700 }}>Engaged</th>
+                <th style={{ textAlign: "right", padding: "8px 10px", color: SAGE, fontWeight: 700 }}>Engagement Rate</th>
+                <th style={{ textAlign: "right", padding: "8px 10px", color: SAGE, fontWeight: 700 }}>Recorded Engagement Time</th>
               </tr>
             </thead>
             <tbody>
@@ -1199,6 +1216,9 @@ function GA4LiveTopPages({ territoryId, year }: { territoryId: string; year: num
                   <td style={{ padding: "6px 10px", color: FOREST, fontFamily: "monospace", fontSize: 11, maxWidth: 350, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.pagePath}</td>
                   <td style={{ padding: "6px 10px", textAlign: "right", fontWeight: 600, color: FOREST }}>{row.sessions.toLocaleString()}</td>
                   <td style={{ padding: "6px 10px", textAlign: "right", color: "#666" }}>{row.activeUsers.toLocaleString()}</td>
+                  <td style={{ padding: "6px 10px", textAlign: "right", color: "#666" }}>{row.engagedSessions.toLocaleString()}</td>
+                  <td style={{ padding: "6px 10px", textAlign: "right", color: "#666" }}>{row.engagementRate === null ? "Unavailable" : `${row.engagementRate.toFixed(1)}%`}</td>
+                  <td style={{ padding: "6px 10px", textAlign: "right", color: "#666" }}>{formatEngagementDuration(row.userEngagementDurationSeconds)}</td>
                 </tr>
               ))}
             </tbody>

@@ -20,8 +20,18 @@ The page-path reader requests deterministic 25,000-row windows, advancing its of
 
 The verified historical range is July 2023 through August 2026. Details of the aggregate result, safety checks, and public read-contract check are recorded in `GA4_DURABLE_IMPORT_VALIDATION_LOG.md`.
 
+## Page-Performance Metric Scope (September 1, 2026)
+
+The GA4 Data API supports page reporting and standard engagement metrics, including sessions, active users, engaged sessions, engagement rate, and user engagement duration. A read-only completed-August 2026 compatibility check succeeded for every mapped property in both Hamilton (5/5) and Durham Region (10/10). This confirms those standard metrics may be requested alongside `pagePath` for the current direct reporting view; it does not retroactively make historical monthly snapshots engagement-complete.
+
+Key events remain a separate governance question. Google defines a key event as a significant property action, and its definition includes an event name, custom/default status, and a counting method that can be once per event or once per session.[4] The Admin API inventory completed for all 19 territories: 17 have consistent key-event definition sets across their mapped properties, while 2 do not. Every territory has one or more configured definition, but a raw `keyEvents` total would still aggregate potentially different configured actions. The portal must therefore display key events as **unavailable pending network-wide approved event-definition governance**, not as leads, conversions, or a comparable territory KPI.
+
+The key-event inventory used only the read-only `properties.keyEvents.list` endpoint and redacted property identifiers and event names from operator output. Google documents that this list endpoint supports the `analytics.readonly` scope and pages its definitions with `nextPageToken`.[5]
+
 ## References
 
 [1]: https://developers.google.com/analytics/devguides/reporting/data/v1/rest/v1beta/properties/runReport "Google Analytics Data API: properties.runReport"
 [2]: https://developers.google.com/analytics/devguides/reporting/data/v1/quotas "Google Analytics Data API limits and quotas"
 [3]: https://developers.google.com/analytics/devguides/config/admin/v1/rest/v1beta/properties/get "Google Analytics Admin API: properties.get"
+[4]: https://developers.google.com/analytics/devguides/config/admin/v1/rest/v1beta/properties.keyEvents "Google Analytics Admin API: KeyEvent resource"
+[5]: https://developers.google.com/analytics/devguides/config/admin/v1/rest/v1beta/properties.keyEvents/list "Google Analytics Admin API: properties.keyEvents.list"

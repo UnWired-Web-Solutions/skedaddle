@@ -88,6 +88,12 @@ export type GA4CoveredResult<T> = {
 
 const GA4_PROPERTY_CONCURRENCY = 4;
 const GA4_PAGE_BATCH_SIZE = 25_000;
+const GA4_PAGE_METRICS = [
+  { name: "sessions" },
+  { name: "activeUsers" },
+  { name: "engagedSessions" },
+  { name: "userEngagementDuration" },
+] as const;
 
 type GA4PageRow = {
   dimensionValues?: Array<{ value?: string | null }> | null;
@@ -133,7 +139,7 @@ export async function fetchGA4PropertyMonthPages(
       requestBody: {
         dateRanges: [{ startDate, endDate }],
         dimensions: [{ name: "pagePath" }],
-        metrics: [{ name: "sessions" }, { name: "activeUsers" }],
+        metrics: [...GA4_PAGE_METRICS],
         limit: String(GA4_PAGE_BATCH_SIZE),
         offset: String(offset),
       },
@@ -308,37 +314,52 @@ export async function fetchGA4TerritoryTopPages(
   startDate: string,
   endDate: string,
   limit = 25,
-): Promise<GA4CoveredResult<{ pagePath: string; sessions: number; activeUsers: number }>> {
+): Promise<GA4CoveredResult<{
+  pagePath: string;
+  sessions: number;
+  activeUsers: number;
+  engagedSessions: number;
+  engagementRate: number | null;
+  userEngagementDurationSeconds: number;
+}>> {
   const client = getGA4Client();
-  const pageMap = new Map<string, { sessions: number; activeUsers: number }>();
+  const pageMap = new Map<string, {
+    sessions: number;
+    activeUsers: number;
+    engagedSessions: number;
+    userEngagementDurationSeconds: number;
+  }>();
   const { results, coverage } = await runAcrossTerritoryProperties(territoryId, async propertyId => {
-    const res = await client.properties.runReport({
-      property: `properties/${propertyId}`,
-      requestBody: {
-        dateRanges: [{ startDate, endDate }],
-        dimensions: [{ name: "pagePath" }],
-        metrics: [{ name: "sessions" }, { name: "activeUsers" }],
-        limit: "100000",
-        orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
-      },
-    });
-    return res.data.rows || [];
+    return fetchGA4PropertyMonthPages(client, propertyId, startDate, endDate);
   });
   for (const { value: rows } of results) {
     for (const row of rows) {
       const path = normalizeGA4PagePath(row.dimensionValues?.[0]?.value || "/");
       const sessions = parseInt(row.metricValues?.[0]?.value || "0", 10);
       const users = parseInt(row.metricValues?.[1]?.value || "0", 10);
-      const existing = pageMap.get(path) || { sessions: 0, activeUsers: 0 };
+      const engagedSessions = parseInt(row.metricValues?.[2]?.value || "0", 10);
+      const userEngagementDurationSeconds = Number.parseFloat(row.metricValues?.[3]?.value || "0") || 0;
+      const existing = pageMap.get(path) || {
+        sessions: 0,
+        activeUsers: 0,
+        engagedSessions: 0,
+        userEngagementDurationSeconds: 0,
+      };
       pageMap.set(path, {
         sessions: existing.sessions + sessions,
         activeUsers: existing.activeUsers + users,
+        engagedSessions: existing.engagedSessions + engagedSessions,
+        userEngagementDurationSeconds: existing.userEngagementDurationSeconds + userEngagementDurationSeconds,
       });
     }
   }
 
   const rows = Array.from(pageMap.entries())
-    .map(([pagePath, data]) => ({ pagePath, ...data }))
+    .map(([pagePath, data]) => ({
+      pagePath,
+      ...data,
+      engagementRate: data.sessions > 0 ? (data.engagedSessions / data.sessions) * 100 : null,
+    }))
     .sort((a, b) => b.sessions - a.sessions)
     .slice(0, limit);
   return { rows, coverage };

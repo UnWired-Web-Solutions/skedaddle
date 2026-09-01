@@ -157,7 +157,13 @@
 - [ ] Content plan specifies which GBP posts link back to which suburb/species pages
 
 ## PRIORITY 3 — Replicate DashThis Analytics in Dashboard
-- [ ] Google Analytics page performance (sessions, engagement, key events)
+- [ ] Google Analytics page performance (sessions, engagement, key events) — direct engagement table delivered; durable historical engagement and key-event governance remain outstanding
+- [x] Audit GA4 direct and durable data availability for page sessions, engagement, and key events — direct year-to-date engagement metrics were verified for Hamilton and Durham with current property coverage; durable completed-month engagement coverage remains deferred and key events are intentionally excluded pending governance
+- [x] Inventory read-only GA4 key-event definitions across mapped properties before aggregating any key-event count; do not treat key events as leads or conversions without an approved definition — all 19 territories audited; 17 definition sets internally consistent and 2 not comparable
+- [ ] Add coverage-aware durable GA4 engagement metrics for completed monthly page snapshots; show key events as unavailable pending a network-wide approved event definition
+- [x] Extend the existing direct GA4 top-pages reporting with verified engagement metrics and a visible key-event-definition limitation; do not retroactively label historical snapshots as engagement-complete — direct table now shows engaged sessions, engagement rate, and recorded engagement duration with property coverage
+- [x] Validate the unexpected zero-valued direct GA4 engagement-duration field against aggregate source queries before displaying it as a meaningful page-performance metric — source audit confirmed zero recorded duration for 4/5 Hamilton and 10/10 Durham properties; UI labels this direct result rather than fabricating an unavailable or inferred value
+- [ ] Checkpoint and deploy the direct GA4 engagement table, then verify the published interface and property-coverage label without publishing a key-event count
 - [x] Google Search Console data (clicks, impressions, avg position, top queries)
 - [x] Google Business Profile data (website clicks, phone calls by month; currently manual/static imports)
 - [x] Month/year filter + year-over-year comparison (last June vs this June)

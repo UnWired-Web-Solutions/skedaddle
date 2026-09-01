@@ -18,6 +18,12 @@ describe("GA4 durable-import safeguards", () => {
     expect(runReport).toHaveBeenCalledTimes(2);
     expect(runReport.mock.calls.map(([request]) => request.requestBody.offset)).toEqual(["0", "25000"]);
     expect(runReport.mock.calls.map(([request]) => request.requestBody.limit)).toEqual(["25000", "25000"]);
+    expect(runReport.mock.calls[0][0].requestBody.metrics.map((metric: { name: string }) => metric.name)).toEqual([
+      "sessions",
+      "activeUsers",
+      "engagedSessions",
+      "userEngagementDuration",
+    ]);
   });
 
   it("retains a complete active snapshot when a later fetch has partial property coverage", () => {
