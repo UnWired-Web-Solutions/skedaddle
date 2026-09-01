@@ -26,3 +26,11 @@ The published Hamilton GA4 trend contract was read for 2023–2026 without retur
 ## Safety Controls Validated
 
 The importer now pages high-cardinality `pagePath` reports deterministically at 25,000 rows per request. A later partial property fetch cannot overwrite an already complete durable month; it is audited with `snapshotApplied = 0` while the existing complete snapshot remains active. The GA4 property creation-time lookup is read-only and must complete for every mapped property before it refreshes the metadata table. These controls follow the official API pagination, quota, and property-lifecycle documentation recorded in `GA4_DURABLE_IMPORT_RESEARCH.md`.
+
+## 2026-09-01 — First Post-Checkpoint UI Check
+
+Checkpoint `cdcf3082` was created after local validation. The first production Analytics check completed its data requests, but the rendered GA4 status panel still said `Latest persisted import: December 2024 · 4/4 properties · complete`. This is the pre-fix wording and period, not the expected active August 2026 snapshot. The chart itself rendered the new backfilled 2025–2026 points. Production API/version investigation remains required before the release can be described as fully verified.
+
+A cache-bypassed production call to `analytics.getGA4ImportStatus` returned the old flat response shape (`year`, `month`, and `status`) and no `activeSnapshot` or `latestAttempt` keys. It returned 2024-12, matching the stale UI label. The configured static version path did not expose a deployment version marker and instead fell through to the application HTML shell. This confirms that the issue is deployment propagation or routing, rather than a browser-only render defect in the checkpointed local implementation.
+
+The alternate configured production domain was checked after its data requests settled and showed the same old flat GA4 response/UI label. Both configured domains therefore remained behind checkpoint `cdcf3082`; no published-interface verification is claimed yet.
