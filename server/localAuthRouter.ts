@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
+import { ENV } from "./_core/env";
 import { publicProcedure, router } from "./_core/trpc";
 
 export type LocalAuthUser = {
@@ -84,10 +85,10 @@ export const localAuthRouter = router({
     .mutation(({ input }) => {
       try {
         const user = authenticateLocalAccount(
-          process.env.LOCAL_AUTH_ACCOUNTS_JSON,
+          ENV.localAuthAccountsJson,
           input.username,
           input.password,
-          process.env.LOCAL_AUTH_ADMIN_PASSWORD,
+          ENV.localAuthAdminPassword,
         );
         if (!user) return { success: false as const, reason: "invalid_credentials" as const };
         return { success: true as const, user };
