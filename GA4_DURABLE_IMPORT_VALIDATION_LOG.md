@@ -52,3 +52,7 @@ Hamilton August 2026 was verified through the public local contract and authenti
 ## 2026-09-02 — Regression Runner Determinism
 
 The first full suite after the engagement change exposed three 15-second strategy-report timeouts only when the default multi-worker run competed for shared database capacity. The Milwaukee report test passed alone in approximately five seconds, and the full strategy-report file passed in isolation. Running all tests with one worker passed 179 tests with 11 intentional skips, confirming resource contention rather than a report-data defect. The standard `pnpm test` command now explicitly uses one minimum and maximum worker so release verification remains deterministic.
+
+## 2026-09-02 — Initial Published Contract Check
+
+Checkpoint `eb850998` was created after local contract and authenticated local UI verification. The first production Analytics review selected Hamilton August 2026 and displayed the previously deployed direct GA4 table but no persisted completed-month engagement section. A redacted production call to `analytics.getGA4DurablePageEngagement` returned HTTP 404. The issue is therefore a delayed/stale production server artifact, not a rendered-table-only defect. No source data, mapping, migration, schedule, or backfill result was changed while recording this rollout evidence.
