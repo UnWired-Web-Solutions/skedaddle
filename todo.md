@@ -271,7 +271,7 @@
 - [x] Republish the unchanged local-auth server route after confirming the corrected verifier passes locally, then verify the production artifact exposes the procedure — clean checkpoint `df660789` propagated and public procedure is live
 - [x] Safely inspect the uploaded `manus-senior-engineer-v1.0.0.zip` archive, assess compatibility with the portal workflow, and integrate only approved non-conflicting components — adopted repository-native context and task/handoff/learning templates; focused workflow regression, TypeScript, full suite (177 passed; 11 intentional skips), and clean production build passed; archive contents were not executed or globally installed
 - [x] Implement and backfill coverage-aware durable GA4 engagement metrics for completed monthly page snapshots; retain key-event counts as unavailable until UWS approves one network-wide event definition — migration `0016`, controlled July 2023–August 2026 reimport, aggregate reconciliation, local contract, and authenticated local UI verification complete
-- [ ] Publish and verify the durable GA4 completed-month engagement server contract and Analytics table; initial checkpoint `eb850998` served an earlier production artifact without the new route
+- [x] Publish and verify the durable GA4 completed-month engagement server contract and Analytics table; initial checkpoint `eb850998` served an earlier production artifact without the new route — rollout checkpoint `dd030acd` deployed the 5/5 covered Hamilton August table and production contract returned the persisted complete-source shape
 
 ## Dave's Email Feedback — Strategy Template Fixes (Jul 23, 2026)
 - [x] Fix report template: use combined GBP (calls + website clicks) not just calls

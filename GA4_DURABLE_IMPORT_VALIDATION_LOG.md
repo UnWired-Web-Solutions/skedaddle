@@ -56,3 +56,9 @@ The first full suite after the engagement change exposed three 15-second strateg
 ## 2026-09-02 — Initial Published Contract Check
 
 Checkpoint `eb850998` was created after local contract and authenticated local UI verification. The first production Analytics review selected Hamilton August 2026 and displayed the previously deployed direct GA4 table but no persisted completed-month engagement section. A redacted production call to `analytics.getGA4DurablePageEngagement` returned HTTP 404. The issue is therefore a delayed/stale production server artifact, not a rendered-table-only defect. No source data, mapping, migration, schedule, or backfill result was changed while recording this rollout evidence.
+
+## 2026-09-02 — Successful Published Engagement Verification
+
+The rollout-evidence checkpoint `dd030acd` propagated the updated client and server artifacts. The authenticated production Hamilton Analytics view for August 2026 rendered the separate **Persisted GA4: Completed-Month Engagement** table, stated that it is displayed only when every mapped property is covered, and showed the explicit key-event governance limitation. The rendered coverage is 5/5 properties.
+
+A redacted production contract check returned HTTP 200, `available: true`, source `persisted_completed_month_ga4_engagement`, and 25 bounded page rows; no page paths or engagement values were included in the check. The production verification is complete. The retained-snapshot notice remains deliberately unobserved until a genuine later partial source attempt occurs.
