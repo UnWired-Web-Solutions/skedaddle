@@ -207,6 +207,16 @@ describe("Strategy Report Router", { timeout: 15_000 }, () => {
     expect(source).toContain("not current Google Drive workbook values");
   });
 
+  it("uses the strongest approved non-Claude internal narrative path without direct Anthropic transport", () => {
+    const source = readFileSync(resolve(process.cwd(), "server/strategyReportRouter.ts"), "utf8");
+    expect(source).toContain('const INTERNAL_REPORT_MODEL = "gpt-5.5"');
+    expect(source).toContain('reasoning: { effort: "high" }');
+    expect(source).not.toContain("https://api.anthropic.com/v1/messages");
+    expect(source).not.toContain("anthropicApiKey");
+    expect(source).not.toContain("claude-opus-5");
+    expect(source).not.toContain("claude-opus-4-7");
+  });
+
   it("does not split a 90-day task at an ordinary GBP mention", async () => {
     const { formatNinetyDayPlanHtml } = await import("./strategyReportRouter");
     const html = formatNinetyDayPlanHtml(

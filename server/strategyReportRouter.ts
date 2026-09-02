@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { publicProcedure, router } from "./_core/trpc";
 import { invokeLLM } from "./_core/llm";
-import { ENV } from "./_core/env";
 import { storagePut } from "./storage";
 import puppeteer from "puppeteer";
 import {
@@ -471,7 +470,7 @@ export async function buildTerritoryData(
   };
 }
 
-// ─── Claude API helper ───────────────────────────────────────────────────────
+// ─── Internal report narrative helper ─────────────────────────────────────────
 
 export async function runReportNarrativeTasks<T>(
   tasks: Array<() => Promise<T>>,
@@ -493,9 +492,8 @@ export async function runReportNarrativeTasks<T>(
   return results;
 }
 
-const DIRECT_CLAUDE_TOTAL_BUDGET_MS = 65_000;
-const DIRECT_CLAUDE_ATTEMPT_TIMEOUT_MS = 45_000;
-const FORGE_CLAUDE_TIMEOUT_MS = 25_000;
+const INTERNAL_REPORT_MODEL = "gpt-5.5";
+const INTERNAL_REPORT_TIMEOUT_MS = 65_000;
 
 async function withReportTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -509,65 +507,31 @@ async function withReportTimeout<T>(promise: Promise<T>, timeoutMs: number, labe
   }
 }
 
-async function callClaude(prompt: string, model: string = "claude-opus-5", maxTokens: number = 4000): Promise<string> {
-  // Primary path: Direct Anthropic API (Claude Opus 5)
-  const apiKey = ENV.anthropicApiKey;
-  if (apiKey) {
-    const directDeadline = Date.now() + DIRECT_CLAUDE_TOTAL_BUDGET_MS;
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const remainingMs = directDeadline - Date.now();
-      if (remainingMs < 1_000) break;
-      try {
-        const resp = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          signal: AbortSignal.timeout(Math.min(DIRECT_CLAUDE_ATTEMPT_TIMEOUT_MS, remainingMs)),
-          headers: {
-            "x-api-key": apiKey,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            model,
-            max_tokens: maxTokens,
-            messages: [{ role: "user", content: prompt }],
-          }),
-        });
-
-        if (resp.ok) {
-          const result = await resp.json() as { content: Array<{ text: string }> };
-          const text = result.content[0]?.text || "";
-          if (text.trim().length > 20) return text;
-          console.warn(`Claude direct API returned near-empty (${text.length} chars), attempt ${attempt + 1}`);
-        } else {
-          const errText = await resp.text();
-          console.error(`Claude direct API error (${model}), attempt ${attempt + 1}:`, resp.status, errText);
-        }
-      } catch (err) {
-        console.error(`Claude direct API fetch error, attempt ${attempt + 1}:`, err);
-      }
-    }
-    console.warn(`Direct Anthropic API failed after 2 attempts — falling back to built-in forge API`);
-  }
-
-  // Fallback path: Built-in forge API (has retry/backoff built in)
+async function callInternalReportNarrative(prompt: string, maxTokens: number = 4000): Promise<string> {
   try {
-    const forgeModel = "claude-opus-4-7"; // Best Claude model available on forge
-    console.log(`Using forge API fallback with ${forgeModel}`);
+    console.log(`Using internal report model ${INTERNAL_REPORT_MODEL}`);
     const result = await withReportTimeout(
       invokeLLM({
-        model: forgeModel,
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: maxTokens,
+        model: INTERNAL_REPORT_MODEL,
+        messages: [
+          {
+            role: "system",
+            content: "You are a senior digital strategist. Follow every source and availability constraint in the user prompt. Do not invent values, scope, conversion metrics, ownership classifications, or current performance claims.",
+          },
+          { role: "user", content: prompt },
+        ],
+        max_completion_tokens: maxTokens,
+        reasoning: { effort: "high" },
       }),
-      FORGE_CLAUDE_TIMEOUT_MS,
-      `Forge ${forgeModel} report request`,
+      INTERNAL_REPORT_TIMEOUT_MS,
+      `Internal ${INTERNAL_REPORT_MODEL} report request`,
     );
     const content = result.choices[0]?.message?.content;
     const text = typeof content === "string" ? content : Array.isArray(content) ? content.map((p: any) => p.type === "text" ? p.text : "").join("") : "";
     if (text.trim().length > 20) return text;
-    console.warn(`Forge API also returned near-empty (${text.length} chars)`);
+    console.warn(`Internal report model returned near-empty (${text.length} chars)`);
   } catch (err) {
-    console.error(`Forge API fallback error:`, err);
+    console.error(`Internal report model error:`, err);
   }
 
   return "";
@@ -656,9 +620,9 @@ STYLE: Professional, data-backed, direct. Written like a senior digital strategi
 
 Return ONLY the paragraph text (no headings, no HTML tags, no markdown). Use plain text with line breaks between paragraphs.`;
 
-  const text = await callClaude(prompt, "claude-opus-5", 1500);
+  const text = await callInternalReportNarrative(prompt, 1500);
 
-  // Convert plain text paragraphs to HTML
+// Convert plain text paragraphs to HTML
   const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
   if (paragraphs.length > 0) {
     return narrativeParagraphsHtml(text);
@@ -734,7 +698,7 @@ STYLE: Analytical, historical-snapshot-revenue-backed, persuasive. Each suburb m
 
 Return ONLY paragraph text (no headings, no HTML, no markdown).`;
 
-  const text = await callClaude(prompt, "claude-opus-5", 1500);
+  const text = await callInternalReportNarrative(prompt, 1500);
   const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
   if (paragraphs.length > 0) return narrativeParagraphsHtml(text);
   console.warn(`AI section returned empty for ${data.name}`);
@@ -779,7 +743,7 @@ STYLE: Strategic and specific. Reference actual suburb names and species. Writte
 
 Return ONLY paragraph text (no headings, no HTML, no markdown). Separate the 4 areas with double line breaks.`;
 
-  const text = await callClaude(prompt, "claude-opus-5", 2500);
+  const text = await callInternalReportNarrative(prompt, 2500);
   const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
   if (paragraphs.length > 0) return narrativeParagraphsHtml(text);
   console.warn(`AI section returned empty for ${data.name}`);
@@ -809,7 +773,7 @@ STYLE: Detailed and prescriptive. This section should read like a content strate
 
 Return ONLY paragraph text (no headings, no HTML, no markdown). Use double line breaks between subsections.`;
 
-  const text = await callClaude(prompt, "claude-opus-5", 3000);
+  const text = await callInternalReportNarrative(prompt, 3000);
   const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
   if (paragraphs.length > 0) return narrativeParagraphsHtml(text);
   console.warn(`AI section returned empty for ${data.name}`);
@@ -849,7 +813,7 @@ STYLE: Tactical and specific. This should read like a monthly playbook a marketi
 
 Return ONLY paragraph text (no headings, no HTML, no markdown). Use double line breaks between subsections.`;
 
-  const text = await callClaude(prompt, "claude-opus-5", 3000);
+  const text = await callInternalReportNarrative(prompt, 3000);
   const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
   if (paragraphs.length > 0) return narrativeParagraphsHtml(text);
   console.warn(`AI section returned empty for ${data.name}`);
@@ -891,7 +855,7 @@ Month 2 — Expansion
 Month 3 — Optimization
 [same format]`;
 
-  const text = await callClaude(prompt, "claude-opus-5", 4000);
+  const text = await callInternalReportNarrative(prompt, 4000);
   if (text.trim().length > 50) return text;
   console.warn(`AI section returned near-empty for ${data.name}`);
   return `Month 1 — Foundation\nPriorities: Analytics owner — verify GA4, Search Console, GBP, and Salesforce coverage — produce an approved baseline; Content lead — audit dedicated hubs for ${data.topSuburbNames.slice(0, 3).join(", ")} — document confirmed gaps; SEO lead — prepare the approved Phase 1 hub briefs — obtain scope sign-off\n\nMonth 2 — Expansion\nPriorities: Content lead — publish only approved Phase 1 suburb hubs — establish measurable local landing pages; GBP owner — run the approved monthly post schedule around ${data.topSpeciesNames.slice(0, 2).join(" and ")} — link every post to a verified destination; Analyst — review complete-month traffic and search evidence — record early movement\n\nMonth 3 — Optimization\nPriorities: Analyst — compare matched complete months — identify evidence-backed winners; Content lead — propose Phase 2 species-by-suburb pages beneath approved hubs — obtain approval before production; Strategy owner — document the next 90-day plan — align capacity, seasonality, and measurement`;
@@ -920,7 +884,7 @@ STYLE: Neutral, direct, and practical. Do not manufacture negative performance c
 Return as plain text in this format (one per line):
 RISK: [risk statement] | IMPACT: [impact] | MITIGATION: [mitigation action]`;
 
-  const text = await callClaude(prompt, "claude-opus-5", 2000);
+  const text = await callInternalReportNarrative(prompt, 2000);
   if (text.trim().length > 50) return text;
   console.warn(`AI section returned near-empty for ${data.name}`);
   return `RISK: Dedicated suburb-hub coverage is not fully verified | IMPACT: Page recommendations may duplicate existing work | MITIGATION: Complete and document the URL audit before approving Phase 1\nRISK: Publishing capacity is not confirmed | IMPACT: Proposed volume may be undeliverable | MITIGATION: Approve monthly GBP and blog counts before scheduling\nRISK: Partial GA4 imports exist | IMPACT: Incomplete traffic may be mistaken for a decline | MITIGATION: Use only complete months in headline totals and disclose coverage\nRISK: Local facts require franchise review | IMPACT: Content may contain inaccurate service-area detail | MITIGATION: Require territory-owner review before publishing\nRISK: Seasonal timing can shift | IMPACT: Planned topics may miss local demand | MITIGATION: Recheck complete-month GBP and search evidence each month`;
@@ -952,7 +916,7 @@ STYLE: Concise, direct, data-backed. Each recommendation should feel like a clea
 
 Return as numbered list (1. ... 2. ... etc.) with no other formatting.`;
 
-  const text = await callClaude(prompt, "claude-opus-5", 1500);
+  const text = await callInternalReportNarrative(prompt, 1500);
   if (text.trim().length > 50) return text;
   console.warn(`AI section returned near-empty for ${data.name}`);
   return `1. Audit dedicated suburb hubs in historical-snapshot revenue order, beginning with ${data.topSuburbNames.slice(0, 3).join(", ")}, before approving new pages.\n2. Establish the measurement baseline using only complete GA4 months and territory-filtered Search Console data.\n3. Keep the ${data.name} territory page as the central search and GBP destination.\n4. Weight approved content toward ${data.topSpeciesNames.slice(0, 2).join(" and ")}, the leading historical-snapshot demand mix.\n5. Recheck seasonal demand monthly before changing the production calendar.\n6. Set GBP volume from approved capacity and rotate verified suburb and species themes.\n7. Build approved permanent suburb hubs before species-by-suburb pages or supporting articles.\n8. Use verified Google Drive workbook work-order and invoice aggregates, together with matched-month digital evidence, to set the next priorities. Inspection, closed-job, and close-rate metrics remain unavailable pending an approved status definition.`;

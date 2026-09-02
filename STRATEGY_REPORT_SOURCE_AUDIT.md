@@ -71,3 +71,71 @@ The full 17-page exact draft now passes visual source-provenance and layout revi
 The audit corrected active strategy-report prompt and deterministic narrative wording where historical sales snapshot revenue or jobs could have been interpreted as current Drive-workbook performance. The Executive Summary, content-architecture, proposed-program, suburb-gap, risk, recommendation, and action-plan contexts now state or require historical-snapshot qualification where relevant.
 
 The focused historical-source regression, TypeScript, serialized full suite, and clean production build passed. The fresh Ottawa report used the established exact-draft export flow and was visually reviewed page by page. The report remains deliberately limited by current source conditions: workbook coverage is partial, conversion metrics are unavailable without an approved status definition, and GBP live activation remains blocked by Google quota and authorization requirements.
+
+## 2026-09-02 — Ottawa internal GPT-5.5 exact-draft PDF review, pages 1-5
+
+After replacing the direct report-narrative transport with internal `gpt-5.5`, a fresh Ottawa draft was generated locally through the normal saved-draft flow and exported as a 21-page Letter PDF. Pages 1 through 5 were visually reviewed.
+
+| Page | Finding |
+|---|---|
+| 1 | Cover page remains clean and identifies Historical Revenue Snapshot, Historical Jobs Snapshot, the partial current Google Drive workbook, and the multi-source data context. |
+| 2 | Executive Summary explicitly identifies revenue and jobs as historical sales-snapshot context and states that they are not current Google Drive workbook performance. Layout is stable and readable. |
+| 3 | Current Campaign section retains configured-mapping language and does not reintroduce inferred publishing volume, legacy CRM claims, or conversion wording. |
+| 4 | Historical Sales Snapshot — Revenue by Species remains clearly labelled and retains partial-workbook and conversion-unavailability disclosure. |
+| 5 | Historical Sales Snapshot — Revenue by City remains clearly labelled and retains the same source and conversion boundary language. |
+
+No clipping, overflow, or broken page transitions were observed on pages 1 through 5. The remaining pages require review before the internal-model migration can be treated as fully verified.
+
+## 2026-09-02 — Ottawa internal GPT-5.5 exact-draft PDF review, pages 6-10
+
+Pages 6 through 10 of the 21-page internal-model Ottawa PDF were visually reviewed.
+
+| Page | Finding |
+|---|---|
+| 6 | Digital Performance renders cleanly. Work-Order Data Status correctly identifies the Google Drive workbook, active partial status, 221,748 included rows, 48,524 explicit exclusions, and conversion unavailability. |
+| 7 | Matched-Month Year-over-Year and imported GA4 pages table render cleanly with no workbook/source-confusion wording. |
+| 8 | Search Console top-pages table continues cleanly with no source-labelling defect. |
+| 9 | Search terms table renders cleanly and pagination remains stable. |
+| 10 | No clipping or layout defect is visible at the end of the top-search-terms continuation; the page remains readable and stable. |
+
+No overflow, clipping, or retired close-rate wording was observed on pages 6 through 10. The remaining pages still require review before the internal-model migration can be treated as fully verified.
+
+## 2026-09-02 — Ottawa internal GPT-5.5 exact-draft PDF review, pages 11-15
+
+Pages 11 through 15 of the 21-page internal-model Ottawa PDF were visually reviewed.
+
+| Page | Finding |
+|---|---|
+| 11 | Content Architecture Gap — The Opportunity renders cleanly and keeps suburb revenue and jobs in historical-snapshot context rather than current workbook demand. |
+| 12 | Proposed Program — Full Build renders cleanly, avoids invented posting volumes, and does not imply current conversion or lead evidence. |
+| 13 | Scale Comparison — Current vs. Proposed remains bounded to confirmed inputs and audit-first language. No hidden scope inflation appears. |
+| 14 | Website Content Architecture continues to use historical-snapshot revenue order and explicitly rejects current workbook, closed-job, or conversion interpretations. |
+| 15 | Website Content Architecture continues cleanly across the page break with stable layout and no source-confusion wording. |
+
+No clipping, overflow, or unsupported conversion language was observed on pages 11 through 15. The remaining pages still require review before the internal-model migration can be treated as fully verified.
+
+## 2026-09-02 — Ottawa internal GPT-5.5 exact-draft PDF review, pages 16-20
+
+Pages 16 through 20 of the 21-page internal-model Ottawa PDF were visually reviewed.
+
+| Page | Finding |
+|---|---|
+| 16 | Website Content Architecture concludes cleanly. It explicitly avoids unsupported claims such as top-performing market, proven closed-job demand, or current conversion evidence. |
+| 17 | Google Business Profile Strategy renders cleanly and keeps GBP spreadsheet figures framed as historical baseline context, not live connected GBP performance. |
+| 18 | Google Business Profile Strategy continues cleanly with no live-GBP implication, quota-approval overstatement, or layout defect. |
+| 19 | 90-Day Action Plan renders cleanly. Tasks rely on approved source coverage and do not reintroduce static T12-demand or closed-job wording. |
+| 20 | Delivery Dependencies and Mitigations table renders cleanly, remains operationally grounded, and does not introduce unsupported ownership, conversion, or source claims. |
+
+No overflow, clipping, unsupported ownership classification, or retired conversion wording was observed on pages 16 through 20. The final page still requires review before the internal-model migration can be treated as fully verified.
+
+## 2026-09-02 — Ottawa internal GPT-5.5 exact-draft PDF review, page 21
+
+The final Summary of Recommendations page renders cleanly. Each numbered recommendation is readable and operationally bounded. The page uses historical-snapshot context for Ottawa/Kanata/Stittsville priority order and GBP activity; it directs the next round of priorities to verified work-order/invoice aggregates and matched-month digital evidence; and it expressly forbids conversion calculation until UWS approves status definitions. No clipping, overflow, unqualified current-performance claim, or unsupported conversion wording was observed.
+
+## Internal-model migration visual conclusion
+
+The exact fresh Ottawa strategy report generated through the internal GPT-5.5 path was exported to a 21-page PDF and visually inspected page by page. The document is readable and stable across all pages. The report preserves historical-snapshot revenue/job qualification, current Drive-workbook partial coverage, GBP historical-baseline context, and conversion/key-event governance boundaries. No direct-Claude wording, direct-Claude transport dependency, retired close-rate presentation, or source-label regression was observed in the final output.
+
+## Internal narrative transport migration
+
+At the user’s direction, the active report narrative path now uses the internal GPT-5.5 integration rather than direct Anthropic transport. The migration retains the existing bounded concurrency, request deadline, empty-response handling, deterministic fallback content, and exact-draft export path. The focused transport regression, complete strategy-report regression, TypeScript, serialized full suite, and clean production build passed. The local exact Ottawa report above is the end-to-end proof for the new path. Published report-generation verification remains required after deployment.
