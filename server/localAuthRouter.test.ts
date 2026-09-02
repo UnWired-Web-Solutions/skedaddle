@@ -12,9 +12,21 @@ describe("local server authentication", () => {
     expect(raw).toBeTruthy();
     const [account] = JSON.parse(raw!) as Array<{ username: string; password: string }>;
     const caller = localAuthRouter.createCaller({} as never);
-    const result = await caller.login({ username: account!.username, password: account!.password });
+    const effectivePassword = account!.username.toLowerCase() === "admin"
+      ? process.env.LOCAL_AUTH_ADMIN_PASSWORD || account!.password
+      : account!.password;
+    const result = await caller.login({ username: account!.username, password: effectivePassword });
     expect(result.success).toBe(true);
     if (result.success) expect(result.user).not.toHaveProperty("password");
+  });
+
+  it("validates the managed primary registry independently of any administrator override", () => {
+    const raw = process.env.LOCAL_AUTH_ACCOUNTS_JSON;
+    expect(raw).toBeTruthy();
+    const [account] = JSON.parse(raw!) as Array<{ username: string; password: string; role: "admin" | "franchise" }>;
+    const result = authenticateLocalAccount(raw, account!.username, account!.password);
+    expect(result).toMatchObject({ username: account!.username.toLowerCase(), role: account!.role });
+    expect(result).not.toHaveProperty("password");
   });
 
   it("returns only authorized user context and never a password", () => {

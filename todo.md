@@ -159,6 +159,8 @@
 - [x] Checkpoint, publish, and complete an authenticated production browser review of the source-safe suburb-content workflow without generating a real draft until reviewer-approved local facts are supplied — production admin review confirmed the manual community field, no static performance selector/Claude wording, disabled draft action without facts, and partial-workbook disclosure for Ottawa
 - [x] Reset the managed portal administrator credential through the secure configuration workflow, validate it without exposing the value, and complete the authenticated production review — focused managed-registry test, full suite, clean build, and successful production administrator sign-in passed without credential output
 - [ ] Add a server-only administrator credential-rotation override that preserves the existing managed franchise registry, validate it, and remove it only after the primary registry is confirmed live
+- [ ] Perform the user-approved controlled production primary-registry check; remove the temporary admin override if authentication remains available and restore it immediately if not
+- [ ] Change the managed administrator password to the user-approved value and validate the updated local and production login without exposing it
 - [x] Preserve administrator access in managed secure configuration and document only the non-sensitive recovery process — registry restored and validated through the public login contract; `LOCAL_AUTH_ACCESS.md` records the safe recovery process without credentials
 - [ ] Content plan specifies which GBP posts link back to which suburb/species pages
 
