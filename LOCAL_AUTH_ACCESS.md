@@ -4,6 +4,4 @@ The portal’s local login registry is stored exclusively in the managed server 
 
 The administrator username is `admin`. If an authorized administrator cannot sign in, update the managed secret through the portal’s secure settings rather than adding or changing credentials in code. The replacement value must be valid JSON, preserve authorized account role and territory metadata, and be verified through the public local-auth procedure without printing a credential value.
 
-When the primary registry has not yet propagated to the deployed service, `LOCAL_AUTH_ADMIN_PASSWORD` may temporarily rotate only the administrator password. It is a server-only managed secret and must never be written to source control. This narrow override does not change franchise credentials, roles, or territory assignments. Remove it after the primary managed registry is confirmed live.
-
 After a credential change, run the focused local-auth regression, checkpoint the release, and verify one authorized sign-in plus one deliberately rejected sign-in in production. Do not use account details from historical documents as an authentication source because they may be stale or intentionally redacted.

@@ -12,10 +12,7 @@ describe("local server authentication", () => {
     expect(raw).toBeTruthy();
     const [account] = JSON.parse(raw!) as Array<{ username: string; password: string }>;
     const caller = localAuthRouter.createCaller({} as never);
-    const effectivePassword = account!.username.toLowerCase() === "admin"
-      ? process.env.LOCAL_AUTH_ADMIN_PASSWORD || account!.password
-      : account!.password;
-    const result = await caller.login({ username: account!.username, password: effectivePassword });
+    const result = await caller.login({ username: account!.username, password: account!.password });
     expect(result.success).toBe(true);
     if (result.success) expect(result.user).not.toHaveProperty("password");
   });
@@ -34,15 +31,6 @@ describe("local server authentication", () => {
       .toEqual({ username: "sample-territory", role: "franchise", locationId: "sample-territory" });
     expect(authenticateLocalAccount(testAccounts, "admin", "test-admin-password"))
       .toEqual({ username: "admin", role: "admin" });
-  });
-
-  it("supports a server-only administrator password rotation without changing franchise credentials", () => {
-    expect(authenticateLocalAccount(testAccounts, "admin", "rotated-admin-password", "rotated-admin-password"))
-      .toEqual({ username: "admin", role: "admin" });
-    expect(authenticateLocalAccount(testAccounts, "admin", "test-admin-password", "rotated-admin-password"))
-      .toBeNull();
-    expect(authenticateLocalAccount(testAccounts, "sample-territory", "test-franchise-password", "rotated-admin-password"))
-      .toEqual({ username: "sample-territory", role: "franchise", locationId: "sample-territory" });
   });
 
   it("rejects invalid credentials and malformed account configuration", () => {

@@ -62,15 +62,11 @@ export function authenticateLocalAccount(
   raw: string | undefined,
   username: string,
   password: string,
-  administratorPasswordOverride?: string,
 ): LocalAuthUser | null {
   const normalizedUsername = username.trim().toLowerCase();
   const account = parseLocalAuthAccounts(raw).find((candidate) => candidate.username === normalizedUsername);
   if (!account) return null;
-  const expectedPassword = account.role === "admin" && administratorPasswordOverride
-    ? administratorPasswordOverride
-    : account.password;
-  if (!constantTimeMatch(expectedPassword, password)) return null;
+  if (!constantTimeMatch(account.password, password)) return null;
   return account.role === "admin"
     ? { username: account.username, role: "admin" }
     : { username: account.username, role: "franchise", locationId: account.locationId };
@@ -88,7 +84,6 @@ export const localAuthRouter = router({
           ENV.localAuthAccountsJson,
           input.username,
           input.password,
-          ENV.localAuthAdminPassword,
         );
         if (!user) return { success: false as const, reason: "invalid_credentials" as const };
         return { success: true as const, user };

@@ -18,7 +18,6 @@ export const ENV = {
   gbpOAuthClientSecret: process.env.GBP_OAUTH_CLIENT_SECRET ?? "",
   gbpOAuthRefreshToken: process.env.GBP_OAUTH_REFRESH_TOKEN ?? "",
   gbpOAuthRedirectUri: process.env.GBP_OAUTH_REDIRECT_URI ?? "https://skedaddle.manus.space/api/gbp/oauth/callback",
-  // Server-only local authentication registry and temporary administrator rotation safeguard.
+  // Server-only local authentication registry.
   localAuthAccountsJson: process.env.LOCAL_AUTH_ACCOUNTS_JSON ?? "",
-  localAuthAdminPassword: process.env.LOCAL_AUTH_ADMIN_PASSWORD ?? "",
 };
