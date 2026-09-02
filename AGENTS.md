@@ -2,6 +2,8 @@
 
 Before changing product behavior, read `docs/PRODUCT_REQUIREMENTS.md` completely. It is the repository-native product contract and links to the fuller meeting notes.
 
+For technical implementation, migration, release, incident, or handoff work, also read `PROJECT_ENGINEERING_CONTEXT.md`. Use `TASK_CONTRACT_TEMPLATE.md` for high-risk or multi-stage work and the handoff/learning templates when their stated conditions apply.
+
 Rules for every change:
 
 - Preserve unfamiliar integrations and history. In particular, never remove GA4, Google Search Console, GBP, or Salesforce code because it is not used by the file being changed.
