@@ -74,6 +74,18 @@ describe("analyticsRouter", () => {
     expect(analyticsPage).toContain("activeGA4Snapshot");
   });
 
+  it("exposes complete persisted monthly GA4 engagement separately from direct YTD data", async () => {
+    const mod = await import("./analyticsRouter");
+    const routerSource = readFileSync(resolve(process.cwd(), "server/analyticsRouter.ts"), "utf8");
+    const analyticsPage = readFileSync(resolve(process.cwd(), "client/src/pages/Analytics.tsx"), "utf8");
+
+    expect(mod.analyticsRouter._def.procedures.getGA4DurablePageEngagement).toBeDefined();
+    expect(routerSource).toContain("persisted_completed_month_ga4_engagement");
+    expect(routerSource).toContain("unavailable_pending_network_key_event_definition");
+    expect(analyticsPage).toContain("Persisted GA4: Completed-Month Engagement");
+    expect(analyticsPage).toContain("Key-event counts remain unavailable");
+  });
+
   it("marks pre-April 2025 Search Console history as unavailable rather than estimating it", () => {
     const page = readFileSync(resolve(process.cwd(), "client/src/pages/Analytics.tsx"), "utf8");
     expect(page).toContain("Verified territory-filtered Search Console history begins in April 2025");

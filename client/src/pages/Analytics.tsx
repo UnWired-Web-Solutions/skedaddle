@@ -1026,6 +1026,7 @@ export default function Analytics() {
 
         {/* ─── Live GA4: Top Pages (from GA4 Data API) ─────────────────────────── */}
         <GA4LiveTopPages territoryId={selectedTerritory} year={selectedYear} />
+        <GA4DurablePageEngagement territoryId={selectedTerritory} year={selectedYear} month={comparisonMonth} />
 
         {/* ─── Live GA4: Top Cities + Channel Breakdown ───────────────────────── */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 28 }}>
@@ -1216,6 +1217,65 @@ function GA4LiveTopPages({ territoryId, year }: { territoryId: string; year: num
                   <td style={{ padding: "6px 10px", color: FOREST, fontFamily: "monospace", fontSize: 11, maxWidth: 350, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.pagePath}</td>
                   <td style={{ padding: "6px 10px", textAlign: "right", fontWeight: 600, color: FOREST }}>{row.sessions.toLocaleString()}</td>
                   <td style={{ padding: "6px 10px", textAlign: "right", color: "#666" }}>{row.activeUsers.toLocaleString()}</td>
+                  <td style={{ padding: "6px 10px", textAlign: "right", color: "#666" }}>{row.engagedSessions.toLocaleString()}</td>
+                  <td style={{ padding: "6px 10px", textAlign: "right", color: "#666" }}>{row.engagementRate === null ? "Unavailable" : `${row.engagementRate.toFixed(1)}%`}</td>
+                  <td style={{ padding: "6px 10px", textAlign: "right", color: "#666" }}>{formatEngagementDuration(row.userEngagementDurationSeconds)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GA4DurablePageEngagement({ territoryId, year, month }: { territoryId: string; year: number; month: number }) {
+  const { data, isLoading } = trpc.analytics.getGA4DurablePageEngagement.useQuery(
+    { territoryId, year, month, limit: 25 },
+    { enabled: !!territoryId },
+  );
+  const unavailableMessage = data?.reason === "partial_property_coverage"
+    ? "This persisted month has partial property coverage, so page engagement totals are unavailable."
+    : data?.reason === "snapshot_predates_durable_engagement"
+      ? "This complete persisted month predates durable engagement fields. It remains unavailable until a controlled reimport completes."
+      : "No complete persisted page-engagement snapshot is available for this selected month.";
+
+  return (
+    <div style={{ background: "#fff", borderRadius: 10, border: `1px solid ${MIST}`, padding: "24px 20px", marginBottom: 28 }}>
+      <h2 style={{ fontSize: 15, fontWeight: 700, color: FOREST, marginBottom: 4, fontFamily: "'Playfair Display', serif", display: "flex", alignItems: "center", gap: 8 }}>
+        <Activity size={16} color={SAGE} /> Persisted GA4: Completed-Month Engagement
+      </h2>
+      <p style={{ fontSize: 12, color: "#888", marginBottom: 16 }}>
+        Direct GA4 Data API snapshot — {FULL_MONTHS[month - 1]} {year}; displayed only when every mapped property was covered.
+      </p>
+      <GA4CoverageNotice coverage={data?.coverage ?? undefined} />
+      <div style={{ marginBottom: 12, padding: "9px 12px", borderRadius: 7, background: "#f8fafc", border: "1px solid #dbe4ed", color: "#4b5563", fontSize: 11, lineHeight: 1.5 }}>
+        Key-event counts remain unavailable pending a network-wide approved event-definition and counting-method policy. No lead or conversion claim is inferred from this table.
+      </div>
+      {isLoading ? (
+        <div style={{ height: 100, display: "flex", alignItems: "center", justifyContent: "center", color: "#aaa" }}>Loading persisted engagement data...</div>
+      ) : !data?.available ? (
+        <div style={{ minHeight: 80, display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", color: "#666", fontSize: 12, padding: "0 18px" }}>{unavailableMessage}</div>
+      ) : (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            <thead>
+              <tr style={{ borderBottom: `2px solid ${MIST}` }}>
+                <th style={{ textAlign: "left", padding: "8px 10px", color: SAGE, fontWeight: 700 }}>#</th>
+                <th style={{ textAlign: "left", padding: "8px 10px", color: SAGE, fontWeight: 700 }}>Page Path</th>
+                <th style={{ textAlign: "right", padding: "8px 10px", color: SAGE, fontWeight: 700 }}>Sessions</th>
+                <th style={{ textAlign: "right", padding: "8px 10px", color: SAGE, fontWeight: 700 }}>Engaged</th>
+                <th style={{ textAlign: "right", padding: "8px 10px", color: SAGE, fontWeight: 700 }}>Engagement Rate</th>
+                <th style={{ textAlign: "right", padding: "8px 10px", color: SAGE, fontWeight: 700 }}>Recorded Engagement Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.rows.map((row, index) => (
+                <tr key={row.pagePath} style={{ borderBottom: `1px solid ${MIST}`, background: index % 2 === 0 ? "#fff" : CREAM }}>
+                  <td style={{ padding: "6px 10px", color: "#888" }}>{index + 1}</td>
+                  <td style={{ padding: "6px 10px", color: FOREST, fontFamily: "monospace", fontSize: 11, maxWidth: 350, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.pagePath}</td>
+                  <td style={{ padding: "6px 10px", textAlign: "right", fontWeight: 600, color: FOREST }}>{row.sessions.toLocaleString()}</td>
                   <td style={{ padding: "6px 10px", textAlign: "right", color: "#666" }}>{row.engagedSessions.toLocaleString()}</td>
                   <td style={{ padding: "6px 10px", textAlign: "right", color: "#666" }}>{row.engagementRate === null ? "Unavailable" : `${row.engagementRate.toFixed(1)}%`}</td>
                   <td style={{ padding: "6px 10px", textAlign: "right", color: "#666" }}>{formatEngagementDuration(row.userEngagementDurationSeconds)}</td>

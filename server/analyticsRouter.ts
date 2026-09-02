@@ -176,6 +176,93 @@ export const analyticsRouter = router({
     }),
 
   /**
+   * Read engagement metrics from one persisted, complete GA4 territory-month.
+   * Historical page rows that predate engagement persistence remain unavailable;
+   * neither those rows nor partial property coverage are converted to zero.
+   */
+  getGA4DurablePageEngagement: publicProcedure
+    .input(z.object({
+      territoryId: z.string(),
+      year: z.number().int(),
+      month: z.number().int().min(1).max(12),
+      limit: z.number().int().min(1).max(100).optional().default(25),
+    }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      const source = "persisted_completed_month_ga4_engagement" as const;
+      const keyEvents = { availability: "unavailable_pending_network_key_event_definition" as const };
+      if (!db) {
+        return { available: false, source, keyEvents, coverage: null, reason: "database_unavailable" as const, rows: [] };
+      }
+
+      const conditions = and(
+        eq(ga4TerritoryPages.territoryId, input.territoryId),
+        eq(ga4TerritoryPages.year, input.year),
+        eq(ga4TerritoryPages.month, input.month),
+      );
+      const [coverage] = await db.select({
+        propertiesExpected: ga4TerritoryMonthly.propertiesExpected,
+        propertiesSucceeded: ga4TerritoryMonthly.propertiesSucceeded,
+      }).from(ga4TerritoryMonthly).where(and(
+        eq(ga4TerritoryMonthly.territoryId, input.territoryId),
+        eq(ga4TerritoryMonthly.year, input.year),
+        eq(ga4TerritoryMonthly.month, input.month),
+      ));
+      const coverageWithState = coverage ? {
+        ...coverage,
+        complete: coverage.propertiesExpected > 0 && coverage.propertiesExpected === coverage.propertiesSucceeded,
+      } : null;
+      if (!coverageWithState) {
+        return { available: false, source, keyEvents, coverage: null, reason: "no_persisted_snapshot" as const, rows: [] };
+      }
+      if (!coverageWithState.complete) {
+        return { available: false, source, keyEvents, coverage: coverageWithState, reason: "partial_property_coverage" as const, rows: [] };
+      }
+
+      const [availability] = await db.select({
+        pageRows: sql<number>`COUNT(*)`,
+        rowsWithEngagement: sql<number>`COALESCE(SUM(CASE WHEN ${ga4TerritoryPages.engagedSessions} IS NOT NULL AND ${ga4TerritoryPages.userEngagementDurationSeconds} IS NOT NULL THEN 1 ELSE 0 END), 0)`,
+      }).from(ga4TerritoryPages).where(conditions);
+      const pageRows = Number(availability?.pageRows || 0);
+      const rowsWithEngagement = Number(availability?.rowsWithEngagement || 0);
+      if (pageRows === 0) {
+        return { available: false, source, keyEvents, coverage: coverageWithState, reason: "no_persisted_pages" as const, rows: [] };
+      }
+      if (rowsWithEngagement !== pageRows) {
+        return { available: false, source, keyEvents, coverage: coverageWithState, reason: "snapshot_predates_durable_engagement" as const, rows: [] };
+      }
+
+      const rows = await db.select({
+        pagePath: ga4TerritoryPages.pagePath,
+        pageType: ga4TerritoryPages.pageType,
+        sessions: ga4TerritoryPages.sessions,
+        activeUsers: ga4TerritoryPages.activeUsers,
+        engagedSessions: ga4TerritoryPages.engagedSessions,
+        userEngagementDurationSeconds: ga4TerritoryPages.userEngagementDurationSeconds,
+      }).from(ga4TerritoryPages).where(conditions).orderBy(desc(ga4TerritoryPages.sessions)).limit(input.limit);
+
+      return {
+        available: true,
+        source,
+        keyEvents,
+        coverage: coverageWithState,
+        reason: null,
+        rows: rows.map(row => {
+          const sessions = Number(row.sessions);
+          const engagedSessions = Number(row.engagedSessions);
+          return {
+            ...row,
+            sessions,
+            activeUsers: Number(row.activeUsers),
+            engagedSessions,
+            userEngagementDurationSeconds: Number(row.userEngagementDurationSeconds),
+            engagementRate: sessions > 0 ? (engagedSessions / sessions) * 100 : null,
+          };
+        }),
+      };
+    }),
+
+  /**
    * Pull a completed calendar month from the live parent-domain property.
    * The importer rejects partial, overlapping, or otherwise unverified
    * territory scopes before it requests or persists Google data.

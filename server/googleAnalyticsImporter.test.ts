@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  aggregateGA4TerritoryMonthPages,
   fetchGA4PropertyMonthPages,
 } from "./googleAnalyticsClient";
 import { shouldRetainExistingCompleteSnapshot } from "./googleAnalyticsImporter";
@@ -43,5 +44,28 @@ describe("GA4 durable-import safeguards", () => {
       propertiesExpected: 4,
       propertiesSucceeded: 4,
     })).toBe(false);
+  });
+
+  it("preserves direct page engagement values, including a reported zero duration, for durable monthly snapshots", () => {
+    const pages = aggregateGA4TerritoryMonthPages([
+      {
+        dimensionValues: [{ value: "/raccoon-removal" }],
+        metricValues: [{ value: "4" }, { value: "3" }, { value: "2" }, { value: "0" }],
+      },
+      {
+        dimensionValues: [{ value: "/raccoon-removal" }],
+        metricValues: [{ value: "6" }, { value: "5" }, { value: "4" }, { value: "12.5" }],
+      },
+    ]);
+
+    expect(pages).toEqual([
+      expect.objectContaining({
+        pagePath: "/raccoon-removal",
+        sessions: 10,
+        activeUsers: 8,
+        engagedSessions: 6,
+        userEngagementDurationSeconds: 12.5,
+      }),
+    ]);
   });
 });

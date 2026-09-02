@@ -456,7 +456,48 @@ export type GA4TerritoryMonthPage = {
   pageType: GA4PageType;
   sessions: number;
   activeUsers: number;
+  engagedSessions: number;
+  userEngagementDurationSeconds: number;
 };
+
+/**
+ * Aggregate paged page-path rows across the explicitly covered properties for a
+ * completed territory month. A GA4-returned zero duration remains zero; it is
+ * not converted to an unavailable or inferred value.
+ */
+export function aggregateGA4TerritoryMonthPages(
+  rows: GA4PageRow[],
+): GA4TerritoryMonthPage[] {
+  const pageMap = new Map<string, {
+    sessions: number;
+    activeUsers: number;
+    engagedSessions: number;
+    userEngagementDurationSeconds: number;
+  }>();
+  for (const row of rows) {
+    const pagePath = normalizeGA4PagePath(row.dimensionValues?.[0]?.value || "/");
+    const existing = pageMap.get(pagePath) || {
+      sessions: 0,
+      activeUsers: 0,
+      engagedSessions: 0,
+      userEngagementDurationSeconds: 0,
+    };
+    pageMap.set(pagePath, {
+      sessions: existing.sessions + Number.parseInt(row.metricValues?.[0]?.value || "0", 10),
+      activeUsers: existing.activeUsers + Number.parseInt(row.metricValues?.[1]?.value || "0", 10),
+      engagedSessions: existing.engagedSessions + Number.parseInt(row.metricValues?.[2]?.value || "0", 10),
+      userEngagementDurationSeconds: existing.userEngagementDurationSeconds
+        + (Number.parseFloat(row.metricValues?.[3]?.value || "0") || 0),
+    });
+  }
+  return Array.from(pageMap.entries())
+    .map(([pagePath, metrics]) => ({
+      pagePath,
+      pageType: classifyGA4PagePath(pagePath),
+      ...metrics,
+    }))
+    .sort((a, b) => b.sessions - a.sessions);
+}
 
 export type GA4TerritoryMonthSnapshot = {
   territoryId: string;
@@ -501,23 +542,12 @@ export async function fetchGA4TerritoryMonthSnapshot(
 
   let sessions = 0;
   let activeUsers = 0;
-  const pageMap = new Map<string, { sessions: number; activeUsers: number }>();
   for (const { value } of results) {
     const total = value.totals[0];
     sessions += Number.parseInt(total?.metricValues?.[0]?.value || "0", 10);
     activeUsers += Number.parseInt(total?.metricValues?.[1]?.value || "0", 10);
-    for (const row of value.pages) {
-      const pagePath = normalizeGA4PagePath(row.dimensionValues?.[0]?.value || "/");
-      const existing = pageMap.get(pagePath) || { sessions: 0, activeUsers: 0 };
-      pageMap.set(pagePath, {
-        sessions: existing.sessions + Number.parseInt(row.metricValues?.[0]?.value || "0", 10),
-        activeUsers: existing.activeUsers + Number.parseInt(row.metricValues?.[1]?.value || "0", 10),
-      });
-    }
   }
-  const pages = Array.from(pageMap.entries())
-    .map(([pagePath, metrics]) => ({ pagePath, pageType: classifyGA4PagePath(pagePath), ...metrics }))
-    .sort((a, b) => b.sessions - a.sessions);
+  const pages = aggregateGA4TerritoryMonthPages(results.flatMap(({ value }) => value.pages));
   const priorityPageSessions = pages
     .filter(page => page.pageType === "species_pages" || page.pageType === "location_page")
     .reduce((sum, page) => sum + page.sessions, 0);

@@ -107,6 +107,8 @@ export async function importGA4TerritoryMonth(
     pageType: page.pageType,
     sessions: page.sessions,
     activeUsers: page.activeUsers,
+    engagedSessions: page.engagedSessions,
+    userEngagementDurationSeconds: String(page.userEngagementDurationSeconds),
     importedAt,
   }));
   const [existingSnapshot] = await db.select({

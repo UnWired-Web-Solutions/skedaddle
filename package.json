@@ -9,7 +9,7 @@
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",
     "format": "prettier --write .",
-    "test": "vitest run",
+    "test": "vitest run --maxWorkers=1 --minWorkers=1",
     "ingest:ga4": "tsx scripts/sync-ga4.mts",
     "backfill:ga4": "tsx scripts/backfill-ga4.mts",
     "ingest:gsc": "node scripts/ingest-search-console.mjs",

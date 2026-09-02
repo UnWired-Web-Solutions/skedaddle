@@ -40,3 +40,15 @@ The alternate configured production domain was checked after its data requests s
 The follow-up deployment checkpoint `efb8a190` completed successfully. The authenticated primary production Analytics page then rendered **Active persisted import: August 2026 · 5/5 properties · complete** for Hamilton. Its GA4 2025–2026 chart rendered normally and no client-side status-contract failure appeared. This confirms the published frontend consumes the deployed `activeSnapshot` contract rather than the stale import-time ordering.
 
 The retained-complete-snapshot notice is intentionally conditional: it appears only if an audited latest attempt differs from the active snapshot. No synthetic partial production fetch was created merely to force that state. Importer regression coverage verifies the retention decision, while the successful complete snapshot remains the active production case.
+
+## 2026-09-02 — Durable Page Engagement Backfill
+
+Two nullable page-snapshot fields were added for direct GA4 `engagedSessions` and recorded engagement duration. Existing historical rows were deliberately left nullable until they were read again from the source; no historic engagement value was inferred or zero-filled. Migration `0016_ambiguous_midnight.sql` adds only those nullable fields.
+
+The controlled sequential backfill then reimported every property-supported territory-month from July 2023 through August 2026. Each cohort completed with zero partial and zero failed imports. Across the resulting complete snapshots, 544 snapshots with returned page rows have populated direct engagement values; 55 complete snapshots had no returned page rows and remain unavailable through the read contract rather than being represented as zero-engagement pages. The aggregate reconciliation found zero complete snapshots with missing engagement values among returned page rows and zero negative engagement values.
+
+Hamilton August 2026 was verified through the public local contract and authenticated local Analytics view: the persisted source is labelled `persisted_completed_month_ga4_engagement`, property coverage is 5/5 complete, and key-event counts remain `unavailable_pending_network_key_event_definition`. A September 2026 query correctly returned unavailable because there is no persisted completed-month snapshot. The interface separates this completed-month evidence from the existing direct year-to-date query.
+
+## 2026-09-02 — Regression Runner Determinism
+
+The first full suite after the engagement change exposed three 15-second strategy-report timeouts only when the default multi-worker run competed for shared database capacity. The Milwaukee report test passed alone in approximately five seconds, and the full strategy-report file passed in isolation. Running all tests with one worker passed 179 tests with 11 intentional skips, confirming resource contention rather than a report-data defect. The standard `pnpm test` command now explicitly uses one minimum and maximum worker so release verification remains deterministic.

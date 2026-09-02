@@ -81,6 +81,10 @@ export const ga4TerritoryPages = mysqlTable("ga4_territory_pages", {
   pageType: varchar("pageType", { length: 32 }).notNull(),
   sessions: int("sessions").notNull().default(0),
   activeUsers: int("activeUsers").notNull().default(0),
+  /** Null means this legacy durable row predates engagement-metric persistence; never treat it as zero. */
+  engagedSessions: int("engagedSessions"),
+  /** Null means this legacy durable row predates engagement-metric persistence; a GA4-returned zero remains zero. */
+  userEngagementDurationSeconds: decimal("userEngagementDurationSeconds", { precision: 20, scale: 3 }),
   importedAt: timestamp("importedAt").defaultNow().notNull(),
 }, (table) => ({
   territoryPeriodTypeIdx: index("ga4_territory_pages_period_type_idx").on(
