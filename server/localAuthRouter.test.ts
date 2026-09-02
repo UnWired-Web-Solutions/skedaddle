@@ -24,6 +24,15 @@ describe("local server authentication", () => {
       .toEqual({ username: "admin", role: "admin" });
   });
 
+  it("supports a server-only administrator password rotation without changing franchise credentials", () => {
+    expect(authenticateLocalAccount(testAccounts, "admin", "rotated-admin-password", "rotated-admin-password"))
+      .toEqual({ username: "admin", role: "admin" });
+    expect(authenticateLocalAccount(testAccounts, "admin", "test-admin-password", "rotated-admin-password"))
+      .toBeNull();
+    expect(authenticateLocalAccount(testAccounts, "sample-territory", "test-franchise-password", "rotated-admin-password"))
+      .toEqual({ username: "sample-territory", role: "franchise", locationId: "sample-territory" });
+  });
+
   it("rejects invalid credentials and malformed account configuration", () => {
     expect(authenticateLocalAccount(testAccounts, "sample-territory", "wrong-password")).toBeNull();
     expect(() => parseLocalAuthAccounts(JSON.stringify([

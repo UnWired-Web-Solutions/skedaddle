@@ -158,6 +158,7 @@
 - [x] Retire active static territory revenue, jobs, species, and location metadata inputs from suburb-content generation; use only verified source context or explicit review-required states — static dashboard inputs removed; server-only aggregate work-order context and identity/geography catalog introduced
 - [ ] Checkpoint, publish, and complete an authenticated production browser review of the source-safe suburb-content workflow without generating a real draft until reviewer-approved local facts are supplied
 - [ ] Reset the managed portal administrator credential through the secure configuration workflow, validate it without exposing the value, and complete the authenticated production review
+- [ ] Add a server-only administrator credential-rotation override that preserves the existing managed franchise registry, validate it, and remove it only after the primary registry is confirmed live
 - [x] Preserve administrator access in managed secure configuration and document only the non-sensitive recovery process — registry restored and validated through the public login contract; `LOCAL_AUTH_ACCESS.md` records the safe recovery process without credentials
 - [ ] Content plan specifies which GBP posts link back to which suburb/species pages
 
