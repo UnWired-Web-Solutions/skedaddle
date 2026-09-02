@@ -153,7 +153,10 @@
 - [x] Take analysis output → generate suburb page content (SEO-optimized)
 - [x] Build content into a checklist/approval workflow
 - [ ] Content assigned to dev for WordPress page build
-- [ ] Integrate AEO/GDO optimization research into content generation instructions
+- [x] Integrate AEO/GDO optimization research into content generation instructions — source record, review-only prompts, outcome-disclaimer rules, and visible-fact schema guidance implemented; local validation complete
+- [x] Audit and integrate evidence-led AEO/GEO guidance into approved suburb-content prompts and review gates without inventing local claims, page status, or production scope — active workflow requires reviewer confirmations, active workbook status, source labelling, approval attestation, and separate export
+- [x] Retire active static territory revenue, jobs, species, and location metadata inputs from suburb-content generation; use only verified source context or explicit review-required states — static dashboard inputs removed; server-only aggregate work-order context and identity/geography catalog introduced
+- [ ] Checkpoint, publish, and complete an authenticated production browser review of the source-safe suburb-content workflow without generating a real draft until reviewer-approved local facts are supplied
 - [ ] Content plan specifies which GBP posts link back to which suburb/species pages
 
 ## PRIORITY 3 — Replicate DashThis Analytics in Dashboard

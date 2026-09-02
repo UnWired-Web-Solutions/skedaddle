@@ -29,11 +29,9 @@ interface GeneratedContent {
   whyChooseSection: string;
   speciesSections: Array<{
     species: string;
-    tier: 1 | 2 | 3;
     heading: string;
     body: string;
     wordCount: number;
-    internalLink: string;
   }>;
   neighbourhoodSection: string;
   faqSection: Array<{ question: string; answer: string }>;
@@ -88,7 +86,7 @@ function ResearchProgressCard({ suburbName }: { suburbName: string }) {
             Researching with Sonar…
           </h2>
           <p className="mt-1 text-sm leading-relaxed" style={{ color: "oklch(0.35 0.04 145)", fontFamily: "Inter, sans-serif" }}>
-            Before Claude Opus 5 drafts the {suburbName} page, the system runs live web research and preserves the resulting source URLs for review.
+            The system prepares a review-only draft, keeps research URLs separate from verified facts, and preserves active workbook source status for editorial review.
           </p>
         </div>
       </div>
@@ -112,7 +110,7 @@ function ResearchProgressCard({ suburbName }: { suburbName: string }) {
           >
             4
           </span>
-          <span>Drafting the source-labelled content package with Claude Opus 5</span>
+          <span>Drafting the source-labelled, review-only content package</span>
         </div>
       </div>
 
@@ -199,11 +197,11 @@ function ContentPreview({ content }: { content: GeneratedContent }) {
       {expandedSections.has("species") && (
         <div className="pl-8 pb-3 space-y-4">
           {content.speciesSections.map((sp, i) => (
-            <div key={i} className="border-l-2 pl-3" style={{ borderColor: sp.tier === 1 ? "oklch(0.68 0.20 140)" : sp.tier === 2 ? "oklch(0.65 0.10 80)" : "oklch(0.85 0.008 80)" }}>
+            <div key={i} className="border-l-2 pl-3" style={{ borderColor: "oklch(0.68 0.20 140)" }}>
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-sm font-semibold" style={{ color: "oklch(0.18 0.015 65)", fontFamily: "Inter, sans-serif" }}>{sp.heading}</span>
-                <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: sp.tier === 1 ? "oklch(0.92 0.06 145)" : "oklch(0.94 0.008 80)", color: sp.tier === 1 ? "oklch(0.28 0.09 145)" : "oklch(0.52 0.016 80)" }}>
-                  Tier {sp.tier} · {sp.wordCount}w
+                <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "oklch(0.94 0.008 80)", color: "oklch(0.52 0.016 80)" }}>
+                  Territory-level context · {sp.wordCount}w
                 </span>
               </div>
               <p className="text-sm leading-relaxed" style={{ color: "oklch(0.35 0.015 65)", fontFamily: "Inter, sans-serif" }}>{sp.body}</p>
@@ -288,27 +286,31 @@ export default function SuburbPageGenerator() {
   const [yearsServing, setYearsServing] = useState("");
   const [neighbourhoods, setNeighbourhoods] = useState("");
   const [county, setCounty] = useState("");
-  const [latitude, setLatitude] = useState("");
-  const [longitude, setLongitude] = useState("");
   const [franchiseFoundedYear, setFranchiseFoundedYear] = useState("");
   const [gbpUrl, setGbpUrl] = useState("");
+  const [reviewerConfirmedServiceAvailability, setReviewerConfirmedServiceAvailability] = useState(false);
+  const [reviewerConfirmedPublishingFacts, setReviewerConfirmedPublishingFacts] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
   const [generatedPageId, setGeneratedPageId] = useState<number | null>(null);
   const [generatedStatus, setGeneratedStatus] = useState<string>("draft");
   const [activeTab, setActiveTab] = useState<"generate" | "history">("generate");
 
   const territoriesQuery = trpc.suburbPage.getTerritories.useQuery();
+  const territoryContextQuery = trpc.suburbPage.getTerritoryContext.useQuery(
+    { territoryId: selectedTerritory || "not-selected" },
+    { enabled: Boolean(selectedTerritory) },
+  );
   const listQuery = trpc.suburbPage.list.useQuery(undefined);
   const generateMutation = trpc.suburbPage.generate.useMutation();
   const updateStatusMutation = trpc.suburbPage.updateStatus.useMutation();
   const utils = trpc.useUtils();
 
   const territories = territoriesQuery.data || [];
-  const selectedTerritoryData = territories.find(t => t.id === selectedTerritory);
-  const suburbs = selectedTerritoryData?.suburbs || [];
+  const territoryContext = territoryContextQuery.data;
+  const activeWorkbookAvailable = territoryContext?.source === "salesforce_drive_workbook";
 
   const handleGenerate = async () => {
-    if (!selectedTerritory || !selectedSuburb || !phone || !yearsServing || !neighbourhoods || !county || !latitude || !longitude || !franchiseFoundedYear || !gbpUrl) return;
+    if (!selectedTerritory || !selectedSuburb || !phone || !yearsServing || !neighbourhoods || !county || !franchiseFoundedYear || !gbpUrl || !reviewerConfirmedServiceAvailability || !reviewerConfirmedPublishingFacts || !activeWorkbookAvailable) return;
 
     const result = await generateMutation.mutateAsync({
       territoryId: selectedTerritory,
@@ -319,8 +321,8 @@ export default function SuburbPageGenerator() {
       gbpUrl,
       neighbourhoods: neighbourhoods.split(",").map(n => n.trim()).filter(Boolean),
       county,
-      latitude: Number(latitude),
-      longitude: Number(longitude),
+      reviewerConfirmedServiceAvailability: true,
+      reviewerConfirmedPublishingFacts: true,
     });
 
     setGeneratedContent(result.content as unknown as GeneratedContent);
@@ -337,11 +339,12 @@ export default function SuburbPageGenerator() {
     md += `**Meta Description:** ${content.metaDescription}\n\n`;
     md += `---\n\n`;
     md += `## Trust Chips\n${content.trustChips.map(c => `- ${c}`).join("\n")}\n\n`;
+    md += `## Business facts for review\n**Name:** ${content.nap.name}\n**Phone:** ${content.nap.phone}\n**Service area:** ${content.nap.serviceArea}\n**Source note:** ${content.nap.source}\n\n`;
     md += `## Introduction\n${content.introSection}\n\n`;
     md += `## Why Homeowners Choose Skedaddle\n${content.whyChooseSection}\n\n`;
-    md += `## Wildlife We Remove\n\n`;
+    md += `## Territory-Level Wildlife Context\n\n`;
     content.speciesSections.forEach(sp => {
-      md += `### ${sp.heading}\n${sp.body}\n\n*Internal link: ${sp.internalLink}*\n\n`;
+      md += `### ${sp.heading}\n${sp.body}\n\n`;
     });
     md += `## Service Area\n${content.neighbourhoodSection}\n\n`;
     md += `## Frequently Asked Questions\n\n`;
@@ -372,7 +375,17 @@ export default function SuburbPageGenerator() {
   };
 
   const handleCopySchema = (content: GeneratedContent) => {
+    if (generatedStatus !== "approved") return;
     navigator.clipboard.writeText(JSON.stringify(content.schemaBlocks, null, 2));
+  };
+
+  const handleApprove = async (id: number) => {
+    const reviewerNotes = window.prompt("Confirm that source disclosure, visible JSON-LD parity, local claims, internal links, and final publishing readiness were reviewed. Add concise notes:");
+    if (!reviewerNotes || reviewerNotes.trim().length < 12) return;
+    if (!window.confirm("Approve this reviewed draft? This does not publish it; export remains a separate step.")) return;
+    await updateStatusMutation.mutateAsync({ id, status: "approved", reviewerNotes: reviewerNotes.trim(), reviewerApprovalAttestation: true });
+    if (generatedPageId === id) setGeneratedStatus("approved");
+    listQuery.refetch();
   };
 
   return (
@@ -393,7 +406,7 @@ export default function SuburbPageGenerator() {
             Suburb Page Generator
           </h1>
           <p className="text-sm" style={{ color: "oklch(0.52 0.016 80)", fontFamily: "Inter, sans-serif" }}>
-            Generate review-ready suburb page content with territory-priority species, JSON-LD schema, and clearly separated verified facts and research suggestions.
+            Create review-only suburb-page drafts using reviewer-confirmed facts, active territory-level workbook context, and clearly labelled research suggestions. No page is automatically published.
           </p>
         </div>
 
@@ -435,7 +448,7 @@ export default function SuburbPageGenerator() {
                   <span className="text-xs font-medium" style={{ color: "oklch(0.52 0.016 80)" }}>Territory</span>
                   <select
                     value={selectedTerritory}
-                    onChange={e => { setSelectedTerritory(e.target.value); setSelectedSuburb(""); }}
+                    onChange={e => { setSelectedTerritory(e.target.value); setSelectedSuburb(""); setReviewerConfirmedServiceAvailability(false); }}
                     className="mt-1 block w-full text-sm border rounded-sm px-3 py-2"
                     style={{ borderColor: "oklch(0.88 0.012 80)" }}
                   >
@@ -446,27 +459,40 @@ export default function SuburbPageGenerator() {
                   </select>
                 </label>
 
-                {/* Suburb select */}
+                {/* Reviewer-entered suburb */}
                 <label className="block mb-3">
-                  <span className="text-xs font-medium" style={{ color: "oklch(0.52 0.016 80)" }}>Suburb</span>
-                  <select
+                  <span className="text-xs font-medium" style={{ color: "oklch(0.52 0.016 80)" }}>Suburb or community name</span>
+                  <input
+                    type="text"
                     value={selectedSuburb}
                     onChange={e => setSelectedSuburb(e.target.value)}
                     className="mt-1 block w-full text-sm border rounded-sm px-3 py-2"
                     style={{ borderColor: "oklch(0.88 0.012 80)" }}
                     disabled={!selectedTerritory}
-                  >
-                    <option value="">Select suburb...</option>
-                    {suburbs.map(s => (
-                      <option key={s.name} value={s.name}>{s.name} (${(s.revenue / 1000).toFixed(0)}K · {s.jobs} jobs)</option>
-                    ))}
-                  </select>
+                    placeholder="Reviewer-confirmed community name"
+                  />
+                  <p className="mt-1 text-xs" style={{ color: "oklch(0.65 0.010 80)" }}>No static suburb list, job total, or revenue ranking is used. Enter only a name independently confirmed for the proposed page.</p>
                 </label>
+
+                {selectedTerritory && (
+                  <div className="mb-3 rounded-sm border p-3" style={{ borderColor: activeWorkbookAvailable ? "oklch(0.82 0.08 145)" : "oklch(0.88 0.10 27)", background: activeWorkbookAvailable ? "oklch(0.975 0.018 145)" : "oklch(0.99 0.02 27)" }}>
+                    <div className="text-xs font-semibold" style={{ color: activeWorkbookAvailable ? "oklch(0.32 0.09 145)" : "oklch(0.45 0.15 27)" }}>Active Drive-workbook source</div>
+                    {territoryContextQuery.isLoading ? (
+                      <div className="mt-1 text-xs" style={{ color: "oklch(0.52 0.016 80)" }}>Checking aggregate source status…</div>
+                    ) : activeWorkbookAvailable ? (
+                      <div className="mt-1 text-xs leading-relaxed" style={{ color: "oklch(0.35 0.04 145)" }}>
+                        {territoryContext?.activeRun?.sourceNote} Species context is territory-level aggregate work-order context only; it does not prove suburban demand or coverage.
+                      </div>
+                    ) : (
+                      <div className="mt-1 text-xs leading-relaxed" style={{ color: "oklch(0.45 0.15 27)" }}>No active approved workbook aggregate is available for this territory. Draft generation is intentionally blocked.</div>
+                    )}
+                  </div>
+                )}
 
                 {/* Required business facts */}
                 <div className="border-t pt-3 mt-3" style={{ borderColor: "oklch(0.93 0.008 80)" }}>
                   <span className="text-xs font-medium" style={{ color: "oklch(0.52 0.016 80)" }}>Required publishing facts</span>
-                  <p className="text-xs mt-1" style={{ color: "oklch(0.65 0.010 80)" }}>No placeholder phone, coordinates, county, or neighbourhoods will be inserted.</p>
+                  <p className="text-xs mt-1" style={{ color: "oklch(0.65 0.010 80)" }}>No placeholder phone, coordinates, county, neighbourhoods, service coverage, or live GBP claim will be inserted. The URL is a reviewer input; it is not checked against a live GBP account.</p>
 
                   <label className="block mt-2">
                     <span className="text-xs" style={{ color: "oklch(0.65 0.010 80)" }}>Phone (from GBP)</span>
@@ -542,34 +568,32 @@ export default function SuburbPageGenerator() {
                     />
                   </label>
 
-                  <div className="grid grid-cols-2 gap-2 mt-2">
-                    <label>
-                      <span className="text-xs" style={{ color: "oklch(0.65 0.010 80)" }}>Latitude</span>
-                      <input type="number" step="any" value={latitude} onChange={e => setLatitude(e.target.value)} placeholder="44.7133" className="mt-0.5 block w-full text-sm border rounded-sm px-3 py-1.5" style={{ borderColor: "oklch(0.88 0.012 80)" }} />
-                    </label>
-                    <label>
-                      <span className="text-xs" style={{ color: "oklch(0.65 0.010 80)" }}>Longitude</span>
-                      <input type="number" step="any" value={longitude} onChange={e => setLongitude(e.target.value)} placeholder="-93.4227" className="mt-0.5 block w-full text-sm border rounded-sm px-3 py-1.5" style={{ borderColor: "oklch(0.88 0.012 80)" }} />
-                    </label>
-                  </div>
+                  <label className="mt-3 flex items-start gap-2 text-xs" style={{ color: "oklch(0.45 0.015 65)" }}>
+                    <input type="checkbox" checked={reviewerConfirmedPublishingFacts} onChange={e => setReviewerConfirmedPublishingFacts(e.target.checked)} className="mt-0.5" />
+                    <span>I confirm that the phone, GBP URL, founding/serving years, county, and neighbourhoods were independently reviewed for this draft.</span>
+                  </label>
+                  <label className="mt-2 flex items-start gap-2 text-xs" style={{ color: "oklch(0.45 0.015 65)" }}>
+                    <input type="checkbox" checked={reviewerConfirmedServiceAvailability} onChange={e => setReviewerConfirmedServiceAvailability(e.target.checked)} className="mt-0.5" />
+                    <span>I confirm that this proposed page’s service-availability wording has been reviewed. This does not verify a live GBP listing or publish the page.</span>
+                  </label>
                 </div>
 
                 {/* Generate button */}
                 <button
                   onClick={handleGenerate}
-                  disabled={!selectedTerritory || !selectedSuburb || !phone || !gbpUrl || !yearsServing || !franchiseFoundedYear || !neighbourhoods || !county || !latitude || !longitude || generateMutation.isPending}
+                  disabled={!selectedTerritory || !selectedSuburb || !phone || !gbpUrl || !yearsServing || !franchiseFoundedYear || !neighbourhoods || !county || !reviewerConfirmedServiceAvailability || !reviewerConfirmedPublishingFacts || !activeWorkbookAvailable || generateMutation.isPending}
                   className="mt-4 w-full py-2.5 rounded-sm text-sm font-semibold text-white transition-opacity disabled:opacity-50"
                   style={{ background: "oklch(0.68 0.20 140)", fontFamily: "Inter, sans-serif" }}
                 >
                   {generateMutation.isPending ? (
                     <span className="flex items-center justify-center gap-2">
                       <Loader2 size={14} className="animate-spin" />
-                      Researching with Sonar…
+                      Preparing review-only draft…
                     </span>
                   ) : (
                     <span className="flex items-center justify-center gap-2">
                       <FileText size={14} />
-                      Generate Suburb Page
+                      Create Review-Only Draft
                     </span>
                   )}
                 </button>
@@ -600,8 +624,9 @@ export default function SuburbPageGenerator() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleCopySchema(generatedContent)}
+                        disabled={generatedStatus !== "approved"}
                         className="flex items-center gap-1 text-xs px-2 py-1 rounded-sm border transition-colors hover:bg-black/5"
-                        style={{ borderColor: "oklch(0.88 0.012 80)", color: "oklch(0.52 0.016 80)" }}
+                        style={{ borderColor: "oklch(0.88 0.012 80)", color: "oklch(0.52 0.016 80)", opacity: generatedStatus === "approved" ? 1 : 0.5 }}
                       >
                         <Copy size={11} /> Schema
                       </button>
@@ -630,7 +655,7 @@ export default function SuburbPageGenerator() {
                   <div className="text-center">
                     <FileText size={32} style={{ color: "oklch(0.80 0.008 80)" }} className="mx-auto mb-3" />
                     <p className="text-sm" style={{ color: "oklch(0.65 0.010 80)", fontFamily: "Inter, sans-serif" }}>
-                      Select a territory and suburb, then click Generate to produce page content.
+                      Select a territory, enter reviewer-confirmed facts, and create a review-only draft. No page is automatically published.
                     </p>
                   </div>
                 </div>
@@ -682,10 +707,7 @@ export default function SuburbPageGenerator() {
                     )}
                     {page.status === "in_review" && (
                       <button
-                        onClick={() => updateStatusMutation.mutateAsync({ id: page.id, status: "approved" }).then(() => {
-                          if (generatedPageId === page.id) setGeneratedStatus("approved");
-                          listQuery.refetch();
-                        })}
+                        onClick={() => handleApprove(page.id)}
                         disabled={generatedPageId !== page.id}
                         title={generatedPageId === page.id ? "Approve reviewed page" : "Open the page before approval"}
                         className="text-xs px-2 py-1 rounded-sm text-white"
