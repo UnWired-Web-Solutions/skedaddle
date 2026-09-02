@@ -32,6 +32,8 @@ The active workflow implements this contract through `server/suburbContentSource
 
 Approval is blocked for legacy or incomplete drafts that lack the source context, requires reviewer attestation and notes, and does not publish. Schema copying and Markdown export are available only after approval. Draft generation was deliberately not exercised with invented local facts during this implementation.
 
+Authenticated production verification confirmed that the control surface presents no static suburb list, job total, revenue ranking, or Claude model wording. For Ottawa, the active workbook is visibly labelled partial and its species context explicitly disclaims suburb-demand or coverage evidence. The create-draft action remains disabled until all reviewer facts and confirmations are supplied; no draft was created during this review.
+
 ## References
 
 [1] [Google Search Central — LocalBusiness structured data](https://developers.google.com/search/docs/appearance/structured-data/local-business)

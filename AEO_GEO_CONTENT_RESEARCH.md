@@ -27,7 +27,7 @@ The internal generator now uses a review-only contract. It retires legacy static
 
 JSON-LD now uses only visible draft content plus reviewer-confirmed business facts. It intentionally omits non-visible coordinates, physical addresses, hours, offers, prices, availability, ratings, reviews, parent-company claims, service radii, and HowTo claims. Approval requires an attestation and concise review notes; export remains separate from approval and automatic publishing is not implemented.
 
-Local validation completed with TypeScript, focused suburb-content regression coverage, the serialized full suite, a clean production build, and public procedure checks that confirmed no static performance fields or raw workbook/currency/customer fields in the suburb contracts. No real suburb draft was generated during validation because no reviewer-approved publishing facts were supplied. Browser visual verification remains pending authenticated production review.
+Local validation completed with TypeScript, focused suburb-content regression coverage, the serialized full suite, a clean production build, and public procedure checks that confirmed no static performance fields or raw workbook/currency/customer fields in the suburb contracts. Authenticated production review then confirmed the review-only interface, manual community entry, no static performance selector, absent Claude wording, disabled draft action while facts are missing, and partial-workbook disclosure for Ottawa. No real suburb draft was generated because no reviewer-approved publishing facts were supplied.
 
 ## References
 
