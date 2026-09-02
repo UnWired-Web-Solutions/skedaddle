@@ -636,6 +636,7 @@ TERRITORY DATA:
 - Average job value: ${formatCurrency(data.avgJobValue, data.currencySymbol)}
 - Top species by revenue: ${data.topSpeciesNames.join(", ")}
 - Top suburbs/cities by revenue: ${data.topSuburbNames.slice(0, 6).join(", ")}
+- Historical source context: the revenue, jobs, average job value, species, and suburb fields above are prior sales-snapshot context, not current Google Drive workbook values.
 - GBP total calls (available period): ${formatNumber(data.gbp.totalCalls)}
 - GBP total website clicks: ${formatNumber(data.gbp.totalClicks)}
 - ${gbpPromptCoverageContext(data)}
@@ -646,12 +647,12 @@ TERRITORY DATA:
 - Seasonal timing: ${data.seasonalTiming}
 
 Write a compelling 3-4 paragraph executive summary that:
-1. Opens with the territory name and key revenue/jobs metrics
-2. Identifies the top 2-3 species driving revenue and the top suburbs generating demand
+1. Opens with the territory name and explicitly labels key revenue/jobs metrics as historical sales-snapshot context
+2. Identifies the top 2-3 species and top suburbs in that historical snapshot; do not describe these as current demand or current workbook performance
 3. Notes the available GBP, Search Console, and GA4 evidence without implying unavailable data
 4. Ends with a clear 2-sentence recommendation: structured local SEO + hub-and-spoke content model to grow organic visibility
 
-STYLE: Professional, data-backed, direct. Written like a senior digital strategist who has studied this territory's numbers. No fluff, no AI-sounding phrases like "leverage" or "harness." Every claim backed by a number from the data above.
+STYLE: Professional, data-backed, direct. Written like a senior digital strategist who has studied this territory's data sources. No fluff, no AI-sounding phrases like "leverage" or "harness." Every claim backed by a number from the data above and qualified according to its source.
 
 Return ONLY the paragraph text (no headings, no HTML tags, no markdown). Use plain text with line breaks between paragraphs.`;
 
@@ -729,7 +730,7 @@ Write 3-4 paragraphs that:
 3. Explain WHY this matters for SEO: no local page = no organic ranking signal for high-intent searches like "[species] removal [suburb]"
 4. ${data.suburbPageStatus === "unknown" ? "Recommend a page audit as the first action item, then position the content build as the primary growth opportunity" : "Position this as the primary structural gap and clearest opportunity for organic search growth"}
 
-STYLE: Analytical, revenue-backed, persuasive. Each suburb mentioned must include its actual revenue figure. ${data.suburbPageStatus === "unknown" ? "Be honest that page status is unverified — do NOT claim pages don't exist without confirmation." : "The tone should make it obvious that NOT building these pages is leaving money on the table."}
+STYLE: Analytical, historical-snapshot-revenue-backed, persuasive. Each suburb mentioned must qualify its revenue figure as historical snapshot context. ${data.suburbPageStatus === "unknown" ? "Be honest that page status is unverified — do NOT claim pages don't exist without confirmation." : "The tone should make it clear that verified content gaps warrant review, without presenting historical revenue as current workbook performance."}
 
 Return ONLY paragraph text (no headings, no HTML, no markdown).`;
 
@@ -740,7 +741,11 @@ Return ONLY paragraph text (no headings, no HTML, no markdown).`;
   const audited = data.suburbs.filter(suburb => suburb.hasPage !== null);
   const missing = audited.filter(suburb => suburb.hasPage === false);
   const missingRevenue = missing.reduce((sum, suburb) => sum + suburb.revenue, 0);
-  return `<p class="narrative">${audited.length ? `${audited.length} revenue-producing suburbs have a documented page status. ${missing.length ? `${missing.length} confirmed gaps represent ${formatCurrency(missingRevenue, data.currencySymbol)} in closed revenue.` : "No dedicated suburb-hub gaps are confirmed in the audited set."}` : "Dedicated suburb-hub coverage has not been audited, so the first action is to verify the highest-revenue markets before describing a page gap."}</p><p class="narrative">Prioritize the audit in revenue order: ${escapeHtml(data.topSuburbNames.slice(0, 5).join(", "))}. A page recommendation becomes approved work only after the hub is verified and the scope is confirmed.</p>`;
+  return `<p class="narrative">${audited.length ? `${audited.length} suburbs represented in the historical sales snapshot have a documented page status. ${missing.length ? `${missing.length} confirmed gaps align with ${formatCurrency(missingRevenue, data.currencySymbol)} in recorded historical snapshot revenue.` : "No dedicated suburb-hub gaps are confirmed in the audited set."}` : "Dedicated suburb-hub coverage has not been audited, so the first action is to verify historically higher-revenue markets before describing a page gap."}</p><p class="narrative">Prioritize the audit in historical-snapshot revenue order: ${escapeHtml(data.topSuburbNames.slice(0, 5).join(", "))}. A page recommendation becomes approved work only after the hub is verified and the scope is confirmed.</p>`;
+}
+
+function historicalSalesPromptContext(): string {
+  return "Historical source context: the listed revenue and job figures are from a prior sales snapshot, not current Google Drive workbook values. Use them only for historical-snapshot prioritization; do not describe them as current performance, closed-job evidence, or conversion evidence.";
 }
 
 async function generateProposedProgram(data: TerritoryDataObject, priorContext: string): Promise<string> {
@@ -760,10 +765,11 @@ TERRITORY DATA:
 - Approved suburb-page build: ${data.proposedSuburbPages || "Not provided"}
 - Approved species × location build: ${data.proposedSpeciesLocationPages || "Not provided"}
 - Campaign notes: ${data.campaignNotes || "None provided"}
+- ${historicalSalesPromptContext()}
 
 Write 4-5 paragraphs describing the proposed full program across these four areas:
 1. GBP Optimization & Post Program: Use only the approved proposed volume above; if none is provided, recommend confirming capacity instead of inventing a number
-2. Website Content Architecture: Use the approved page counts above and prioritize them in revenue order
+2. Website Content Architecture: Use the approved page counts above and prioritize verification and approved builds in historical-snapshot revenue order
 3. Blog Content Reorientation: Use only the approved blog volume above; distinguish a content recommendation from an agreed deliverable
 4. Local SEO Foundation: Schema markup, NAP citation audit, internal linking, rank tracking
 
@@ -777,7 +783,7 @@ Return ONLY paragraph text (no headings, no HTML, no markdown). Separate the 4 a
   const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
   if (paragraphs.length > 0) return narrativeParagraphsHtml(text);
   console.warn(`AI section returned empty for ${data.name}`);
-  return `<p class="narrative">The proposed program begins with measurement and a verified content audit. GBP and blog publishing remain at ${data.proposedGbpPostsPerMonth || "an unconfirmed"} and ${data.proposedBlogPostsPerMonth || "an unconfirmed"} posts per month respectively until capacity is approved.</p><p class="narrative">Phase 1 prioritizes up to ${data.proposedSuburbPages || "the approved number of"} dedicated suburb hubs in revenue order, beginning with ${escapeHtml(data.topSuburbNames.slice(0, 3).join(", "))}. Phase 2 adds up to ${data.proposedSpeciesLocationPages || "the approved number of"} species-by-location pages beneath verified hubs, weighted toward ${escapeHtml(data.topSpeciesNames.slice(0, 3).join(", "))}. Schema, citations, internal links, and rank tracking are audit recommendations—not claims about the current campaign.</p>`;
+  return `<p class="narrative">The proposed program begins with measurement and a verified content audit. GBP and blog publishing remain at ${data.proposedGbpPostsPerMonth || "an unconfirmed"} and ${data.proposedBlogPostsPerMonth || "an unconfirmed"} posts per month respectively until capacity is approved.</p><p class="narrative">Phase 1 prioritizes up to ${data.proposedSuburbPages || "the approved number of"} dedicated suburb hubs in historical-snapshot revenue order, beginning with ${escapeHtml(data.topSuburbNames.slice(0, 3).join(", "))}. Phase 2 adds up to ${data.proposedSpeciesLocationPages || "the approved number of"} species-by-location pages beneath verified hubs, weighted toward ${escapeHtml(data.topSpeciesNames.slice(0, 3).join(", "))}. Schema, citations, internal links, and rank tracking are audit recommendations—not claims about the current campaign.</p>`;
 }
 
 async function generateContentArchitecture(data: TerritoryDataObject, priorContext: string): Promise<string> {
@@ -787,18 +793,19 @@ PRIOR CONTEXT:
 ${priorContext}
 
 TERRITORY DATA:
-- Top suburbs by revenue: ${data.suburbs.slice(0, 8).map(s => `${s.suburb} (${formatCurrency(s.revenue, data.currencySymbol)})`).join(", ")}
-- Top species: ${data.species.slice(0, 5).map(s => `${s.species} (${formatPct(s.pctRevenue)} of revenue)`).join(", ")}
-- Total suburbs with revenue: ${data.suburbs.length}
+- Top suburbs by historical-snapshot revenue: ${data.suburbs.slice(0, 8).map(s => `${s.suburb} (${formatCurrency(s.revenue, data.currencySymbol)})`).join(", ")}
+- Top species by historical-snapshot revenue: ${data.species.slice(0, 5).map(s => `${s.species} (${formatPct(s.pctRevenue)} of historical snapshot revenue)`).join(", ")}
+- Total suburbs represented in the historical snapshot: ${data.suburbs.length}
+- ${historicalSalesPromptContext()}
 
 Write a detailed content architecture section covering:
 1. The Hub-and-Spoke Model explanation (hub page = main territory page, spokes = suburb pages + species pages)
 2. Content types and word count guidance: Hub pages 1500-2200 words, Species pages 1000-1500 words, Suburb pages 900-1400 words, Species×Location pages 700-1000 words
-3. Mandatory phase order: Phase 1 builds Tier 1 suburb hub pages in revenue order; Phase 2 builds species×suburb pages beneath those approved hubs. Never reverse these phases
-4. Species page priority weighting (Tier 1, Tier 2, Tier 3 based on revenue/job volume)
+3. Mandatory phase order: Phase 1 verifies and builds approved Tier 1 suburb hub pages in historical-snapshot revenue order; Phase 2 builds species×suburb pages beneath those approved hubs. Never reverse these phases
+4. Species page priority weighting (Tier 1, Tier 2, Tier 3 based on historical snapshot revenue/job context)
 5. Blog reorientation strategy: from generic educational → conversion-oriented, suburb-specific, species×suburb×season combinations
 
-STYLE: Detailed and prescriptive. This section should read like a content strategist's build plan — specific enough that a developer could start building pages from it. Reference actual suburb names and revenue figures.
+STYLE: Detailed and prescriptive. This section should read like a content strategist's build plan — specific enough that a developer could start building pages from it. Reference actual suburb names and explicitly qualify revenue figures as historical snapshot context.
 
 Return ONLY paragraph text (no headings, no HTML, no markdown). Use double line breaks between subsections.`;
 
@@ -806,7 +813,7 @@ Return ONLY paragraph text (no headings, no HTML, no markdown). Use double line 
   const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
   if (paragraphs.length > 0) return narrativeParagraphsHtml(text);
   console.warn(`AI section returned empty for ${data.name}`);
-  return `<p class="narrative">Use the main ${escapeHtml(data.name)} location page as the territory hub. In Phase 1, verify and then build approved suburb hubs in revenue order, beginning with ${escapeHtml(data.topSuburbNames.slice(0, 4).join(", "))}. Each hub should answer local service intent and link back to the territory hub.</p><p class="narrative">Only after those hubs are approved should Phase 2 add species-by-suburb pages, led by ${escapeHtml(data.topSpeciesNames.slice(0, 3).join(", "))}. Conversion-oriented seasonal articles can support these permanent pages, but they do not replace them and do not prove that a hub exists.</p>`;
+  return `<p class="narrative">Use the main ${escapeHtml(data.name)} location page as the territory hub. In Phase 1, verify and then build approved suburb hubs in historical-snapshot revenue order, beginning with ${escapeHtml(data.topSuburbNames.slice(0, 4).join(", "))}. Each hub should answer local service intent and link back to the territory hub.</p><p class="narrative">Only after those hubs are approved should Phase 2 add species-by-suburb pages, led by ${escapeHtml(data.topSpeciesNames.slice(0, 3).join(", "))}. Conversion-oriented seasonal articles can support these permanent pages, but they do not replace them and do not prove that a hub exists.</p>`;
 }
 
 async function generateGbpStrategy(data: TerritoryDataObject, priorContext: string): Promise<string> {
@@ -860,10 +867,11 @@ TERRITORY DATA:
 - Top species: ${data.topSpeciesNames.join(", ")}
 - Seasonal timing: ${data.seasonalTiming}
 - Country: ${data.country}
+- ${historicalSalesPromptContext()}
 
 Write a focused month-by-month 90-day plan. Each month must contain 3-5 total priorities, not a long backlog. Every priority must include an owner role, a concrete deliverable, and a measurable outcome.
 
-MONTH 1 should focus on: measurement baseline, confirmed technical gaps, and Phase 1 Tier 1 suburb hub pages in revenue order
+MONTH 1 should focus on: measurement baseline, confirmed technical gaps, and Phase 1 Tier 1 suburb hub pages in historical-snapshot revenue order
 
 MONTH 2 should focus on: Phase 2 species×suburb pages beneath the approved Month 1 hubs, review velocity, and seasonal content aligned to the territory's wildlife calendar
 
@@ -896,11 +904,12 @@ PRIOR CONTEXT:
 ${priorContext}
 
 TERRITORY DATA:
-- Total revenue: ${formatCurrency(data.totalRevenue, data.currencySymbol)}
+- Historical snapshot revenue: ${formatCurrency(data.totalRevenue, data.currencySymbol)}
 - Top species: ${data.topSpeciesNames.join(", ")}
 - Top suburbs: ${data.topSuburbNames.slice(0, 6).join(", ")}
 - GBP calls: ${formatNumber(data.gbp.totalCalls)}
 - ${gbpPromptCoverageContext(data)}
+- ${historicalSalesPromptContext()}
 
 Identify 4-6 delivery dependencies and data gaps. Do not characterize revenue concentration as fragility and do not discuss territory close rate because territory proposal/appointment counts are unavailable. Focus on page-status verification, approved production capacity, tracking coverage, local-fact review, seasonal timing, and ownership.
 
@@ -924,15 +933,16 @@ PRIOR CONTEXT (key conclusions from the full document):
 ${priorContext}
 
 TERRITORY DATA:
-- Revenue: ${formatCurrency(data.totalRevenue, data.currencySymbol)}, ${formatNumber(data.totalJobs)} jobs
+- Historical snapshot revenue: ${formatCurrency(data.totalRevenue, data.currencySymbol)}, ${formatNumber(data.totalJobs)} jobs
 - Top species: ${data.topSpeciesNames.join(", ")}
 - Top suburbs: ${data.topSuburbNames.slice(0, 6).join(", ")}
+- ${historicalSalesPromptContext()}
 
 Write exactly 8 numbered recommendations that summarize the entire strategy. Each recommendation should be 1-2 sentences, actionable, and reference specific data points from this territory. They should cover:
-1. Build suburb pages in revenue order (name the top 3)
+1. Verify and build suburb pages in historical-snapshot revenue order (name the top 3)
 2. Execute local SEO foundation in parallel
 3. Keep the main hub page as SEO/GBP anchor
-4. Weight content to the top 2 species (with their % of revenue/jobs)
+4. Weight content to the top 2 species (with their % of historical-snapshot revenue/jobs)
 5. Capitalize on seasonal species momentum
 6. Align GBP post timing to species calendar
 7. Build static page layer first, blog second
@@ -945,7 +955,7 @@ Return as numbered list (1. ... 2. ... etc.) with no other formatting.`;
   const text = await callClaude(prompt, "claude-opus-5", 1500);
   if (text.trim().length > 50) return text;
   console.warn(`AI section returned near-empty for ${data.name}`);
-  return `1. Audit dedicated suburb hubs in revenue order, beginning with ${data.topSuburbNames.slice(0, 3).join(", ")}, before approving new pages.\n2. Establish the measurement baseline using only complete GA4 months and territory-filtered Search Console data.\n3. Keep the ${data.name} territory page as the central search and GBP destination.\n4. Weight approved content toward ${data.topSpeciesNames.slice(0, 2).join(" and ")}, the leading historical revenue species.\n5. Recheck seasonal demand monthly before changing the production calendar.\n6. Set GBP volume from approved capacity and rotate verified suburb and species themes.\n7. Build approved permanent suburb hubs before species-by-suburb pages or supporting articles.\n8. Use verified Google Drive workbook work-order and invoice aggregates, together with matched-month digital evidence, to set the next priorities. Inspection, closed-job, and close-rate metrics remain unavailable pending an approved status definition.`;
+  return `1. Audit dedicated suburb hubs in historical-snapshot revenue order, beginning with ${data.topSuburbNames.slice(0, 3).join(", ")}, before approving new pages.\n2. Establish the measurement baseline using only complete GA4 months and territory-filtered Search Console data.\n3. Keep the ${data.name} territory page as the central search and GBP destination.\n4. Weight approved content toward ${data.topSpeciesNames.slice(0, 2).join(" and ")}, the leading historical-snapshot demand mix.\n5. Recheck seasonal demand monthly before changing the production calendar.\n6. Set GBP volume from approved capacity and rotate verified suburb and species themes.\n7. Build approved permanent suburb hubs before species-by-suburb pages or supporting articles.\n8. Use verified Google Drive workbook work-order and invoice aggregates, together with matched-month digital evidence, to set the next priorities. Inspection, closed-job, and close-rate metrics remain unavailable pending an approved status definition.`;
 }
 
 // ─── Deterministic Template Sections ─────────────────────────────────────────
@@ -1780,7 +1790,7 @@ export async function generateStrategyReport(
   const performanceHtml = buildGbpDataHtml(data) + buildOrganicAnalyticsHtml(data);
   const scaleHtml = buildScaleComparisonHtml(data);
   const priorContext = [
-    `Executive Summary facts: ${data.name} territory, ${formatCurrency(data.totalRevenue, data.currencySymbol)} revenue, ${formatNumber(data.totalJobs)} jobs.`,
+    `Executive Summary historical sales-snapshot facts: ${data.name} territory, ${formatCurrency(data.totalRevenue, data.currencySymbol)} revenue, ${formatNumber(data.totalJobs)} jobs; these are not current Google Drive workbook values.`,
     `Top species: ${data.species.slice(0, 3).map(s => `${s.species} (${formatPct(s.pctRevenue)})`).join(", ")}.`,
     `Top suburbs: ${data.suburbs.slice(0, 5).map(s => `${s.suburb} (${formatCurrency(s.revenue, data.currencySymbol)})`).join(", ")}. ${pageGapContext}`,
     `GBP available values: ${formatNumber(data.gbp.totalCalls)} calls, ${formatNumber(data.gbp.totalClicks)} clicks across ${data.gbp.monthly.length} represented months. ${gbpPromptCoverageContext(data)}`,

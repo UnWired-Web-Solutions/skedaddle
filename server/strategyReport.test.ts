@@ -198,6 +198,15 @@ describe("Strategy Report Router", { timeout: 15_000 }, () => {
     expect(source).toContain("Historical Revenue Snapshot");
   });
 
+  it("qualifies historical revenue and job context in active report prompts and deterministic gap narratives", () => {
+    const source = readFileSync(resolve(process.cwd(), "server/strategyReportRouter.ts"), "utf8");
+    expect(source).toContain("historical-snapshot revenue order");
+    expect(source).toContain("Historical source context: the listed revenue and job figures are from a prior sales snapshot, not current Google Drive workbook values.");
+    expect(source).toContain("historical-snapshot demand mix");
+    expect(source).toContain("explicitly labels key revenue/jobs metrics as historical sales-snapshot context");
+    expect(source).toContain("not current Google Drive workbook values");
+  });
+
   it("does not split a 90-day task at an ordinary GBP mention", async () => {
     const { formatNinetyDayPlanHtml } = await import("./strategyReportRouter");
     const html = formatNinetyDayPlanHtml(
