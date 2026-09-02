@@ -139,3 +139,7 @@ The exact fresh Ottawa strategy report generated through the internal GPT-5.5 pa
 ## Internal narrative transport migration
 
 At the user’s direction, the active report narrative path now uses the internal GPT-5.5 integration rather than direct Anthropic transport. The migration retains the existing bounded concurrency, request deadline, empty-response handling, deterministic fallback content, and exact-draft export path. The focused transport regression, complete strategy-report regression, TypeScript, serialized full suite, and clean production build passed. The local exact Ottawa report above is the end-to-end proof for the new path. Published report-generation verification remains required after deployment.
+
+## Published verification blocker
+
+Checkpoint `15a12cdd` completed its local validation but the managed production deployment reported a Cloud Run service-quota exhaustion while creating the new service. Production runtime log retrieval consequently returned `service not found`. An in-flight browser report on the prior reachable service remained at 97% document assembly and did not provide a new internal-model completion result. This must not be treated as production verification of the migration. No further report draft was approved, exported, or represented as live. The portal needs a successful managed deployment before the internal GPT-5.5 production report flow can be validated.

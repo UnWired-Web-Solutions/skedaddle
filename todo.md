@@ -276,7 +276,7 @@
 - [x] Qualify historical-snapshot revenue and job references in active strategy-report prompts, fallbacks, and suburb-gap narratives so they cannot be presented as current workbook evidence — Executive Summary and all audited report contexts now require historical-snapshot language; focused regression, TypeScript, serialized full suite, clean build, and PDF review passed
 - [x] Qualify Executive Summary historical revenue and job totals as prior sales-snapshot context so the opening report narrative cannot imply current workbook performance — corrected prompt and regression passed; final Ottawa PDF explicitly labels the figures as historical snapshot context
 - [x] Replace direct Claude strategy-report narrative generation with the strongest suitable internal LLM path, preserving bounded reliability controls, deterministic fallbacks, and source-qualified reporting — internal GPT-5.5 completed the fresh local Ottawa exact-draft flow; source tests, TypeScript, serialized full suite (181 passed; 11 intentional skips), clean build, and all 21 PDF pages passed review
-- [ ] Publish and verify internal GPT-5.5 strategy-report generation in production, including bounded completion and the exact-draft output flow
+- [ ] Publish and verify internal GPT-5.5 strategy-report generation in production, including bounded completion and the exact-draft output flow — blocked: managed deployment reported Cloud Run service-quota exhaustion for checkpoint `15a12cdd`; no production completion claim is permitted until a successful deployment is available
 
 ## Dave's Email Feedback — Strategy Template Fixes (Jul 23, 2026)
 - [x] Fix report template: use combined GBP (calls + website clicks) not just calls
