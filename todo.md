@@ -9,7 +9,7 @@
 - [x] Feed exact July 2025–June 2026 workbook aggregates into strategy reports and proposals with explicit historical fallback behavior
 - [x] Keep CAD and USD separate and label source counts/values as work orders and recorded pre-tax invoice values, not conversions or recognized revenue
 - [x] Add deterministic authentication fixtures to CI and validate TypeScript, 181 tests, and the production build locally
-- [ ] Review and commit the local `codex/workbook-integrity-fixes` branch, then push only with explicit Ay authorization
+- [x] Review, commit, and push `codex/workbook-integrity-fixes` after explicit Ay authorization — remote commit `5badbe16` published and synchronized
 - [ ] Configure a dedicated production `LOCAL_AUTH_SESSION_SECRET` and complete authenticated administrator/franchise runtime verification after an approved deployment
 - [ ] Verify the repaired migration chain against a disposable clean database before the next clean-environment install; do not rerun already-applied historical migrations against production
 

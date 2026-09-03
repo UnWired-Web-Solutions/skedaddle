@@ -15,7 +15,7 @@
 | Database migration or backfill | No | Code-only repair; no production write authorization |
 | External API mutation | No | Not required for this repair |
 | Checkpoint and deployment | No | Not explicitly authorized |
-| GitHub push or merge | No | Assistant committed to a local handoff pending explicit push authorization |
+| GitHub push or merge | Push authorized; merge not authorized | Ay explicitly instructed “push it” after reviewing the local handoff |
 | Outbound communication | No | Not requested |
 
 ## Impact surface and invariants

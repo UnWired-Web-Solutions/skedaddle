@@ -16,4 +16,4 @@
 ## Propagation
 
 - **Project test, constraint, or documentation updated:** `AGENTS.md`, `PROJECT_ENGINEERING_CONTEXT.md`, `docs/PRODUCT_REQUIREMENTS.md`, `todo.md`, authentication documentation, task contract, CI fixture, session tests, authorization compatibility tests, period-window tests, strategy/proposal source tests, and `server/migrationIntegrity.test.ts`.
-- **Residual risk or owner action:** The code is not committed, pushed, deployed, migrated, or runtime verified. UWS must set the production session secret, validate a disposable clean migration, and perform authenticated administrator/franchise checks after an approved deployment.
+- **Residual risk or owner action:** The code is committed and pushed but is not merged, deployed, migrated, or runtime verified. UWS must set the production session secret, validate a disposable clean migration, and perform authenticated administrator/franchise checks after an approved deployment.
