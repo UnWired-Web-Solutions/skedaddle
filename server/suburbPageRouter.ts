@@ -10,7 +10,8 @@
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { suburbPages } from "../drizzle/schema";
-import { publicProcedure, router } from "./_core/trpc";
+import { adminProcedure, router } from "./_core/trpc";
+import { invokeLLM } from "./_core/llm";
 import { getDb } from "./db";
 import { getTerritorySpeciesContext, type TerritorySpeciesContext } from "./suburbContentSources";
 import { buildSuburbSchema, type SuburbSchemaParams } from "./templates/suburbPageSchema";
@@ -119,31 +120,26 @@ function requiredText(record: Record<string, unknown>, key: string, maxLength: n
   return value.trim();
 }
 
-async function callClaudeOpus(prompt: string, maxTokens: number): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("Content drafting is unavailable because the approved model credential is not configured.");
+const INTERNAL_SUBURB_DRAFT_MODEL = "gpt-5.5";
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    signal: AbortSignal.timeout(60_000),
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "claude-opus-5",
-      max_tokens: maxTokens,
-      temperature: 0.2,
-      messages: [{ role: "user", content: prompt }],
-    }),
+async function callInternalSuburbNarrative(prompt: string, maxTokens: number): Promise<string> {
+  const timeout = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error("Content drafting timed out. No draft was saved.")), 60_000);
   });
-
-  if (!response.ok) {
-    throw new Error(`Content drafting failed with model response ${response.status}. No draft was saved.`);
-  }
-  const body = await response.json() as { content?: Array<{ text?: string }> };
-  const text = body.content?.[0]?.text?.trim();
+  const result = await Promise.race([
+    invokeLLM({
+      model: INTERNAL_SUBURB_DRAFT_MODEL,
+      messages: [{ role: "user", content: prompt }],
+      maxTokens,
+      reasoning: { effort: "high" },
+      responseFormat: { type: "json_object" },
+    }),
+    timeout,
+  ]);
+  const content = result.choices[0]?.message.content;
+  const text = typeof content === "string"
+    ? content.trim()
+    : content?.filter((part) => part.type === "text").map((part) => part.text).join("\n").trim();
   if (!text) throw new Error("Content drafting returned an empty response. No draft was saved.");
   return text;
 }
@@ -184,7 +180,7 @@ async function generateNarrative(
   species: string[],
   facts: PublishingFacts,
 ): Promise<Pick<SuburbPageContent, "introSection" | "whyChooseSection" | "speciesSections" | "neighbourhoodSection" | "faqSection" | "closingCta">> {
-  const raw = await callClaudeOpus(`You are drafting an internal, review-only local service-content package. Return one JSON object and no prose outside the JSON.
+  const raw = await callInternalSuburbNarrative(`You are drafting an internal, review-only local service-content package. Return one JSON object and no prose outside the JSON.
 
 Page intent: a homeowner researching wildlife-control service information for ${suburbName}, ${state}.
 Brand identity: ${territoryName}.
@@ -361,9 +357,9 @@ const generationInput = z.object({
 });
 
 export const suburbPageRouter = router({
-  getTerritories: publicProcedure.query(() => TERRITORY_CATALOG),
+  getTerritories: adminProcedure.query(() => TERRITORY_CATALOG),
 
-  getTerritoryContext: publicProcedure
+  getTerritoryContext: adminProcedure
     .input(z.object({ territoryId: z.string().min(1).max(64) }))
     .query(async ({ input }) => {
       const territory = getTerritoryCatalogEntry(input.territoryId);
@@ -382,7 +378,7 @@ export const suburbPageRouter = router({
       };
     }),
 
-  generate: publicProcedure
+  generate: adminProcedure
     .input(generationInput)
     .mutation(async ({ input }) => {
       const content = await generateSuburbPageContent(input.territoryId, input.suburbName, input);
@@ -405,7 +401,7 @@ export const suburbPageRouter = router({
       return { id: inserted.insertId, content };
     }),
 
-  list: publicProcedure
+  list: adminProcedure
     .input(z.object({ territoryId: z.string().optional() }).optional())
     .query(async ({ input }) => {
       const db = await getDb();
@@ -414,7 +410,7 @@ export const suburbPageRouter = router({
       return db.select().from(suburbPages).orderBy(desc(suburbPages.generatedAt));
     }),
 
-  getPage: publicProcedure
+  getPage: adminProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .query(async ({ input }) => {
       const db = await getDb();
@@ -424,7 +420,7 @@ export const suburbPageRouter = router({
       return { ...page, content: JSON.parse(page.contentJson || "{}") as SuburbPageContent, schema: JSON.parse(page.schemaJson || "[]") };
     }),
 
-  updateStatus: publicProcedure
+  updateStatus: adminProcedure
     .input(z.object({
       id: z.number().int().positive(),
       status: z.enum(["draft", "in_review", "approved", "exported"]),

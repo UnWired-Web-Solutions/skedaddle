@@ -20,4 +20,6 @@ export const ENV = {
   gbpOAuthRedirectUri: process.env.GBP_OAUTH_REDIRECT_URI ?? "https://skedaddle.manus.space/api/gbp/oauth/callback",
   // Server-only local authentication registry.
   localAuthAccountsJson: process.env.LOCAL_AUTH_ACCOUNTS_JSON ?? "",
+  // Dedicated signing secret for HTTP-only local portal sessions. Required only when the staged session architecture is activated.
+  localAuthSessionSecret: process.env.LOCAL_AUTH_SESSION_SECRET ?? "",
 };

@@ -18,10 +18,24 @@ describe("local server authentication", () => {
     const raw = process.env.LOCAL_AUTH_ACCOUNTS_JSON;
     expect(raw).toBeTruthy();
     const [account] = JSON.parse(raw!) as Array<{ username: string; password: string }>;
-    const caller = localAuthRouter.createCaller({} as never);
-    const result = await caller.login({ username: account!.username, password: account!.password });
-    expect(result.success).toBe(true);
-    if (result.success) expect(result.user).not.toHaveProperty("password");
+    const originalSecret = process.env.LOCAL_AUTH_SESSION_SECRET;
+    process.env.LOCAL_AUTH_SESSION_SECRET = "test-local-auth-session-secret-with-at-least-thirty-two-bytes";
+    const issuedCookies: Array<{ name: string; value: string; options: Record<string, unknown> }> = [];
+    try {
+      const caller = localAuthRouter.createCaller({
+        req: { ip: "127.0.0.1", protocol: "https", headers: {} },
+        res: { cookie: (name: string, value: string, options: Record<string, unknown>) => issuedCookies.push({ name, value, options }) },
+      } as never);
+      const result = await caller.login({ username: account!.username, password: account!.password });
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.user).not.toHaveProperty("password");
+      expect(issuedCookies).toHaveLength(1);
+      expect(issuedCookies[0]).toMatchObject({ name: "skedaddle_local_session", options: { httpOnly: true, secure: true } });
+      expect(issuedCookies[0]?.value).not.toContain(account!.password);
+    } finally {
+      if (originalSecret === undefined) delete process.env.LOCAL_AUTH_SESSION_SECRET;
+      else process.env.LOCAL_AUTH_SESSION_SECRET = originalSecret;
+    }
   });
 
   it("validates the managed primary registry independently of any administrator override", () => {

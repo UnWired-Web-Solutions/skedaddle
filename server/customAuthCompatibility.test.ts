@@ -4,34 +4,36 @@ import { analyticsRouter } from "./analyticsRouter";
 import { proposalRouter } from "./proposalRouter";
 import { strategyReportRouter } from "./strategyReportRouter";
 
-const localAdminContext = {
+const anonymousContext = {
   user: null,
+  portalUser: null,
   req: {} as TrpcContext["req"],
   res: {} as TrpcContext["res"],
 } satisfies TrpcContext;
 
-describe("custom local authentication compatibility", () => {
-  it("keeps strategy report discovery available without a Manus OAuth session", async () => {
-    const territories = await strategyReportRouter.createCaller(localAdminContext).getTerritories();
-    expect(territories.length).toBeGreaterThan(0);
+const localAdminContext = {
+  ...anonymousContext,
+  portalUser: { username: "admin", role: "admin" as const, locationId: null },
+} satisfies TrpcContext;
+
+describe("server-backed local authentication compatibility", () => {
+  it("rejects sensitive discovery without a validated local session", async () => {
+    await expect(strategyReportRouter.createCaller(anonymousContext).getTerritories()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(proposalRouter.createCaller(anonymousContext).getTerritories()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(analyticsRouter.createCaller(anonymousContext).getTerritories()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
 
-  it("keeps proposal discovery available without a Manus OAuth session", async () => {
-    const territories = await proposalRouter.createCaller(localAdminContext).getTerritories();
-    expect(territories.length).toBeGreaterThan(0);
-  });
-
-  it("keeps analytics discovery available without a Manus OAuth session", async () => {
-    const result = await analyticsRouter.createCaller(localAdminContext).getTerritories();
-    expect(result.territories.length).toBeGreaterThan(0);
-  });
-
-  it("keeps GBP readiness visible without a Manus OAuth session and without claiming live data", async () => {
-    const result = await analyticsRouter.createCaller(localAdminContext).getGBPIntegrationStatus();
-    expect(result.liveDataActive).toBe(false);
-    expect(result.approval.status).toBe("pending_google_allowlist_review");
-    expect(result.mapping.totalCandidates).toBe(32);
-    expect(typeof result.oauthClientConfigured).toBe("boolean");
-    expect(typeof result.oauthRefreshAuthorizationConfigured).toBe("boolean");
+  it("allows an administrator session to access strategy, proposal, analytics, and GBP readiness without Manus OAuth", async () => {
+    const [strategyTerritories, proposalTerritories, analyticsTerritories, gbp] = await Promise.all([
+      strategyReportRouter.createCaller(localAdminContext).getTerritories(),
+      proposalRouter.createCaller(localAdminContext).getTerritories(),
+      analyticsRouter.createCaller(localAdminContext).getTerritories(),
+      analyticsRouter.createCaller(localAdminContext).getGBPIntegrationStatus(),
+    ]);
+    expect(strategyTerritories.length).toBeGreaterThan(0);
+    expect(proposalTerritories.length).toBeGreaterThan(0);
+    expect(analyticsTerritories.territories.length).toBeGreaterThan(0);
+    expect(gbp.liveDataActive).toBe(false);
+    expect(gbp.approval.status).toBe("pending_google_allowlist_review");
   });
 });

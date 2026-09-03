@@ -33,9 +33,10 @@ describe("TERRITORIES", () => {
 });
 
 // ── Router procedure tests ───────────────────────────────────────────────────
-function createPublicContext(): TrpcContext {
+function createAdminContext(): TrpcContext {
   return {
     user: null,
+    portalUser: { username: "admin", role: "admin", locationId: null },
     req: { protocol: "https", headers: {} } as TrpcContext["req"],
     res: {} as TrpcContext["res"],
   };
@@ -43,7 +44,7 @@ function createPublicContext(): TrpcContext {
 
 describe("gbpImage.getTerritories", () => {
   it("returns all territories as an array", async () => {
-    const caller = appRouter.createCaller(createPublicContext());
+    const caller = appRouter.createCaller(createAdminContext());
     const territories = await caller.gbpImage.getTerritories();
     expect(Array.isArray(territories)).toBe(true);
     expect(territories.length).toBeGreaterThanOrEqual(19);
@@ -56,14 +57,14 @@ describe("gbpImage.getTerritories", () => {
 
 describe("gbpImage.getSuburbs", () => {
   it("returns suburbs for a valid territory", async () => {
-    const caller = appRouter.createCaller(createPublicContext());
+    const caller = appRouter.createCaller(createAdminContext());
     const suburbs = await caller.gbpImage.getSuburbs({ territoryId: "hamilton" });
     expect(Array.isArray(suburbs)).toBe(true);
     expect(suburbs).toContain("Ancaster");
   });
 
   it("returns empty array for unknown territory", async () => {
-    const caller = appRouter.createCaller(createPublicContext());
+    const caller = appRouter.createCaller(createAdminContext());
     await expect(caller.gbpImage.getSuburbs({ territoryId: "unknown-territory" })).rejects.toThrow();
   });
 });
@@ -115,7 +116,7 @@ describe("contentHash8 (filename collision fix)", () => {
 // ── #1: getJobStatus returns not_found for unknown jobs ──────────────────────
 describe("gbpImage.getJobStatus", () => {
   it("returns found=false for unknown jobId", async () => {
-    const caller = appRouter.createCaller(createPublicContext());
+    const caller = appRouter.createCaller(createAdminContext());
     const result = await caller.gbpImage.getJobStatus({ jobId: "nonexistent_job_id" });
     expect(result.found).toBe(false);
     expect(result.status).toBe("not_found");

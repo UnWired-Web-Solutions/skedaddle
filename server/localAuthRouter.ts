@@ -1,45 +1,34 @@
-import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
+import { getSessionCookieOptions } from "./_core/cookies";
 import { ENV } from "./_core/env";
 import { publicProcedure, router } from "./_core/trpc";
+import { authenticateLocalAccount, parseLocalAuthAccounts } from "./localAuthAccounts";
+import {
+  createLocalSessionToken,
+  LOCAL_SESSION_COOKIE,
+  LOCAL_SESSION_TTL_SECONDS,
+  readLocalSessionCookie,
+  resolveLocalSessionUser,
+} from "./localSession";
 
-export type LocalAuthUser = {
-  username: string;
-  role: "admin" | "franchise";
-  locationId?: string;
-};
+export { authenticateLocalAccount, parseLocalAuthAccounts } from "./localAuthAccounts";
+export type { LocalAuthUser } from "./localAuthAccounts";
 
-type LocalAuthAccount = LocalAuthUser & { password: string };
-
-const accountSchema = z.object({
-  username: z.string().trim().min(1).max(64),
-  password: z.string().min(1).max(256),
-  role: z.enum(["admin", "franchise"]),
-  locationId: z.string().trim().min(1).max(64).optional(),
-}).superRefine((account, ctx) => {
-  if (account.role === "franchise" && !account.locationId) {
-    ctx.addIssue({ code: "custom", message: "Franchise accounts require a locationId." });
-  }
-  if (account.role === "admin" && account.locationId) {
-    ctx.addIssue({ code: "custom", message: "Admin accounts must not carry a locationId." });
-  }
-});
-
-const accountsSchema = z.array(accountSchema).min(1).max(100);
 const MAX_FAILED_LOGINS = 5;
 const FAILED_LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const MAX_RATE_LIMIT_KEYS = 1_000;
 const failedLogins = new Map<string, number[]>();
 
-function constantTimeMatch(expected: string, supplied: string): boolean {
-  const expectedBytes = Buffer.from(expected, "utf8");
-  const suppliedBytes = Buffer.from(supplied, "utf8");
-  if (expectedBytes.length !== suppliedBytes.length) return false;
-  return timingSafeEqual(expectedBytes, suppliedBytes);
-}
-
 function loginAttemptKey(ip: string | undefined, username: string): string {
   return `${ip || "unknown"}\u0000${username.trim().toLowerCase()}`;
+}
+
+function localSessionSigningSecret(): string {
+  const secret = process.env.LOCAL_AUTH_SESSION_SECRET || ENV.localAuthSessionSecret;
+  if (Buffer.byteLength(secret, "utf8") < 32) {
+    throw new Error("Local session signing secret is unavailable.");
+  }
+  return secret;
 }
 
 export function isLoginRateLimited(key: string, now = Date.now()): boolean {
@@ -65,69 +54,53 @@ export function resetLoginRateLimitForTests(): void {
   failedLogins.clear();
 }
 
-export function parseLocalAuthAccounts(raw: string | undefined): LocalAuthAccount[] {
-  if (!raw) throw new Error("Local authentication is not configured.");
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new Error("Local authentication configuration is invalid.");
-  }
-
-  const accounts = accountsSchema.parse(parsed).map((account) => ({
-    ...account,
-    username: account.username.toLowerCase(),
-  }));
-  const usernames = new Set<string>();
-  for (const account of accounts) {
-    if (usernames.has(account.username)) {
-      throw new Error("Local authentication configuration has duplicate usernames.");
-    }
-    usernames.add(account.username);
-  }
-  return accounts;
-}
-
-export function authenticateLocalAccount(
-  raw: string | undefined,
-  username: string,
-  password: string,
-): LocalAuthUser | null {
-  const normalizedUsername = username.trim().toLowerCase();
-  const account = parseLocalAuthAccounts(raw).find((candidate) => candidate.username === normalizedUsername);
-  if (!account) return null;
-  if (!constantTimeMatch(account.password, password)) return null;
-  return account.role === "admin"
-    ? { username: account.username, role: "admin" }
-    : { username: account.username, role: "franchise", locationId: account.locationId };
-}
-
 export const localAuthRouter = router({
   login: publicProcedure
     .input(z.object({
       username: z.string().trim().min(1).max(64),
       password: z.string().min(1).max(256),
     }))
-    .mutation(({ input, ctx }) => {
+    .mutation(async ({ input, ctx }) => {
       const key = loginAttemptKey(ctx.req?.ip, input.username);
       if (isLoginRateLimited(key)) {
         return { success: false as const, reason: "rate_limited" as const };
       }
       try {
-        const user = authenticateLocalAccount(
-          ENV.localAuthAccountsJson,
-          input.username,
-          input.password,
-        );
+        const user = authenticateLocalAccount(ENV.localAuthAccountsJson, input.username, input.password);
         if (!user) {
           recordFailedLogin(key);
           return { success: false as const, reason: "invalid_credentials" as const };
         }
+
+        const signingSecret = localSessionSigningSecret();
+        const token = await createLocalSessionToken({ username: user.username }, signingSecret);
+        ctx.res.cookie(LOCAL_SESSION_COOKIE, token, {
+          ...getSessionCookieOptions(ctx.req),
+          maxAge: LOCAL_SESSION_TTL_SECONDS * 1000,
+        });
         failedLogins.delete(key);
         return { success: true as const, user };
       } catch {
         return { success: false as const, reason: "unavailable" as const };
       }
     }),
+  session: publicProcedure.query(async ({ ctx }) => {
+    try {
+      const user = await resolveLocalSessionUser(
+        readLocalSessionCookie(ctx.req.headers.cookie),
+        localSessionSigningSecret(),
+        ENV.localAuthAccountsJson,
+      );
+      return { user } as const;
+    } catch {
+      return { user: null } as const;
+    }
+  }),
+  logout: publicProcedure.mutation(({ ctx }) => {
+    ctx.res.clearCookie(LOCAL_SESSION_COOKIE, {
+      ...getSessionCookieOptions(ctx.req),
+      maxAge: -1,
+    });
+    return { success: true } as const;
+  }),
 });

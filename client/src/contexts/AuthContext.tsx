@@ -5,36 +5,29 @@ export interface AuthUser {
   username: string;
   role: "admin" | "franchise";
   locationId?: string;
+  name?: string;
+  email?: string;
 }
 
 interface AuthContextValue {
   user: AuthUser | null;
   isAuthenticated: boolean;
+  isLoading: boolean;
   login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
-const SESSION_KEY = "skedaddle_portal_user";
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function readStoredUser(): AuthUser | null {
-  try {
-    const stored = sessionStorage.getItem(SESSION_KEY);
-    if (!stored) return null;
-    const candidate = JSON.parse(stored) as AuthUser;
-    if (!candidate || typeof candidate.username !== "string" || (candidate.role !== "admin" && candidate.role !== "franchise")) {
-      return null;
-    }
-    if (candidate.role === "franchise" && !candidate.locationId) return null;
-    return candidate;
-  } catch {
-    return null;
-  }
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(readStoredUser);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const { mutateAsync: authenticate } = trpc.localAuth.login.useMutation();
+  const { mutateAsync: endSession } = trpc.localAuth.logout.useMutation();
+  const session = trpc.localAuth.session.useQuery(undefined, { retry: false, refetchOnWindowFocus: true });
+
+  useEffect(() => {
+    if (!session.isLoading) setUser(session.data?.user ?? null);
+  }, [session.data?.user, session.isLoading]);
 
   const login = useCallback(async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
@@ -42,31 +35,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!result.success) {
         return {
           success: false,
-          error: result.reason === "unavailable" ? "Sign-in is temporarily unavailable." : "Invalid username or password.",
+          error: result.reason === "rate_limited"
+            ? "Too many unsuccessful attempts. Please wait before trying again."
+            : result.reason === "unavailable"
+              ? "Sign-in is temporarily unavailable."
+              : "Invalid username or password.",
         };
       }
-      setUser(result.user);
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify(result.user));
+      const confirmedSession = await session.refetch();
+      if (!confirmedSession.data?.user) return { success: false, error: "Sign-in is temporarily unavailable." };
+      setUser(confirmedSession.data.user);
       return { success: true };
     } catch {
       return { success: false, error: "Sign-in is temporarily unavailable." };
     }
-  }, [authenticate]);
+  }, [authenticate, session]);
 
-  const logout = useCallback(() => {
-    setUser(null);
-    sessionStorage.removeItem(SESSION_KEY);
-  }, []);
+  const logout = useCallback(async () => {
+    try {
+      await endSession();
+    } finally {
+      setUser(null);
+      await session.refetch();
+    }
+  }, [endSession, session]);
 
-  useEffect(() => {
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key === SESSION_KEY && !event.newValue) setUser(null);
-    };
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
-  }, []);
-
-  return <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading: session.isLoading, login, logout }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthContextValue {

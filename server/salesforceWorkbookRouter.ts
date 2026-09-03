@@ -6,7 +6,7 @@ import {
   salesforceWorkbookSources,
 } from "../drizzle/schema";
 import { latestTwelveCompletedMonths, reportingWindowLabel, type ReportingWindow } from "../shared/reportingPeriod";
-import { publicProcedure, router } from "./_core/trpc";
+import { adminProcedure, portalProcedure, router, territoryProcedure } from "./_core/trpc";
 import { getDb } from "./db";
 
 function inWorkbookWindow(window: ReportingWindow) {
@@ -29,7 +29,7 @@ export function parseWorkbookCountJson(value: string | null): Record<string, num
 }
 
 export const salesforceWorkbookRouter = router({
-  getStatus: publicProcedure.query(async () => {
+  getStatus: portalProcedure.query(async () => {
     const db = await getDb();
     if (!db) return { configured: false as const, source: null, latestRun: null };
     const sources = await db.select().from(salesforceWorkbookSources).orderBy(desc(salesforceWorkbookSources.updatedAt)).limit(1);
@@ -85,7 +85,7 @@ export const salesforceWorkbookRouter = router({
     };
   }),
 
-  getTerritoryMonthly: publicProcedure
+  getTerritoryMonthly: territoryProcedure
     .input(z.object({
       territoryId: z.string().min(1).max(64),
       year: z.number().int().min(2020).max(2100).optional(),
@@ -131,7 +131,7 @@ export const salesforceWorkbookRouter = router({
       };
     }),
 
-  getTerritoryPerformance: publicProcedure
+  getTerritoryPerformance: territoryProcedure
     .input(z.object({ territoryId: z.string().min(1).max(64) }))
     .query(async ({ input }) => {
       const reportingWindow = latestTwelveCompletedMonths();
@@ -222,7 +222,7 @@ export const salesforceWorkbookRouter = router({
       };
     }),
 
-  getNetworkPerformance: publicProcedure.query(async () => {
+  getNetworkPerformance: adminProcedure.query(async () => {
     const reportingWindow = latestTwelveCompletedMonths();
     const unavailable = { source: "unavailable" as const, activeRun: null, reportingWindow: reportingWindowLabel(reportingWindow), territories: [] };
     const db = await getDb();
