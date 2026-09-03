@@ -15,6 +15,7 @@ jobs:
       SONAR_API_KEY: test-key-not-for-api-calls
       RUN_LIVE_API_TESTS: "0"
       PUPPETEER_SKIP_DOWNLOAD: "true"
+      LOCAL_AUTH_SESSION_SECRET: test-session-secret-with-at-least-32-characters
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

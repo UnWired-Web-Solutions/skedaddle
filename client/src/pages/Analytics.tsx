@@ -6,6 +6,7 @@
  */
 
 import PortalLayout from "@/components/PortalLayout";
+import { useAuth } from "@/contexts/AuthContext";
 import { trpc } from "@/lib/trpc";
 import { useState, useMemo, useCallback, useEffect } from "react";
 import {
@@ -250,13 +251,16 @@ function InsightsPanel({ insights, isLoading, territoryName }: { insights: any[]
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 export default function Analytics() {
-  const [selectedTerritory, setSelectedTerritory] = useState("hamilton");
+  const { user } = useAuth();
+  const [selectedTerritory, setSelectedTerritory] = useState(() => (
+    user?.role === "franchise" && user.locationId ? user.locationId : "hamilton"
+  ));
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [comparisonMonth, setComparisonMonth] = useState(new Date().getMonth() + 1);
 
   // Fetch territories (19 parent territories)
   const { data: territories } = trpc.analytics.getTerritories.useQuery();
-  const { data: latestPeriod } = trpc.analytics.getLatestPeriod.useQuery();
+  const { data: latestPeriod } = trpc.analytics.getLatestPeriod.useQuery({ territoryId: selectedTerritory });
   const { data: dateRange } = trpc.analytics.getDateRange.useQuery();
 
   useEffect(() => {
@@ -265,6 +269,13 @@ export default function Analytics() {
       setComparisonMonth(latestPeriod.latest.month);
     }
   }, [latestPeriod]);
+
+  useEffect(() => {
+    const allowed = territories?.territories ?? [];
+    if (allowed.length > 0 && !allowed.some((territory) => territory.id === selectedTerritory)) {
+      setSelectedTerritory(allowed[0].id);
+    }
+  }, [selectedTerritory, territories]);
 
   // Fetch insights — territory-specific when a territory is selected
   const { data: insights, isLoading: insightsLoading } = trpc.analytics.getInsights.useQuery({
@@ -731,7 +742,7 @@ export default function Analytics() {
               </p>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "flex-end" }}>
-              {searchConsoleScope?.status === "ready" && (
+              {user?.role === "admin" && searchConsoleScope?.status === "ready" && (
                 <button
                   onClick={() => {
                     setSearchConsoleSyncMessage(null);
@@ -951,7 +962,7 @@ export default function Analytics() {
               </p>
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-              <button
+              {user?.role === "admin" && <button
                 onClick={() => {
                   setGA4SyncMessage(null);
                   ga4Sync.mutate({ territoryId: selectedTerritory, year: selectedYear, month: comparisonMonth });
@@ -967,7 +978,7 @@ export default function Analytics() {
               >
                 <RefreshCw size={12} className={ga4Sync.isPending ? "animate-spin" : ""} />
                 {ga4Sync.isPending ? "Importing…" : "Import GA4 month"}
-              </button>
+              </button>}
               <button
                 onClick={handleExportGA4}
                 disabled={ga4ChartData.length === 0}

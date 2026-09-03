@@ -5,6 +5,7 @@ import {
   ga4TerritoryPages,
   gscPageMetrics,
   gscQueryMetrics,
+  salesforceWorkbookAggregates,
   salesforceWorkbookImportRuns,
   salesforceWorkbookSources,
 } from "../drizzle/schema";
@@ -71,6 +72,35 @@ export type ReportingAnalyticsSnapshot = {
     topPages: Array<{ pageUrl: string; clicks: number; impressions: number }>;
     topQueries: Array<{ query: string; clicks: number; impressions: number }>;
   };
+};
+
+export type ReportingWorkbookBreakdown = {
+  label: string;
+  workOrders: number;
+  invoiceValueRows: number;
+  recordedInvoicePreTaxAmount: number;
+};
+
+export type ReportingWorkbookSnapshot = {
+  source: "salesforce_drive_workbook";
+  workbookTitle: string;
+  sheetName: string;
+  status: "complete" | "partial";
+  rowsProcessed: number;
+  rowsRejected: number;
+  activatedAt: Date | null;
+  maxSourceModifiedAt: string | null;
+  currencyCode: "CAD" | "USD";
+  periodLabel: string;
+  workOrders: number;
+  invoiceValueRows: number;
+  recordedInvoicePreTaxAmount: number;
+  species: ReportingWorkbookBreakdown[];
+  cities: ReportingWorkbookBreakdown[];
+  networkSpecies: ReportingWorkbookBreakdown[];
+  networkWorkOrders: number;
+  networkRecordedInvoicePreTaxAmount: number;
+  conversionMetric: "unavailable_pending_status_definition";
 };
 
 /** Converts metric-level source decisions into a report-safe monthly table. */
@@ -278,6 +308,120 @@ export async function loadTerritoryWorkbookSourceStatus() {
     maxSourceModifiedAt: run.maxSourceModifiedAt,
     conversionMetric: "unavailable_pending_status_definition" as const,
   };
+}
+
+export async function loadTerritoryWorkbookPerformance(
+  territoryId: string,
+  currencyCode: "CAD" | "USD",
+  window: ReportingWindow = INITIAL_SALES_REPORT_WINDOW,
+): Promise<ReportingWorkbookSnapshot | null> {
+  const db = await getDb();
+  if (!db) return null;
+  try {
+    const [source] = await db.select().from(salesforceWorkbookSources)
+      .orderBy(desc(salesforceWorkbookSources.updatedAt)).limit(1);
+    if (!source?.lastSuccessfulRunId) return null;
+    const [run] = await db.select().from(salesforceWorkbookImportRuns)
+      .where(eq(salesforceWorkbookImportRuns.id, source.lastSuccessfulRunId)).limit(1);
+    if (!run || (run.status !== "complete" && run.status !== "partial")) return null;
+
+    const period = inWindowSql(
+      salesforceWorkbookAggregates.periodYear,
+      salesforceWorkbookAggregates.periodMonth,
+      window,
+    );
+    const dimensions = {
+      label: salesforceWorkbookAggregates.speciesLabel,
+      city: salesforceWorkbookAggregates.cityLabel,
+      workOrders: sql<number>`SUM(${salesforceWorkbookAggregates.recordCount})`,
+      invoiceValueRows: sql<number>`SUM(${salesforceWorkbookAggregates.invoiceValueCount})`,
+      recordedInvoicePreTaxAmount: sql<string>`SUM(${salesforceWorkbookAggregates.invoicePreTaxAmount})`,
+    };
+    const totalsSelection = {
+      aggregateRows: sql<number>`COUNT(*)`,
+      workOrders: sql<number>`SUM(${salesforceWorkbookAggregates.recordCount})`,
+      invoiceValueRows: sql<number>`SUM(${salesforceWorkbookAggregates.invoiceValueCount})`,
+      recordedInvoicePreTaxAmount: sql<string>`SUM(${salesforceWorkbookAggregates.invoicePreTaxAmount})`,
+    };
+    const base = [
+      eq(salesforceWorkbookAggregates.importRunId, run.id),
+      eq(salesforceWorkbookAggregates.currencyCode, currencyCode),
+      eq(salesforceWorkbookAggregates.statusLabel, "__ALL__"),
+      period,
+    ];
+    const [territoryTotals, speciesRows, cityRows, networkSpeciesRows, networkTotals] = await Promise.all([
+      db.select(totalsSelection).from(salesforceWorkbookAggregates).where(and(
+        ...base,
+        eq(salesforceWorkbookAggregates.territoryId, territoryId),
+        eq(salesforceWorkbookAggregates.speciesLabel, "__ALL__"),
+        eq(salesforceWorkbookAggregates.cityLabel, "__ALL__"),
+      )),
+      db.select(dimensions).from(salesforceWorkbookAggregates).where(and(
+        ...base,
+        eq(salesforceWorkbookAggregates.territoryId, territoryId),
+        ne(salesforceWorkbookAggregates.speciesLabel, "__ALL__"),
+        eq(salesforceWorkbookAggregates.cityLabel, "__ALL__"),
+      )).groupBy(salesforceWorkbookAggregates.speciesLabel),
+      db.select(dimensions).from(salesforceWorkbookAggregates).where(and(
+        ...base,
+        eq(salesforceWorkbookAggregates.territoryId, territoryId),
+        eq(salesforceWorkbookAggregates.speciesLabel, "__ALL__"),
+        ne(salesforceWorkbookAggregates.cityLabel, "__ALL__"),
+      )).groupBy(salesforceWorkbookAggregates.cityLabel),
+      db.select(dimensions).from(salesforceWorkbookAggregates).where(and(
+        ...base,
+        ne(salesforceWorkbookAggregates.speciesLabel, "__ALL__"),
+        eq(salesforceWorkbookAggregates.cityLabel, "__ALL__"),
+      )).groupBy(salesforceWorkbookAggregates.speciesLabel),
+      db.select(totalsSelection).from(salesforceWorkbookAggregates).where(and(
+        ...base,
+        eq(salesforceWorkbookAggregates.speciesLabel, "__ALL__"),
+        eq(salesforceWorkbookAggregates.cityLabel, "__ALL__"),
+      )),
+    ]);
+
+    const mapBreakdown = (
+      rows: typeof speciesRows,
+      field: "label" | "city",
+    ): ReportingWorkbookBreakdown[] => rows.map((row) => ({
+      label: row[field],
+      workOrders: Number(row.workOrders),
+      invoiceValueRows: Number(row.invoiceValueRows),
+      recordedInvoicePreTaxAmount: Number(row.recordedInvoicePreTaxAmount),
+    })).sort((a, b) => (
+      b.recordedInvoicePreTaxAmount - a.recordedInvoicePreTaxAmount
+      || b.workOrders - a.workOrders
+      || a.label.localeCompare(b.label)
+    ));
+
+    const totals = territoryTotals[0];
+    const network = networkTotals[0];
+    if (!totals || Number(totals.aggregateRows) === 0) return null;
+    return {
+      source: "salesforce_drive_workbook",
+      workbookTitle: source.workbookTitle,
+      sheetName: source.sheetName,
+      status: run.status,
+      rowsProcessed: run.rowsProcessed,
+      rowsRejected: run.rowsRejected,
+      activatedAt: run.activatedAt,
+      maxSourceModifiedAt: run.maxSourceModifiedAt,
+      currencyCode,
+      periodLabel: reportingWindowLabel(window),
+      workOrders: Number(totals.workOrders),
+      invoiceValueRows: Number(totals.invoiceValueRows),
+      recordedInvoicePreTaxAmount: Number(totals.recordedInvoicePreTaxAmount),
+      species: mapBreakdown(speciesRows, "label"),
+      cities: mapBreakdown(cityRows, "city"),
+      networkSpecies: mapBreakdown(networkSpeciesRows, "label"),
+      networkWorkOrders: Number(network?.workOrders ?? 0),
+      networkRecordedInvoicePreTaxAmount: Number(network?.recordedInvoicePreTaxAmount ?? 0),
+      conversionMetric: "unavailable_pending_status_definition",
+    };
+  } catch (error) {
+    console.warn(`[ReportingData] Workbook performance unavailable for ${territoryId}/${reportingWindowLabel(window)}:`, error);
+    return null;
+  }
 }
 
 export async function findSuburbAnalyticsEvidence(territoryId: string, suburbName: string) {

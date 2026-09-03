@@ -1,6 +1,6 @@
 # Skedaddle Product Contract
 
-Last updated: 2026-08-21
+Last updated: 2026-09-03
 
 ## Product purpose and users
 
@@ -12,19 +12,24 @@ The source meeting notes are maintained in [Chat About The Week Ahead](https://d
 
 The initial sales strategy report is the first deliverable. It must combine:
 
-- Salesforce revenue, jobs, inspections, closed jobs, territory close rate, and network close-rate benchmark;
+- source-qualified work-order counts and recorded pre-tax invoice values from the approved UWS Drive workbook;
+- an explicit statement that inspections, closed jobs, leads, conversions, territory close rate, and network close-rate benchmarks are unavailable until UWS approves a status definition;
 - an explicit year-over-year comparison over matched months;
-- revenue by species and by target suburb;
+- matched-period recorded invoice values and work orders by species and city; city results inform an audit but do not prove a suburb-page opportunity;
 - Google Business Profile performance and territory-specific monthly post recommendations;
 - GA4 sessions and priority-page sessions imported from the territory property map;
 - Search Console clicks, impressions, top 25 pages, and top 25 search terms from the main domain property filtered to approved territory paths;
 - a phased deployment recommendation: suburb hubs first, then species-by-suburb pages only when approved.
 
-The quarterly post-sale performance report is later scope. Suburb-page generation is paused indefinitely and must not be expanded through reporting work.
+The quarterly post-sale performance report is later scope. Suburb-page generation is an administrator-only, review-only workflow; publishing and direct WordPress mutation remain outside the approved scope.
 
 ## Reporting truth rules
 
-The current Salesforce snapshot covers 2025-07-01 through 2026-06-30. Until Salesforce data becomes selectable and durable, digital totals shown beside it must use that same window. Every report must display the period and an as-of/generated timestamp.
+The UWS-owned Google Drive workbook is the active Salesforce-derived source. It is read-only at source, imported daily, aggregate-only in portal responses, currency-separated, and may be partial. Accepted rows are never silently combined with rejected rows, and workbook values are never called live Salesforce API data.
+
+The initial strategy report and proposal use 2025-07-01 through 2026-06-30 across workbook, GA4, Search Console, and GBP evidence. They prefer active workbook aggregates for that exact window. The legacy sales snapshot is allowed only as a visibly labelled fallback when matched-period workbook aggregates are unavailable. Every report displays the period, source status, and generated timestamp.
+
+Territory dashboards and network rankings use one common rolling window: the latest 12 completed UTC calendar months. Totals, species, cities, and every territory in a network ranking use that identical window. Current and future months are excluded. Network ranks restart by currency; CAD and USD are never compared.
 
 Only complete GA4 import months belong in headline totals, top-page rankings, comparisons, or AI context. Partial months must be shown separately with the expected/succeeded property counts. Missing data is “unavailable,” never zero.
 
@@ -50,11 +55,12 @@ Generation must remain useful when an AI provider is unavailable: each narrative
 
 ## Acceptance checks
 
-- Report cover and evidence sections show 2025-07-01 through 2026-06-30 and identify Salesforce, GA4, Search Console, and GBP sources separately.
+- Report cover and evidence sections show 2025-07-01 through 2026-06-30 and identify the Salesforce-derived Google Drive workbook, GA4, Search Console, and GBP sources separately.
 - Headline GA4 totals exclude partial imports and show a visible coverage warning when partial data exists.
-- The report includes matched-month YoY, close rate, the top 25 pages, and the top 25 queries when those sources are available.
+- The report includes matched-month digital YoY, the top 25 pages, and the top 25 queries when those sources are available. Close rate remains explicitly unavailable pending an approved status definition.
 - No fallback contains “please regenerate” or “will be populated.”
 - Proposal scope matches the operator’s explicit scope notes; pricing tiers are non-zero and non-decreasing.
 - `/report/:id` does not display the obsolete hard-coded July 2026 static report.
-- Report and proposal procedures remain compatible with the portal's custom local admin gate. They use `publicProcedure` until server-backed local authentication replaces `AuthContext`; using Manus OAuth procedures causes the verified `10001`/`10002` failures.
+- Successful local login creates a signed, HTTP-only server session. Browser `sessionStorage` cannot establish identity or role. Anonymous callers cannot read portal analytics or trigger generators; franchise sessions can read only their configured territory; network commercial summaries, imports, reports, proposals, suburb content, GBP image generation, and review mutations require an administrator session.
+- A clean migration-chain check rejects duplicate column additions and indexes dropped before creation.
 - The exact reviewed draft is the artifact exported to PDF.

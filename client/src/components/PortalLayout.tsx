@@ -29,9 +29,9 @@ interface NavItem {
 
 const TOP_NAV: NavItem[] = [
   { label: "Overview", href: "/", icon: <LayoutDashboard size={16} /> },
-  { label: "Network", href: "/network", icon: <MapPin size={16} /> },
+  { label: "Network", href: "/network", icon: <MapPin size={16} />, adminOnly: true },
   { label: "Tools", href: "/tools", icon: <BarChart3 size={16} /> },
-  { label: "GBP Images", href: "/gbp-images", icon: <ImageIcon size={16} /> },
+  { label: "GBP Images", href: "/gbp-images", icon: <ImageIcon size={16} />, adminOnly: true },
   { label: "Analytics", href: "/analytics", icon: <LineChart size={16} /> },
   { label: "Resources", href: "/resources", icon: <BookOpen size={16} />, adminOnly: true },
   { label: "Proposals", href: "/proposals", icon: <FileText size={16} />, adminOnly: true },

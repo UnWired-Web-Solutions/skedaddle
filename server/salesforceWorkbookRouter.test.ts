@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseWorkbookCountJson, salesforceWorkbookRouter } from "./salesforceWorkbookRouter";
+import { latestTwelveCompletedMonths, parseWorkbookCountJson, salesforceWorkbookRouter } from "./salesforceWorkbookRouter";
 
 describe("Salesforce workbook router safety helpers", () => {
   it("returns only finite non-negative count values", () => {
@@ -14,5 +14,13 @@ describe("Salesforce workbook router safety helpers", () => {
   it("exposes the aggregate-only network performance contract", () => {
     expect(salesforceWorkbookRouter._def.procedures.getNetworkPerformance).toBeDefined();
     expect(salesforceWorkbookRouter._def.procedures.getTerritoryCloseRate).toBeUndefined();
+  });
+
+  it("uses the latest twelve completed months and excludes the current month", () => {
+    expect(latestTwelveCompletedMonths(new Date("2026-09-03T12:00:00Z"))).toEqual({
+      start: { year: 2025, month: 9 },
+      end: { year: 2026, month: 8 },
+      label: "2025-09 through 2026-08",
+    });
   });
 });

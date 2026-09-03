@@ -18,7 +18,7 @@ The archive was **not** installed as a global skill and its auxiliary `README.md
 
 ## Skedaddle-specific adaptations
 
-The adopted context makes the active Drive workbook, GA4, GSC, and GBP source boundaries explicit. It preserves currency segregation, unavailable-not-zero reporting, aggregate-only operational displays, the custom local-auth requirement, `publicProcedure` compatibility, deterministic daily imports, disabled GBP activation, and the distinction between checkpointing, pushing, deploying, and runtime verification.
+The adopted context makes the active Drive workbook, GA4, GSC, and GBP source boundaries explicit. It preserves currency segregation, unavailable-not-zero reporting, aggregate-only operational displays, signed server-backed local authentication, territory and administrator authorization, deterministic daily imports, disabled GBP activation, and the distinction between checkpointing, pushing, deploying, and runtime verification.
 
 This is a process and documentation change only. It does not alter application behavior, source mappings, imports, schedules, credentials, database state, or production data.
 

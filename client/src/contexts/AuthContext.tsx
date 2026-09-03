@@ -1,5 +1,5 @@
 import { trpc } from "@/lib/trpc";
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect } from "react";
 
 export interface AuthUser {
   username: string;
@@ -10,31 +10,23 @@ export interface AuthUser {
 interface AuthContextValue {
   user: AuthUser | null;
   isAuthenticated: boolean;
+  isLoading: boolean;
   login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const SESSION_KEY = "skedaddle_portal_user";
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function readStoredUser(): AuthUser | null {
-  try {
-    const stored = sessionStorage.getItem(SESSION_KEY);
-    if (!stored) return null;
-    const candidate = JSON.parse(stored) as AuthUser;
-    if (!candidate || typeof candidate.username !== "string" || (candidate.role !== "admin" && candidate.role !== "franchise")) {
-      return null;
-    }
-    if (candidate.role === "franchise" && !candidate.locationId) return null;
-    return candidate;
-  } catch {
-    return null;
-  }
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(readStoredUser);
+  const utils = trpc.useUtils();
+  const session = trpc.localAuth.me.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: true,
+  });
   const { mutateAsync: authenticate } = trpc.localAuth.login.useMutation();
+  const { mutateAsync: endSession } = trpc.auth.logout.useMutation();
+  const user = session.data ?? null;
 
   const login = useCallback(async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
@@ -42,31 +34,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!result.success) {
         return {
           success: false,
-          error: result.reason === "unavailable" ? "Sign-in is temporarily unavailable." : "Invalid username or password.",
+          error: result.reason === "rate_limited"
+            ? "Too many sign-in attempts. Please wait 15 minutes and try again."
+            : result.reason === "unavailable"
+              ? "Sign-in is temporarily unavailable."
+              : "Invalid username or password.",
         };
       }
-      setUser(result.user);
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify(result.user));
+      utils.localAuth.me.setData(undefined, result.user);
       return { success: true };
     } catch {
       return { success: false, error: "Sign-in is temporarily unavailable." };
     }
-  }, [authenticate]);
+  }, [authenticate, utils.localAuth.me]);
 
-  const logout = useCallback(() => {
-    setUser(null);
+  const logout = useCallback(async () => {
+    try {
+      await endSession();
+    } finally {
+      utils.localAuth.me.setData(undefined, null);
+    }
+  }, [endSession, utils.localAuth.me]);
+
+  useEffect(() => {
+    // Remove the legacy browser-trusted identity. Authentication now comes only
+    // from the signed, HTTP-only server session cookie.
     sessionStorage.removeItem(SESSION_KEY);
   }, []);
 
-  useEffect(() => {
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key === SESSION_KEY && !event.newValue) setUser(null);
-    };
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
-  }, []);
-
-  return <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading: session.isLoading, login, logout }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthContextValue {

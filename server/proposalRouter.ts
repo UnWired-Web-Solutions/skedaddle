@@ -1,11 +1,12 @@
 import { z } from "zod";
-import { publicProcedure, router } from "./_core/trpc";
+import { adminProcedure, router } from "./_core/trpc";
 import { ENV } from "./_core/env";
 import { invokeLLM } from "./_core/llm";
 import { storagePut } from "./storage";
 import puppeteer from "puppeteer";
 import {
   loadTerritoryReportingAnalytics,
+  loadTerritoryWorkbookPerformance,
   type ReportingAnalyticsSnapshot,
 } from "./territoryReportingData";
 import { INITIAL_SALES_REPORT_WINDOW, reportingMonthIso } from "../shared/reportingPeriod";
@@ -21,6 +22,8 @@ interface ProposalData {
   country: string;
   currency: "CAD" | "USD";
   totalRevenue: number;
+  workOrders: number;
+  salesSource: "salesforce_drive_workbook" | "legacy_historical_snapshot";
   topSuburbs: string[];
   topSpecies: string[];
   seasonalTiming: string;
@@ -142,18 +145,20 @@ async function generateProposalNarrative(data: ProposalData): Promise<string> {
 
 Key data points:
 - Territory: ${data.territoryName}
-- Total closed revenue (2025-07-01 through 2026-06-30): ${revenueFormatted}
-- Top suburbs by revenue: ${suburbList}
-- Top species by revenue: ${speciesList}
+- ${data.salesSource === "salesforce_drive_workbook" ? "Recorded pre-tax invoice value" : "Historical snapshot revenue"} (2025-07-01 through 2026-06-30): ${revenueFormatted}
+- ${data.salesSource === "salesforce_drive_workbook" ? "Recorded work orders" : "Historical snapshot jobs"}: ${data.workOrders.toLocaleString("en-US")}
+- Sales source: ${data.salesSource === "salesforce_drive_workbook" ? "active UWS Google Drive workbook; values are work-order aggregates, not inspections, closed jobs, recognized revenue, leads, or conversions" : "legacy historical snapshot because matched-period workbook aggregates are unavailable"}
+- Top cities by the same source-qualified value: ${suburbList}
+- Top species by the same source-qualified value: ${speciesList}
 - Seasonal wildlife timing: ${data.seasonalTiming}
 - Search evidence: ${data.analytics.hasGsc ? `${data.analytics.organicClicks.toLocaleString("en-US")} Search Console clicks and ${data.analytics.searchImpressions.toLocaleString("en-US")} impressions across ${data.analytics.gscMonths} imported months (${data.analytics.gscPeriod})` : "No persisted Search Console import is available"}
 - GA4 evidence: ${data.analytics.hasGa4 ? `${data.analytics.priorityPageSessions.toLocaleString("en-US")} species/location-page sessions across ${data.analytics.ga4Months} imported months (${data.analytics.ga4Period}; ${data.analytics.ga4Coverage})` : "No persisted GA4 import is available"}
 
 Write a compelling 3-4 sentence opening paragraph that:
 1. Names the territory and frames the opportunity (high-intent local searches, growing market)
-2. References the revenue figure as proof of demand and uses measured search data only when it is available
-3. Mentions 2-3 specific suburbs that drive the highest value
-4. Positions the proposal as a structured program to grow organic visibility and convert more traffic into closed revenue
+2. References the source-qualified recorded value as operating context—not proof of conversions—and uses measured search data only when it is available
+3. Mentions 2-3 specific cities with the highest recorded value
+4. Positions the proposal as a structured program to grow measured organic visibility and qualified demand without promising closed revenue
 
 Style: Professional but direct. No fluff. Written as if from a senior digital marketing strategist who knows this specific market. Do NOT sound like AI. Do NOT use phrases like "leverage," "harness," or "cutting-edge." Write like a person who has studied this territory's data.
 
@@ -192,7 +197,7 @@ Return ONLY the paragraph text, no quotes or formatting.`;
   } catch (error) {
     console.error("Fallback proposal narrative request failed:", error);
   }
-  return `The ${data.territoryName} territory generated ${revenueFormatted} in closed revenue from July 2025 through June 2026, with demand concentrated in ${data.topSuburbs.slice(0, 3).join(", ")}. The strongest species categories are ${speciesList}. This proposal presents the operator-approved scope for improving measured local visibility and turning more qualified demand into inspections and closed work.`;
+  return `From July 2025 through June 2026, the ${data.territoryName} territory recorded ${revenueFormatted} in ${data.salesSource === "salesforce_drive_workbook" ? "pre-tax invoice values across work orders" : "historical snapshot revenue"}, with the highest recorded values in ${data.topSuburbs.slice(0, 3).join(", ")}. The strongest species categories in that same source are ${speciesList}. This proposal presents the operator-approved scope for improving measured local visibility and qualified demand; it does not infer inspections, closed jobs, or conversion performance.`;
 }
 
 // ─── HTML Template ───────────────────────────────────────────────────────────
@@ -454,6 +459,7 @@ function buildProposalHtml(data: ProposalData, narrative: string, config: Propos
   
   <h2>The Opportunity</h2>
   <p class="narrative">${safeNarrative}</p>
+  <div class="includes-box"><strong>Sales context:</strong> ${data.salesSource === "salesforce_drive_workbook" ? `The active UWS Google Drive workbook records ${money(data.totalRevenue)} in pre-tax invoice values across ${data.workOrders.toLocaleString("en-US")} work orders for July 2025–June 2026. These are not inspections, closed jobs, recognized revenue, leads, or conversions.` : `Matched-period workbook aggregates were unavailable. ${money(data.totalRevenue)} and ${data.workOrders.toLocaleString("en-US")} jobs are retained only as visibly historical snapshot context.`}</div>
   <div class="includes-box"><strong>Measured digital baseline:</strong> ${data.analytics.available ? `${data.analytics.hasGsc ? `${data.analytics.organicClicks.toLocaleString("en-US")} Search Console clicks and ${data.analytics.searchImpressions.toLocaleString("en-US")} impressions across ${data.analytics.gscMonths} imported months (${data.analytics.gscPeriod}).` : "No persisted Search Console import."} ${data.analytics.hasGa4 ? `${data.analytics.priorityPageSessions.toLocaleString("en-US")} GA4 species/location-page sessions across ${data.analytics.ga4Months} imported months (${data.analytics.ga4Period}); coverage: ${data.analytics.ga4Coverage}.` : "No persisted GA4 import."}` : "No persisted GA4 or Search Console import is available for this proposal. Performance claims are intentionally omitted."}</div>
   
   <h2>Recommended Program Framework</h2>
@@ -471,7 +477,7 @@ function buildProposalHtml(data: ProposalData, narrative: string, config: Propos
   <ul>
     <li>Ongoing optimization of your existing GBP listings — service categories, description, photo refresh, Q&A, and profile completeness reviewed and updated on a consistent basis.</li>
     <li>Monthly post program using a proven structure: species or seasonal hook, local ${data.territoryName} suburb signal (${data.topSuburbs.slice(0, 4).join(", ")}), service proof, and a direct call-to-action.</li>
-    <li>Post volume scales by package tier — higher frequency drives stronger local pack visibility and more call conversions during ${data.territoryName}'s peak wildlife seasons.</li>
+    <li>Post volume scales by package tier; measured calls, clicks, and local visibility should be reviewed during ${data.territoryName}'s peak wildlife seasons without assuming post frequency caused a conversion.</li>
   </ul>
   
   <h3>Future Performance Strategy (Not Included Unless Approved)</h3>
@@ -637,7 +643,7 @@ async function generatePdf(html: string): Promise<Buffer> {
 
 export const proposalRouter = router({
   // Get available territories for proposal generation
-  getTerritories: publicProcedure.query(async () => {
+  getTerritories: adminProcedure.query(async () => {
     // Import franchise data dynamically to avoid circular deps
     const { DASHBOARD_DATA } = await import("../client/src/data/dashboardData");
     const { FRANCHISE_LOCATIONS } = await import("../client/src/data/franchises");
@@ -650,12 +656,13 @@ export const proposalRouter = router({
         city: loc.city,
         state: loc.state,
         country: loc.country,
-        revenue: DASHBOARD_DATA[loc.id]?.total_revenue || 0,
+        revenue: null,
+        salesSummary: "Loaded from the matched-period workbook after selection",
       }));
   }),
 
   // Backward-compatible PDF action; it only accepts an existing saved draft.
-  generate: publicProcedure
+  generate: adminProcedure
     .input(z.object({ draftId: z.string().uuid() }))
     .mutation(async ({ input }) => {
       const { DASHBOARD_DATA } = await import("../client/src/data/dashboardData");
@@ -677,7 +684,7 @@ export const proposalRouter = router({
     }),
 
   // Preview HTML (for in-browser preview without PDF generation)
-  preview: publicProcedure
+  preview: adminProcedure
     .input(proposalInputSchema)
     .mutation(async ({ input }) => {
       const { DASHBOARD_DATA } = await import("../client/src/data/dashboardData");
@@ -688,7 +695,16 @@ export const proposalRouter = router({
 
       const dashData = DASHBOARD_DATA[input.territoryId];
       if (!dashData) throw new Error(`No dashboard data for: ${input.territoryId}`);
-      const reportingAnalytics = await loadTerritoryReportingAnalytics(input.territoryId);
+      const [reportingAnalytics, workbookPerformance] = await Promise.all([
+        loadTerritoryReportingAnalytics(input.territoryId),
+        loadTerritoryWorkbookPerformance(input.territoryId, dashData.currency, INITIAL_SALES_REPORT_WINDOW),
+      ]);
+      const sourceSpecies = workbookPerformance
+        ? workbookPerformance.species.map((row) => row.label)
+        : dashData.species.map((row) => row.species);
+      const sourceCities = workbookPerformance
+        ? workbookPerformance.cities.map((row) => row.label)
+        : dashData.suburbs.map((row) => row.suburb);
 
       const proposalData: ProposalData = {
         territoryId: input.territoryId,
@@ -697,9 +713,11 @@ export const proposalRouter = router({
         state: location.state,
         country: location.country === "CA" ? "Canada" : "United States",
         currency: dashData.currency,
-        totalRevenue: dashData.total_revenue,
-        topSuburbs: dashData.suburbs.slice(0, 8).map((s) => s.suburb),
-        topSpecies: dashData.species.slice(0, 5).map((s) => s.species),
+        totalRevenue: workbookPerformance?.recordedInvoicePreTaxAmount ?? dashData.total_revenue,
+        workOrders: workbookPerformance?.workOrders ?? dashData.total_jobs,
+        salesSource: workbookPerformance ? "salesforce_drive_workbook" : "legacy_historical_snapshot",
+        topSuburbs: sourceCities.slice(0, 8),
+        topSpecies: sourceSpecies.slice(0, 5),
         seasonalTiming: getSeasonalTiming(location.state),
         analytics: buildProposalAnalytics(reportingAnalytics),
       };
@@ -720,7 +738,7 @@ export const proposalRouter = router({
     }),
 
   // Export the exact reviewed preview; no second AI call can change the copy.
-  exportPdf: publicProcedure
+  exportPdf: adminProcedure
     .input(z.object({ draftId: z.string().uuid() }))
     .mutation(async ({ input }) => {
       const draft = await getReportDraft(input.draftId, "proposal");

@@ -1,5 +1,18 @@
 # Skedaddle Franchise Portal — TODO
 
+## Workbook Reporting Integrity and Authorization (Sep 3, 2026)
+- [x] Replace browser-trusted local identity with a signed, HTTP-only server session and rate-limited login
+- [x] Restrict anonymous procedures to login/session/logout and health; enforce administrator-only generation, imports, reviews, and network commercial summaries
+- [x] Enforce franchise territory isolation in server procedures and direct client routes
+- [x] Repair duplicate-column/index defects in the clean Drizzle migration chain and add a migration-integrity regression test
+- [x] Apply one latest-12-completed-month window to workbook dashboard totals, species, cities, and network rankings
+- [x] Feed exact July 2025–June 2026 workbook aggregates into strategy reports and proposals with explicit historical fallback behavior
+- [x] Keep CAD and USD separate and label source counts/values as work orders and recorded pre-tax invoice values, not conversions or recognized revenue
+- [x] Add deterministic authentication fixtures to CI and validate TypeScript, 181 tests, and the production build locally
+- [ ] Review and commit the local `codex/workbook-integrity-fixes` branch, then push only with explicit Ay authorization
+- [ ] Configure a dedicated production `LOCAL_AUTH_SESSION_SECRET` and complete authenticated administrator/franchise runtime verification after an approved deployment
+- [ ] Verify the repaired migration chain against a disposable clean database before the next clean-environment install; do not rerun already-applied historical migrations against production
+
 ## Repository Updates Review (Aug 18, 2026)
 - [x] Inspect and assess newly available repository updates before integration — `codex/meeting-report-priorities` validated (76 passed, 1 skipped); needs one GSC query-scope safeguard before merge
 - [x] Publish and verify the merged `codex/meeting-report-priorities` update — safeguard, merge, database migration, TypeScript, and 76 passing tests complete
@@ -260,7 +273,7 @@
 - [x] Fix Denver (Colorado) missing from session rankings — reconciled as a stale task: no active session leaderboard exists, and Denver has durable direct GA4 coverage from its first eligible month, January 2025
 - [x] Reconcile direct GA4 mapping, durable coverage, and ranking inputs for Ottawa, Denver, Hamilton, and Milwaukee before changing any displayed territory ranking — documented aggregate-only review confirmed Milwaukee above Hamilton, Ottawa present, and Denver correctly pre-creation unavailable; no source/display defect found
 - [x] Replace the Network page’s static Salesforce revenue leaderboard with active Drive-workbook aggregates, split by verified currency and labelled partial when coverage is incomplete — production now renders the active partial workbook summary, separate CAD/USD ranks, and explicit exclusions without a T12 claim
-- [x] Add a public aggregate-only workbook network-performance contract for the active run, excluding customer-level fields and unapproved conversion/status semantics — `salesforceWorkbook.getNetworkPerformance` production contract and rendered table were verified with no raw source fields or conversion claim
+- [x] Add an aggregate-only workbook network-performance contract for the active run, excluding customer-level fields and unapproved conversion/status semantics — the production contract and rendered table were verified with no raw source fields or conversion claim; access is now administrator-only
 - [x] Flag GBP data as incomplete for multi-GBP territories (GBP disclaimer note added to Analytics.tsx)
 - [ ] Fix GBP post volume: 20-25 posts/month per sub-location for large territories
 - [x] Add corporate vs franchise distinction to territory data — active territory context now identifies the verified franchise reporting role and explicitly avoids an unsupported corporate ownership classification

@@ -238,7 +238,7 @@ export default function StrategyReportGenerator() {
                 {territories?.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name} — {t.city}, {t.state} ({t.country === "CA" ? "CAD" : "USD"}{" "}
-                    {t.revenue > 0 ? `$${(t.revenue / 1000000).toFixed(2)}M` : "No data"})
+                    {t.revenue !== null ? `$${(t.revenue / 1000000).toFixed(2)}M` : t.salesSummary})
                   </option>
                 ))}
               </select>

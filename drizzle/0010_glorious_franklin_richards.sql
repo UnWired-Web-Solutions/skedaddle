@@ -1,2 +1,1 @@
-ALTER TABLE `salesforce_workbook_aggregates` DROP INDEX `sf_workbook_aggregates_run_dimensions_unique`;--> statement-breakpoint
 ALTER TABLE `salesforce_workbook_aggregates` ADD CONSTRAINT `sf_workbook_aggregates_run_dimensions_unique` UNIQUE(`importRunId`,`territoryId`,`sourceTerritoryLabel`,`periodYear`,`periodMonth`,`statusLabel`,`speciesLabel`,`cityLabel`,`currencyCode`);

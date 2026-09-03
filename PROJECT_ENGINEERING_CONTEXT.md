@@ -1,7 +1,7 @@
 ---
 title: Skedaddle Engineering Context
 status: Active project workflow reference
-last_reviewed: 2026-09-01
+last_reviewed: 2026-09-03
 ---
 
 # Skedaddle Engineering Context
@@ -27,7 +27,9 @@ Do not treat an earlier completion claim as proof. Treat a request to investigat
 
 ## Architecture boundaries
 
-The portal uses React, Express, tRPC, Drizzle, and MySQL/TiDB. Custom local portal authentication is required. All portal tRPC procedures remain `publicProcedure`; server-side local authentication and role/territory gating enforce access. Do not introduce Manus OAuth `protectedProcedure` or `adminProcedure`, which are incompatible with the portal’s established access model.
+The portal uses React, Express, tRPC, Drizzle, and MySQL/TiDB. Custom local portal authentication creates a signed, HTTP-only, 12-hour session after checking the server-managed account registry. Browser storage and frontend route visibility are not authorization boundaries. Keep only login, session discovery/logout, and health public; use authenticated portal, territory-scoped, or administrator procedures according to the data and mutation risk. Franchise sessions may read only their configured territory. Paid generation, review mutations, imports, report/proposal/suburb generation, and network commercial summaries are administrator-only.
+
+The Drive-workbook dashboard window is the latest 12 completed UTC calendar months and applies identically to totals, species, cities, and network rankings. The initial strategy report and commercial proposal use the explicit July 2025–June 2026 contract across workbook, GA4, GSC, and GBP evidence. Strategy/proposal sales sections prefer the active matched-period workbook and may use the legacy snapshot only as an explicitly labelled fallback. Workbook invoice values are recorded pre-tax values, not recognized revenue, and record counts are work orders—not inspections, closed jobs, leads, or conversions.
 
 The daily Drive-workbook importer is deterministic, read-only at source, locked, audited, idempotent, revision-aware, and does not call an agent or language model. Do not create duplicate schedules or alter the workbook merely to test an import branch.
 

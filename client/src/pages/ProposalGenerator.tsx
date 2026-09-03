@@ -98,7 +98,8 @@ export default function ProposalGenerator() {
     setPdfUrl(null);
   };
 
-  const formatRevenue = (revenue: number, id: string) => {
+  const formatRevenue = (revenue: number | null, id: string) => {
+    if (revenue === null) return "Matched-period data loads after selection";
     const territory = territories?.find((t) => t.id === id);
     const symbol = territory?.country === "CA" ? "CA$" : "$";
     return revenue >= 1_000_000
@@ -195,7 +196,7 @@ export default function ProposalGenerator() {
                   <option value="">Choose a territory...</option>
                   {territories?.map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.name} — {formatRevenue(t.revenue, t.id)} T12 Revenue
+                      {t.name} — {formatRevenue(t.revenue, t.id)}
                     </option>
                   ))}
                 </select>
@@ -219,7 +220,7 @@ export default function ProposalGenerator() {
                   </div>
                   <div style={{ color: "oklch(0.75 0.18 140)", fontWeight: 600 }}>
                     {formatRevenue(selectedTerritoryData.revenue, selectedTerritoryData.id)}{" "}
-                    trailing 12-month revenue
+                    source-qualified sales context
                   </div>
                 </div>
               )}
@@ -516,7 +517,7 @@ export default function ProposalGenerator() {
               className="mt-4 text-xs"
               style={{ color: "oklch(0.65 0.010 80)", fontFamily: "Inter, sans-serif" }}
             >
-              The proposal auto-fills suburb names, revenue figures, seasonal timing, and
+              The proposal auto-fills city names, source-qualified sales figures, seasonal timing, and
               species data from the territory snapshot. Commercial terms always come from the confirmed inputs above; the opening narrative is generated once per draft.
             </div>
           </div>

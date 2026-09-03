@@ -27,9 +27,25 @@ function ProtectedRoute({
   component: React.ComponentType;
   adminOnly?: boolean;
 }) {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
+  if (isLoading) return null;
   if (!isAuthenticated) return <Redirect to="/login" />;
   if (adminOnly && user?.role !== "admin") return <Redirect to="/" />;
+  return <Component />;
+}
+
+function TerritoryProtectedRoute({
+  component: Component,
+}: {
+  component: React.ComponentType;
+}) {
+  const { isAuthenticated, isLoading, user } = useAuth();
+  const { id } = useParams<{ id: string }>();
+  if (isLoading) return null;
+  if (!isAuthenticated) return <Redirect to="/login" />;
+  if (user?.role === "franchise" && (!user.locationId || user.locationId !== id)) {
+    return <Redirect to={user.locationId ? `/location/${user.locationId}` : "/"} />;
+  }
   return <Component />;
 }
 
@@ -38,7 +54,9 @@ function LegacyReportRedirect() {
   return <Redirect to={`/location/${id}`} />;
 }
 function Router() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) return null;
 
   return (
     <Switch>
@@ -49,7 +67,7 @@ function Router() {
         <ProtectedRoute component={Home} />
       </Route>
       <Route path="/network">
-        <ProtectedRoute component={Network} />
+        <ProtectedRoute component={Network} adminOnly />
       </Route>
       <Route path="/tools">
         <ProtectedRoute component={Tools} />
@@ -58,19 +76,19 @@ function Router() {
         <ProtectedRoute component={Resources} adminOnly />
       </Route>
       <Route path="/location/:id">
-        <ProtectedRoute component={LocationDetail} />
+        <TerritoryProtectedRoute component={LocationDetail} />
       </Route>
       <Route path="/dashboard/:id">
-        <ProtectedRoute component={Dashboard} />
+        <TerritoryProtectedRoute component={Dashboard} />
       </Route>
       <Route path="/report/:id">
-        <ProtectedRoute component={LegacyReportRedirect} />
+        <TerritoryProtectedRoute component={LegacyReportRedirect} />
       </Route>
       <Route path="/trigger/:id">
-        <ProtectedRoute component={TriggerReport} />
+        <TerritoryProtectedRoute component={TriggerReport} />
       </Route>
       <Route path="/gbp-images">
-        <ProtectedRoute component={GbpImageGenerator} />
+        <ProtectedRoute component={GbpImageGenerator} adminOnly />
       </Route>
       <Route path="/analytics">
         <ProtectedRoute component={Analytics} />

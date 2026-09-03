@@ -20,7 +20,8 @@ describe("project engineering workflow", () => {
   it("preserves source, authentication, currency, and partial-data guardrails", () => {
     expect(projectContext).toContain("Google Drive workbook is the active Salesforce-derived source");
     expect(projectContext).toContain("Never combine CAD and USD");
-    expect(projectContext).toContain("publicProcedure");
+    expect(projectContext).toContain("signed, HTTP-only, 12-hour session");
+    expect(projectContext).toContain("Franchise sessions may read only their configured territory");
     expect(projectContext).toContain("Record partial coverage and source failures");
   });
 

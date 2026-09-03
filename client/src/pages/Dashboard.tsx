@@ -109,7 +109,7 @@ export default function Dashboard() {
     );
   }
 
-  const workbookMonths = workbookPerformance?.months.slice(-12) ?? [];
+  const workbookMonths = workbookPerformance?.months ?? [];
   const workbookSpecies = workbookPerformance?.species ?? [];
   const workbookCities = workbookPerformance?.cities ?? [];
   const workbookCurrencies = Array.from(new Set(workbookMonths.map(row => row.currencyCode)));
@@ -150,7 +150,7 @@ export default function Dashboard() {
         {/* ── KPI Strip ── */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 40 }}>
           <KpiCard icon={DollarSign} label={workbookCurrency ? `Recorded Invoice Value (${workbookCurrency})` : "Recorded Invoice Value"} value={totalWorkbookInvoiceRows > 0 ? formatWorkbookMoney(totalWorkbookInvoiceValue) : "Pending"} sub={totalWorkbookInvoiceRows > 0 ? "Workbook pre-tax amounts; not Salesforce API" : "No canonical workbook amount available"} color={SAGE} />
-          <KpiCard icon={Users} label="Workbook Work Orders" value={workbookMonths.length ? totalWorkbookJobs.toLocaleString() : "Pending"} sub={workbookMonths.length ? "Last 12 source months; all statuses" : "No canonical workbook snapshot available"} color={SAGE} />
+          <KpiCard icon={Users} label="Workbook Work Orders" value={workbookMonths.length ? totalWorkbookJobs.toLocaleString() : "Pending"} sub={workbookMonths.length ? `${workbookPerformance?.reportingWindow.label}; completed months; all source statuses` : "No canonical workbook snapshot available"} color={SAGE} />
           <KpiCard icon={TrendingUp} label="Top Species" value={workbookSpecies[0]?.label || "Pending"} sub={workbookSpecies[0] ? `${workbookSpecies[0].workOrders.toLocaleString()} recorded work orders` : "Workbook aggregate unavailable"} color={GOLD} />
           <KpiCard icon={MapPin} label="Top City" value={workbookCities[0]?.label || "Pending"} sub={workbookCities[0] ? `${workbookCities[0].workOrders.toLocaleString()} recorded work orders` : "Workbook aggregate unavailable"} color={GOLD} />
           {hasGsc && <KpiCard icon={Search} label="GSC Clicks" value={fmtN(data.gsc.total_clicks)} sub={`${gscTrend >= 0 ? "+" : ""}${gscTrend} vs prev month`} color={RUST} />}
@@ -168,7 +168,7 @@ export default function Dashboard() {
           <SectionHeader
             title="Salesforce-derived Work-Order Status"
             subtitle={workbookPerformance?.activeRun
-              ? `Google Drive workbook · ${workbookPerformance.activeRun.status} snapshot · ${workbookPerformance.activeRun.rowsRejected.toLocaleString()} source rows explicitly excluded from canonical territory aggregates`
+              ? `Google Drive workbook · ${workbookPerformance.reportingWindow.label} · ${workbookPerformance.activeRun.status} snapshot · ${workbookPerformance.activeRun.rowsRejected.toLocaleString()} source rows explicitly excluded from canonical territory aggregates`
               : "No active canonical workbook snapshot is available for this territory."}
           />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 18 }}>
@@ -191,7 +191,7 @@ export default function Dashboard() {
 
         {/* ── Workbook city table ── */}
         <div style={{ background: CREAM, borderRadius: 10, padding: 24, border: `1px solid ${MIST}`, marginBottom: 32 }}>
-            <SectionHeader title="Work Orders by City" subtitle="Active Google Drive workbook snapshot; not a suburb-page opportunity ranking" />
+            <SectionHeader title="Work Orders by City" subtitle={`${workbookPerformance?.reportingWindow.label ?? "Completed reporting window"}; same period as territory totals; not a suburb-page opportunity ranking`} />
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>

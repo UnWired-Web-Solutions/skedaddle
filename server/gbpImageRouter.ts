@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { publicProcedure, router } from "./_core/trpc";
+import { adminProcedure, router } from "./_core/trpc";
 import { invokeLLM } from "./_core/llm";
 import sharp from "sharp";
 import { storagePut } from "./storage";
@@ -946,17 +946,17 @@ function parseStoredQa(value: string | null): ImageQAResult | null {
 }
 
 export const gbpImageRouter = router({
-  getTerritories: publicProcedure.query(() => Object.entries(TERRITORIES).map(([id, t]) => ({
+  getTerritories: adminProcedure.query(() => Object.entries(TERRITORIES).map(([id, t]) => ({
     id,
     label: t.label,
     suburbs: t.suburbs,
   }))),
 
-  getSuburbs: publicProcedure
+  getSuburbs: adminProcedure
     .input(z.object({ territoryId: territoryIdSchema }))
     .query(({ input }) => TERRITORIES[input.territoryId].suburbs),
 
-  generateSingle: publicProcedure
+  generateSingle: adminProcedure
     .input(generationPostSchema)
     .mutation(async ({ input }) => generateSingleImage(
       input.title,
@@ -966,7 +966,7 @@ export const gbpImageRouter = router({
       { variationKey: input.variationKey, scheduledFor: input.scheduledFor },
     )),
 
-  generateBulk: publicProcedure
+  generateBulk: adminProcedure
     .input(z.object({ posts: z.array(generationPostSchema).min(1).max(50) }))
     .mutation(async ({ input }) => {
       cleanupOldJobs();
@@ -1075,7 +1075,7 @@ export const gbpImageRouter = router({
       return { jobId };
     }),
 
-  getJobStatus: publicProcedure
+  getJobStatus: adminProcedure
     .input(z.object({ jobId: z.string().min(1).max(64) }))
     .query(async ({ input }) => {
       const job = jobStore.get(input.jobId) || await readPersistedJob(input.jobId);
@@ -1093,7 +1093,7 @@ export const gbpImageRouter = router({
       };
     }),
 
-  listAssets: publicProcedure
+  listAssets: adminProcedure
     .input(z.object({
       territoryId: territoryIdSchema.optional(),
       status: z.enum(["draft", "in_review", "approved", "rejected", "posted"]).optional(),
@@ -1113,7 +1113,7 @@ export const gbpImageRouter = router({
       return { available: true as const, assets: rows.map((asset) => ({ ...asset, qa: parseStoredQa(asset.qaJson) })) };
     }),
 
-  updateAssetReview: publicProcedure
+  updateAssetReview: adminProcedure
     .input(z.object({
       id: z.number().int().positive(),
       status: z.enum(["draft", "in_review", "approved", "rejected"]),

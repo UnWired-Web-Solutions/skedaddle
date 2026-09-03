@@ -5,8 +5,49 @@ import {
   salesforceWorkbookImportRuns,
   salesforceWorkbookSources,
 } from "../drizzle/schema";
-import { publicProcedure, router } from "./_core/trpc";
+import { adminProcedure, portalProcedure, router, territoryProcedure } from "./_core/trpc";
 import { getDb } from "./db";
+
+export type WorkbookReportingWindow = {
+  start: { year: number; month: number };
+  end: { year: number; month: number };
+  label: string;
+};
+
+function shiftMonth(year: number, month: number, offset: number) {
+  const shifted = new Date(Date.UTC(year, month - 1 + offset, 1));
+  return { year: shifted.getUTCFullYear(), month: shifted.getUTCMonth() + 1 };
+}
+
+function monthLabel(period: { year: number; month: number }): string {
+  return `${period.year}-${String(period.month).padStart(2, "0")}`;
+}
+
+export function latestTwelveCompletedMonths(asOf = new Date()): WorkbookReportingWindow {
+  const end = shiftMonth(asOf.getUTCFullYear(), asOf.getUTCMonth() + 1, -1);
+  const start = shiftMonth(end.year, end.month, -11);
+  return { start, end, label: `${monthLabel(start)} through ${monthLabel(end)}` };
+}
+
+function calendarYearThroughCompletedMonth(year: number, asOf = new Date()): WorkbookReportingWindow {
+  const latestCompleted = latestTwelveCompletedMonths(asOf).end;
+  const end = year < latestCompleted.year
+    ? { year, month: 12 }
+    : year === latestCompleted.year
+      ? latestCompleted
+      : { year, month: 0 };
+  return {
+    start: { year, month: 1 },
+    end,
+    label: end.month > 0 ? `${year}-01 through ${monthLabel(end)}` : `${year} (no completed months yet)`,
+  };
+}
+
+function inWorkbookWindow(window: WorkbookReportingWindow) {
+  const start = window.start.year * 100 + window.start.month;
+  const end = window.end.year * 100 + window.end.month;
+  return sql`${salesforceWorkbookAggregates.periodYear} * 100 + ${salesforceWorkbookAggregates.periodMonth} BETWEEN ${start} AND ${end}`;
+}
 
 export function parseWorkbookCountJson(value: string | null): Record<string, number> {
   if (!value) return {};
@@ -22,7 +63,7 @@ export function parseWorkbookCountJson(value: string | null): Record<string, num
 }
 
 export const salesforceWorkbookRouter = router({
-  getStatus: publicProcedure.query(async () => {
+  getStatus: portalProcedure.query(async () => {
     const db = await getDb();
     if (!db) return { configured: false as const, source: null, latestRun: null };
     const sources = await db.select().from(salesforceWorkbookSources).orderBy(desc(salesforceWorkbookSources.updatedAt)).limit(1);
@@ -78,22 +119,23 @@ export const salesforceWorkbookRouter = router({
     };
   }),
 
-  getTerritoryMonthly: publicProcedure
+  getTerritoryMonthly: territoryProcedure
     .input(z.object({
       territoryId: z.string().min(1).max(64),
       year: z.number().int().min(2020).max(2100).optional(),
     }))
     .query(async ({ input }) => {
+      const reportingWindow = input.year ? calendarYearThroughCompletedMonth(input.year) : latestTwelveCompletedMonths();
       const db = await getDb();
-      if (!db) return { source: "unavailable" as const, run: null, months: [] };
+      if (!db) return { source: "unavailable" as const, run: null, months: [], reportingWindow };
       const sources = await db.select().from(salesforceWorkbookSources).orderBy(desc(salesforceWorkbookSources.updatedAt)).limit(1);
       const source = sources[0];
-      if (!source?.lastSuccessfulRunId) return { source: "unavailable" as const, run: null, months: [] };
+      if (!source?.lastSuccessfulRunId) return { source: "unavailable" as const, run: null, months: [], reportingWindow };
       const runRows = await db.select().from(salesforceWorkbookImportRuns)
         .where(eq(salesforceWorkbookImportRuns.id, source.lastSuccessfulRunId)).limit(1);
       const run = runRows[0];
       if (!run || (run.status !== "complete" && run.status !== "partial")) {
-        return { source: "unavailable" as const, run: null, months: [] };
+        return { source: "unavailable" as const, run: null, months: [], reportingWindow };
       }
       const filters = [
         eq(salesforceWorkbookAggregates.importRunId, run.id),
@@ -101,8 +143,8 @@ export const salesforceWorkbookRouter = router({
         eq(salesforceWorkbookAggregates.statusLabel, "__ALL__"),
         eq(salesforceWorkbookAggregates.speciesLabel, "__ALL__"),
         eq(salesforceWorkbookAggregates.cityLabel, "__ALL__"),
+        inWorkbookWindow(reportingWindow),
       ];
-      if (input.year) filters.push(eq(salesforceWorkbookAggregates.periodYear, input.year));
       const rows = await db.select({
         year: salesforceWorkbookAggregates.periodYear,
         month: salesforceWorkbookAggregates.periodMonth,
@@ -113,6 +155,7 @@ export const salesforceWorkbookRouter = router({
       }).from(salesforceWorkbookAggregates).where(and(...filters));
       return {
         source: "salesforce_drive_workbook" as const,
+        reportingWindow,
         run: {
           id: run.id,
           status: run.status,
@@ -124,10 +167,11 @@ export const salesforceWorkbookRouter = router({
       };
     }),
 
-  getTerritoryPerformance: publicProcedure
+  getTerritoryPerformance: territoryProcedure
     .input(z.object({ territoryId: z.string().min(1).max(64) }))
     .query(async ({ input }) => {
-      const unavailable = { source: "unavailable" as const, activeRun: null, months: [], species: [], cities: [], conversionMetric: "unavailable_pending_status_definition" as const };
+      const reportingWindow = latestTwelveCompletedMonths();
+      const unavailable = { source: "unavailable" as const, activeRun: null, reportingWindow, months: [], species: [], cities: [], conversionMetric: "unavailable_pending_status_definition" as const };
       const db = await getDb();
       if (!db) return unavailable;
       const sourceRows = await db.select().from(salesforceWorkbookSources).orderBy(desc(salesforceWorkbookSources.updatedAt)).limit(1);
@@ -140,6 +184,7 @@ export const salesforceWorkbookRouter = router({
       const baseFilters = [
         eq(salesforceWorkbookAggregates.importRunId, run.id),
         eq(salesforceWorkbookAggregates.territoryId, input.territoryId),
+        inWorkbookWindow(reportingWindow),
       ];
       const aggregateSelection = {
         label: salesforceWorkbookAggregates.speciesLabel,
@@ -204,6 +249,7 @@ export const salesforceWorkbookRouter = router({
       };
       return {
         source: "salesforce_drive_workbook" as const,
+        reportingWindow,
         activeRun: { id: run.id, status: run.status, rowsRejected: run.rowsRejected, activatedAt: run.activatedAt, maxSourceModifiedAt: run.maxSourceModifiedAt },
         months: months.map(row => ({ year: row.year, month: row.month, currencyCode: row.currencyCode, workOrders: Number(row.workOrders), invoiceValueRows: Number(row.invoiceValueRows), invoicePreTaxAmount: Number(row.invoicePreTaxAmount) })).sort((a, b) => a.year - b.year || a.month - b.month),
         species: summarize(speciesRows, "label"),
@@ -212,8 +258,9 @@ export const salesforceWorkbookRouter = router({
       };
     }),
 
-  getNetworkPerformance: publicProcedure.query(async () => {
-    const unavailable = { source: "unavailable" as const, activeRun: null, territories: [] };
+  getNetworkPerformance: adminProcedure.query(async () => {
+    const reportingWindow = latestTwelveCompletedMonths();
+    const unavailable = { source: "unavailable" as const, activeRun: null, reportingWindow, territories: [] };
     const db = await getDb();
     if (!db) return unavailable;
     const sourceRows = await db.select().from(salesforceWorkbookSources).orderBy(desc(salesforceWorkbookSources.updatedAt)).limit(1);
@@ -235,6 +282,7 @@ export const salesforceWorkbookRouter = router({
       eq(salesforceWorkbookAggregates.statusLabel, "__ALL__"),
       eq(salesforceWorkbookAggregates.speciesLabel, "__ALL__"),
       eq(salesforceWorkbookAggregates.cityLabel, "__ALL__"),
+      inWorkbookWindow(reportingWindow),
     )).groupBy(
       salesforceWorkbookAggregates.territoryId,
       salesforceWorkbookAggregates.currencyCode,
@@ -242,6 +290,7 @@ export const salesforceWorkbookRouter = router({
 
     return {
       source: "salesforce_drive_workbook" as const,
+      reportingWindow,
       activeRun: {
         id: run.id,
         status: run.status,

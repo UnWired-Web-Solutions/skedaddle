@@ -9,14 +9,17 @@ import { strategyReportRouter } from "./strategyReportRouter";
 import { suburbPageRouter } from "./suburbPageRouter";
 import { salesforceWorkbookRouter } from "./salesforceWorkbookRouter";
 import { localAuthRouter } from "./localAuthRouter";
+import { getLocalSessionCookieOptions, isLocalSessionUser, LOCAL_AUTH_COOKIE_NAME } from "./localAuthSession";
 
 export const appRouter = router({
   system: systemRouter,
   auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
+    me: publicProcedure.query(({ ctx }) => isLocalSessionUser(ctx.user) ? null : ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      const localCookieOptions = getLocalSessionCookieOptions(ctx.req);
+      ctx.res.clearCookie(LOCAL_AUTH_COOKIE_NAME, { ...localCookieOptions, maxAge: -1 });
       return { success: true } as const;
     }),
   }),

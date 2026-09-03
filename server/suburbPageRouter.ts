@@ -10,7 +10,7 @@
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { suburbPages } from "../drizzle/schema";
-import { publicProcedure, router } from "./_core/trpc";
+import { adminProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
 import { getTerritorySpeciesContext, type TerritorySpeciesContext } from "./suburbContentSources";
 import { buildSuburbSchema, type SuburbSchemaParams } from "./templates/suburbPageSchema";
@@ -361,9 +361,9 @@ const generationInput = z.object({
 });
 
 export const suburbPageRouter = router({
-  getTerritories: publicProcedure.query(() => TERRITORY_CATALOG),
+  getTerritories: adminProcedure.query(() => TERRITORY_CATALOG),
 
-  getTerritoryContext: publicProcedure
+  getTerritoryContext: adminProcedure
     .input(z.object({ territoryId: z.string().min(1).max(64) }))
     .query(async ({ input }) => {
       const territory = getTerritoryCatalogEntry(input.territoryId);
@@ -382,7 +382,7 @@ export const suburbPageRouter = router({
       };
     }),
 
-  generate: publicProcedure
+  generate: adminProcedure
     .input(generationInput)
     .mutation(async ({ input }) => {
       const content = await generateSuburbPageContent(input.territoryId, input.suburbName, input);
@@ -405,7 +405,7 @@ export const suburbPageRouter = router({
       return { id: inserted.insertId, content };
     }),
 
-  list: publicProcedure
+  list: adminProcedure
     .input(z.object({ territoryId: z.string().optional() }).optional())
     .query(async ({ input }) => {
       const db = await getDb();
@@ -414,7 +414,7 @@ export const suburbPageRouter = router({
       return db.select().from(suburbPages).orderBy(desc(suburbPages.generatedAt));
     }),
 
-  getPage: publicProcedure
+  getPage: adminProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .query(async ({ input }) => {
       const db = await getDb();
@@ -424,7 +424,7 @@ export const suburbPageRouter = router({
       return { ...page, content: JSON.parse(page.contentJson || "{}") as SuburbPageContent, schema: JSON.parse(page.schemaJson || "[]") };
     }),
 
-  updateStatus: publicProcedure
+  updateStatus: adminProcedure
     .input(z.object({
       id: z.number().int().positive(),
       status: z.enum(["draft", "in_review", "approved", "exported"]),

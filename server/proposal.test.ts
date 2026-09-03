@@ -108,6 +108,9 @@ describe("Proposal Generator", () => {
       expect(source).toContain("tokenBufferPercent");
       expect(source).toContain("Only the deliverables explicitly listed in the approved scope notes");
       expect(source).not.toContain('<td class="check">✓</td>');
+      expect(source).toContain("loadTerritoryWorkbookPerformance");
+      expect(source).not.toContain("Total closed revenue");
+      expect(source).not.toContain("generated ${revenueFormatted} in closed revenue");
     });
   });
 

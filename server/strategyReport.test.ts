@@ -118,6 +118,7 @@ describe("Strategy Report Router", { timeout: 15_000 }, () => {
       end: "2026-06-30",
       label: "2025-07 through 2026-06",
     });
+    expect(data.salesDataSource).toMatch(/^(salesforce_drive_workbook|legacy_historical_snapshot)$/);
 
     // Derived fields
     expect(data.topSpeciesNames.length).toBeGreaterThan(0);
@@ -192,19 +193,19 @@ describe("Strategy Report Router", { timeout: 15_000 }, () => {
     const source = readFileSync(resolve(process.cwd(), "server/strategyReportRouter.ts"), "utf8");
     expect(source).toContain("Work-Order Data Status");
     expect(source).toContain("unavailable pending an approved status definition");
-    expect(source).toContain("historical sales snapshot");
+    expect(source).toContain("active UWS Google Drive workbook");
     expect(source).not.toContain("Use closed revenue, jobs, inspections, close rate");
     expect(source).not.toContain("<strong>Data Sources:</strong> Salesforce CRM");
-    expect(source).toContain("Historical Revenue Snapshot");
+    expect(source).toContain("Recorded invoice value (pre-tax)");
   });
 
-  it("qualifies historical revenue and job context in active report prompts and deterministic gap narratives", () => {
+  it("uses matched-period workbook values when available and keeps a labelled historical fallback", () => {
     const source = readFileSync(resolve(process.cwd(), "server/strategyReportRouter.ts"), "utf8");
-    expect(source).toContain("historical-snapshot revenue order");
-    expect(source).toContain("Historical source context: the listed revenue and job figures are from a prior sales snapshot, not current Google Drive workbook values.");
-    expect(source).toContain("historical-snapshot demand mix");
-    expect(source).toContain("explicitly labels key revenue/jobs metrics as historical sales-snapshot context");
-    expect(source).toContain("not current Google Drive workbook values");
+    expect(source).toContain("matched-period workbook value");
+    expect(source).toContain("Historical source context: the listed revenue and job figures are from a prior sales snapshot");
+    expect(source).toContain("work-order counts and recorded pre-tax invoice values come from the active UWS Google Drive workbook");
+    expect(source).toContain("are not inspections, closed jobs, recognized revenue, leads, or conversion evidence");
+    expect(source).toContain("loadTerritoryWorkbookPerformance");
   });
 
   it("uses the strongest approved non-Claude internal narrative path without direct Anthropic transport", () => {
