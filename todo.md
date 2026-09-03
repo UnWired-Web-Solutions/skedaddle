@@ -1,8 +1,8 @@
 # Skedaddle Franchise Portal — TODO
 
 ## Repository Updates Review (Aug 18, 2026)
-- [ ] Inspect, review, and safely integrate the newly available repository update; preserve source-provenance and authentication safeguards and verify the result before publishing
-- [ ] Selectively adapt safe workbook reporting-window and migration-integrity improvements from `codex/workbook-integrity-fixes`; preserve public procedures, fail-closed source rules, and current active-content protections
+- [x] Inspect, review, and safely integrate the newly available repository update; preserve source-provenance and authentication safeguards and verify the result before publishing — reviewed `codex/workbook-integrity-fixes`, selectively adapted compatible safeguards, and production-verified the completed-month aggregate disclosures
+- [x] Selectively adapt safe workbook reporting-window and migration-integrity improvements from `codex/workbook-integrity-fixes`; preserve public procedures, fail-closed source rules, and current active-content protections — focused/full local tests and clean build passed; production verification confirmed the completed-month disclosure and bounded public login rate limit, while the migration-chain test and duplicate-statement repair remain clean-install safeguards validated locally
 - [x] Write a Codex-facing Markdown handoff that records adopted changes and the authorization, static-data, and stale-documentation changes intentionally omitted — `CODEX_WORKBOOK_INTEGRITY_ADAPTATION_2026-09-03.md` records the exact selective-adaptation and omission decisions
 - [x] Inspect and assess newly available repository updates before integration — `codex/meeting-report-priorities` validated (76 passed, 1 skipped); needs one GSC query-scope safeguard before merge
 - [x] Publish and verify the merged `codex/meeting-report-priorities` update — safeguard, merge, database migration, TypeScript, and 76 passing tests complete
