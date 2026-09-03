@@ -5,6 +5,7 @@ import {
   ga4TerritoryPages,
   gscPageMetrics,
   gscQueryMetrics,
+  salesforceWorkbookAggregates,
   salesforceWorkbookImportRuns,
   salesforceWorkbookSources,
 } from "../drizzle/schema";
@@ -278,6 +279,217 @@ export async function loadTerritoryWorkbookSourceStatus() {
     maxSourceModifiedAt: run.maxSourceModifiedAt,
     conversionMetric: "unavailable_pending_status_definition" as const,
   };
+}
+
+export type WorkbookAggregatePeriodRow = {
+  year: number;
+  month: number;
+  currencyCode: string;
+  workOrders: number;
+  invoiceValueRows: number;
+  invoicePreTaxAmount: number;
+};
+
+export type WorkbookAggregateBreakdownRow = {
+  label: string;
+  currencyCode: string;
+  workOrders: number;
+  invoiceValueRows: number;
+  invoicePreTaxAmount: number;
+};
+
+export type TerritoryWorkbookAggregateSnapshot = {
+  source: "salesforce_drive_workbook";
+  currencyCode: "CAD" | "USD";
+  reportingWindow: ReportingWindow;
+  reportingPeriodLabel: string;
+  activeRun: {
+    id: number;
+    status: "complete" | "partial";
+    rowsProcessed: number;
+    rowsRejected: number;
+    activatedAt: Date | null;
+    maxSourceModifiedAt: string | null;
+  };
+  totals: {
+    workOrders: number;
+    invoiceValueRows: number;
+    invoicePreTaxAmount: number;
+  };
+  sameCurrencyNetworkBenchmark: {
+    workOrders: number;
+    invoiceValueRows: number;
+    invoicePreTaxAmount: number;
+  };
+  months: WorkbookAggregatePeriodRow[];
+  species: WorkbookAggregateBreakdownRow[];
+  cities: WorkbookAggregateBreakdownRow[];
+  conversionMetric: "unavailable_pending_status_definition";
+};
+
+type WorkbookAggregateQueryRow = {
+  label: string;
+  currencyCode: string;
+  workOrders: number | string;
+  invoiceValueRows: number | string;
+  invoicePreTaxAmount: number | string;
+};
+
+/** Keeps approved aggregate values separated by currency; raw workbook rows are never loaded. */
+export function summarizeWorkbookAggregateRows(
+  rows: WorkbookAggregateQueryRow[],
+): WorkbookAggregateBreakdownRow[] {
+  const totals = new Map<string, WorkbookAggregateBreakdownRow>();
+  for (const row of rows) {
+    const label = row.label.trim();
+    const currencyCode = row.currencyCode.trim();
+    if (!label || !currencyCode) continue;
+    const key = `${currencyCode}\u0000${label}`;
+    const current = totals.get(key) ?? {
+      label,
+      currencyCode,
+      workOrders: 0,
+      invoiceValueRows: 0,
+      invoicePreTaxAmount: 0,
+    };
+    current.workOrders += Number(row.workOrders);
+    current.invoiceValueRows += Number(row.invoiceValueRows);
+    current.invoicePreTaxAmount += Number(row.invoicePreTaxAmount);
+    totals.set(key, current);
+  }
+  return Array.from(totals.values()).sort((a, b) => (
+    a.currencyCode.localeCompare(b.currencyCode)
+    || b.invoicePreTaxAmount - a.invoicePreTaxAmount
+    || b.workOrders - a.workOrders
+    || a.label.localeCompare(b.label)
+  ));
+}
+
+/**
+ * Loads facts only from the active Drive-workbook aggregate run for the exact
+ * reporting window. It fails closed, never reads raw workbook rows, and never
+ * infers conversion or combines currencies.
+ */
+export async function loadTerritoryWorkbookAggregate(
+  territoryId: string,
+  currencyCode: "CAD" | "USD",
+  window: ReportingWindow = INITIAL_SALES_REPORT_WINDOW,
+): Promise<TerritoryWorkbookAggregateSnapshot | null> {
+  const db = await getDb();
+  if (!db) return null;
+  try {
+    const [source] = await db.select().from(salesforceWorkbookSources)
+      .orderBy(desc(salesforceWorkbookSources.updatedAt)).limit(1);
+    if (!source?.lastSuccessfulRunId) return null;
+    const [run] = await db.select().from(salesforceWorkbookImportRuns)
+      .where(eq(salesforceWorkbookImportRuns.id, source.lastSuccessfulRunId)).limit(1);
+    if (!run || (run.status !== "complete" && run.status !== "partial")) return null;
+
+    const period = inWindowSql(
+      salesforceWorkbookAggregates.periodYear,
+      salesforceWorkbookAggregates.periodMonth,
+      window,
+    );
+    const baseFilters = [
+      eq(salesforceWorkbookAggregates.importRunId, run.id),
+      eq(salesforceWorkbookAggregates.territoryId, territoryId),
+      eq(salesforceWorkbookAggregates.currencyCode, currencyCode),
+      period,
+    ];
+    const aggregateSelection = {
+      label: salesforceWorkbookAggregates.speciesLabel,
+      currencyCode: salesforceWorkbookAggregates.currencyCode,
+      workOrders: sql<number>`SUM(${salesforceWorkbookAggregates.recordCount})`,
+      invoiceValueRows: sql<number>`SUM(${salesforceWorkbookAggregates.invoiceValueCount})`,
+      invoicePreTaxAmount: sql<string>`SUM(${salesforceWorkbookAggregates.invoicePreTaxAmount})`,
+    };
+
+    const [monthRows, speciesRows, cityRows, networkRows] = await Promise.all([
+      db.select({
+        year: salesforceWorkbookAggregates.periodYear,
+        month: salesforceWorkbookAggregates.periodMonth,
+        currencyCode: salesforceWorkbookAggregates.currencyCode,
+        workOrders: sql<number>`SUM(${salesforceWorkbookAggregates.recordCount})`,
+        invoiceValueRows: sql<number>`SUM(${salesforceWorkbookAggregates.invoiceValueCount})`,
+        invoicePreTaxAmount: sql<string>`SUM(${salesforceWorkbookAggregates.invoicePreTaxAmount})`,
+      }).from(salesforceWorkbookAggregates).where(and(
+        ...baseFilters,
+        eq(salesforceWorkbookAggregates.statusLabel, "__ALL__"),
+        eq(salesforceWorkbookAggregates.speciesLabel, "__ALL__"),
+        eq(salesforceWorkbookAggregates.cityLabel, "__ALL__"),
+      )).groupBy(
+        salesforceWorkbookAggregates.periodYear,
+        salesforceWorkbookAggregates.periodMonth,
+        salesforceWorkbookAggregates.currencyCode,
+      ),
+      db.select(aggregateSelection).from(salesforceWorkbookAggregates).where(and(
+        ...baseFilters,
+        eq(salesforceWorkbookAggregates.statusLabel, "__ALL__"),
+        eq(salesforceWorkbookAggregates.cityLabel, "__ALL__"),
+        ne(salesforceWorkbookAggregates.speciesLabel, "__ALL__"),
+      )).groupBy(salesforceWorkbookAggregates.speciesLabel, salesforceWorkbookAggregates.currencyCode),
+      db.select({ ...aggregateSelection, label: salesforceWorkbookAggregates.cityLabel }).from(salesforceWorkbookAggregates).where(and(
+        ...baseFilters,
+        eq(salesforceWorkbookAggregates.statusLabel, "__ALL__"),
+        eq(salesforceWorkbookAggregates.speciesLabel, "__ALL__"),
+        ne(salesforceWorkbookAggregates.cityLabel, "__ALL__"),
+      )).groupBy(salesforceWorkbookAggregates.cityLabel, salesforceWorkbookAggregates.currencyCode),
+      db.select({
+        workOrders: sql<number>`SUM(${salesforceWorkbookAggregates.recordCount})`,
+        invoiceValueRows: sql<number>`SUM(${salesforceWorkbookAggregates.invoiceValueCount})`,
+        invoicePreTaxAmount: sql<string>`SUM(${salesforceWorkbookAggregates.invoicePreTaxAmount})`,
+      }).from(salesforceWorkbookAggregates).where(and(
+        eq(salesforceWorkbookAggregates.importRunId, run.id),
+        eq(salesforceWorkbookAggregates.currencyCode, currencyCode),
+        eq(salesforceWorkbookAggregates.statusLabel, "__ALL__"),
+        eq(salesforceWorkbookAggregates.speciesLabel, "__ALL__"),
+        eq(salesforceWorkbookAggregates.cityLabel, "__ALL__"),
+        period,
+      )),
+    ]);
+    if (monthRows.length === 0) return null;
+    const totals = monthRows.reduce((total, row) => ({
+      workOrders: total.workOrders + Number(row.workOrders),
+      invoiceValueRows: total.invoiceValueRows + Number(row.invoiceValueRows),
+      invoicePreTaxAmount: total.invoicePreTaxAmount + Number(row.invoicePreTaxAmount),
+    }), { workOrders: 0, invoiceValueRows: 0, invoicePreTaxAmount: 0 });
+    const network = networkRows[0];
+
+    return {
+      source: "salesforce_drive_workbook",
+      currencyCode,
+      reportingWindow: window,
+      reportingPeriodLabel: reportingWindowLabel(window),
+      activeRun: {
+        id: run.id,
+        status: run.status,
+        rowsProcessed: run.rowsProcessed,
+        rowsRejected: run.rowsRejected,
+        activatedAt: run.activatedAt,
+        maxSourceModifiedAt: run.maxSourceModifiedAt,
+      },
+      totals,
+      sameCurrencyNetworkBenchmark: {
+        workOrders: Number(network?.workOrders ?? 0),
+        invoiceValueRows: Number(network?.invoiceValueRows ?? 0),
+        invoicePreTaxAmount: Number(network?.invoicePreTaxAmount ?? 0),
+      },
+      months: monthRows.map(row => ({
+        year: row.year,
+        month: row.month,
+        currencyCode: row.currencyCode,
+        workOrders: Number(row.workOrders),
+        invoiceValueRows: Number(row.invoiceValueRows),
+        invoicePreTaxAmount: Number(row.invoicePreTaxAmount),
+      })).sort((a, b) => a.year - b.year || a.month - b.month || a.currencyCode.localeCompare(b.currencyCode)),
+      species: summarizeWorkbookAggregateRows(speciesRows),
+      cities: summarizeWorkbookAggregateRows(cityRows),
+      conversionMetric: "unavailable_pending_status_definition",
+    };
+  } catch (error) {
+    console.warn(`[ReportingData] Workbook aggregate unavailable for ${territoryId}/${reportingWindowLabel(window)}:`, error);
+    return null;
+  }
 }
 
 export async function findSuburbAnalyticsEvidence(territoryId: string, suburbName: string) {

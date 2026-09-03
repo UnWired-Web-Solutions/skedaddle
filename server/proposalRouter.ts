@@ -1,15 +1,17 @@
 import { z } from "zod";
-import { publicProcedure, router } from "./_core/trpc";
-import { ENV } from "./_core/env";
+import { adminProcedure, router } from "./_core/trpc";
 import { invokeLLM } from "./_core/llm";
 import { storagePut } from "./storage";
 import puppeteer from "puppeteer";
 import {
   loadTerritoryReportingAnalytics,
+  loadTerritoryWorkbookAggregate,
   type ReportingAnalyticsSnapshot,
+  type TerritoryWorkbookAggregateSnapshot,
 } from "./territoryReportingData";
 import { INITIAL_SALES_REPORT_WINDOW, reportingMonthIso } from "../shared/reportingPeriod";
 import { createReportDraft, getReportDraft, markReportDraftExported } from "./reportDraftStore";
+import { getTerritoryCatalogEntry, TERRITORY_CATALOG } from "./territoryCatalog";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -20,10 +22,7 @@ interface ProposalData {
   state: string;
   country: string;
   currency: "CAD" | "USD";
-  totalRevenue: number;
-  topSuburbs: string[];
-  topSpecies: string[];
-  seasonalTiming: string;
+  workbook: TerritoryWorkbookAggregateSnapshot | null;
   analytics: {
     available: boolean;
     hasGsc: boolean;
@@ -105,83 +104,39 @@ function escapeHtml(value: string): string {
   } as Record<string, string>)[character] || character);
 }
 
-// ─── Seasonal data by region ─────────────────────────────────────────────────
-
-const SEASONAL_DATA: Record<string, string> = {
-  // Canadian territories
-  "ON": "raccoon denning in May and June, bat maternity exclusion window in August, mice entry peak in September and October, squirrel attic activity in spring and fall",
-  "BC": "spring bat emergence and roosting in April, raccoon denning in May, rat activity year-round with peaks in fall, squirrel attic entry in spring and fall",
-  "QC": "raccoon denning in May and June, bat maternity colonies forming in June, mice seeking entry in September and October, squirrel activity in spring and fall",
-  // US territories
-  "MN": "spring bat emergence in April, raccoon denning in May, summer squirrel attic activity, fall rodent entry from September through November",
-  "WI": "spring bat emergence in April, raccoon denning in May, summer squirrel attic activity, fall rodent entry from September through November",
-  "OH": "spring raccoon denning in April and May, bat maternity colonies in June, fall mice and squirrel entry from September, winter rodent pressure through December",
-  "CO": "spring raccoon activity in April, bat emergence in May, summer squirrel attic entry, fall mice and rat entry from September through November",
-  "GA": "year-round raccoon and squirrel activity, bat maternity colonies from April through August, fall rodent entry from October, winter attic denning from December",
-  "MD": "spring raccoon denning in April and May, bat maternity colonies from May through August, fall squirrel and mice entry from September, winter rodent pressure",
-  "PA": "spring raccoon denning in April and May, bat maternity exclusion window from June through August, fall rodent entry from September, winter mice and squirrel pressure",
-  // Default
-  "default": "spring wildlife emergence and denning activity, summer bat maternity season, fall rodent entry pressure, winter attic denning and overwintering",
-};
-
-function getSeasonalTiming(state: string): string {
-  return SEASONAL_DATA[state] || SEASONAL_DATA["default"];
+function workbookContextSummary(workbook: TerritoryWorkbookAggregateSnapshot | null): string {
+  if (!workbook) return "No active Drive-workbook aggregate is available for this reporting window. Sales context is unavailable and must not be inferred.";
+  const cityLabels = workbook.cities.slice(0, 8).map(row => row.label).join(", ") || "no city categories";
+  const speciesLabels = workbook.species.slice(0, 8).map(row => row.label).join(", ") || "no species categories";
+  return `Active Drive-workbook aggregate: ${workbook.activeRun.status}; reporting period ${workbook.reportingPeriodLabel}; ${workbook.activeRun.rowsRejected} rejected source rows; city categories ${cityLabels}; species categories ${speciesLabels}; conversion is unavailable pending an approved status definition. This context is aggregate-only and must not be framed as local demand, closed revenue, ranking, service coverage, or a conversion result.`;
 }
 
-// ─── Claude Opus 5 narrative generation ──────────────────────────────────────
+// ─── Internal GPT proposal narrative generation ───────────────────────────────
 
 async function generateProposalNarrative(data: ProposalData): Promise<string> {
-  const apiKey = ENV.anthropicApiKey;
-
-  const currencySymbol = data.currency === "CAD" ? "CA$" : "$";
-  const revenueFormatted = `${currencySymbol}${(data.totalRevenue / 1000000).toFixed(1)}M`;
-  const suburbList = data.topSuburbs.slice(0, 6).join(", ");
-  const speciesList = data.topSpecies.slice(0, 4).join(", ");
+  const workbookSummary = workbookContextSummary(data.workbook);
 
   const prompt = `You are writing the opening paragraph for a franchise digital marketing proposal for Skedaddle Humane Wildlife Control. This is the "${data.territoryName}" territory (${data.city}, ${data.state}, ${data.country}).
 
-Key data points:
+Approved context:
 - Territory: ${data.territoryName}
-- Total closed revenue (2025-07-01 through 2026-06-30): ${revenueFormatted}
-- Top suburbs by revenue: ${suburbList}
-- Top species by revenue: ${speciesList}
-- Seasonal wildlife timing: ${data.seasonalTiming}
+- Workbook context: ${workbookSummary}
 - Search evidence: ${data.analytics.hasGsc ? `${data.analytics.organicClicks.toLocaleString("en-US")} Search Console clicks and ${data.analytics.searchImpressions.toLocaleString("en-US")} impressions across ${data.analytics.gscMonths} imported months (${data.analytics.gscPeriod})` : "No persisted Search Console import is available"}
 - GA4 evidence: ${data.analytics.hasGa4 ? `${data.analytics.priorityPageSessions.toLocaleString("en-US")} species/location-page sessions across ${data.analytics.ga4Months} imported months (${data.analytics.ga4Period}; ${data.analytics.ga4Coverage})` : "No persisted GA4 import is available"}
 
 Write a compelling 3-4 sentence opening paragraph that:
-1. Names the territory and frames the opportunity (high-intent local searches, growing market)
-2. References the revenue figure as proof of demand and uses measured search data only when it is available
-3. Mentions 2-3 specific suburbs that drive the highest value
-4. Positions the proposal as a structured program to grow organic visibility and convert more traffic into closed revenue
+1. Names the territory and explains that the proposal turns the approved scope into a reviewable marketing program.
+2. Uses measured search data only if it is supplied above, with the stated coverage.
+3. Treats Drive-workbook categories as aggregate planning context only; do not claim local demand, revenue, job totals, rankings, conversion, service coverage, availability, or seasonality.
+4. States that priorities, local facts, and content claims require editorial review before publication.
 
-Style: Professional but direct. No fluff. Written as if from a senior digital marketing strategist who knows this specific market. Do NOT sound like AI. Do NOT use phrases like "leverage," "harness," or "cutting-edge." Write like a person who has studied this territory's data.
+Style: Professional but direct. No fluff. Do NOT sound like AI. Do NOT use phrases like "leverage," "harness," or "cutting-edge." Do not promise rankings, traffic, leads, calls, revenue, or conversions.
 
 Return ONLY the paragraph text, no quotes or formatting.`;
 
-  if (apiKey) {
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      try {
-        const resp = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-          body: JSON.stringify({ model: "claude-opus-5", max_tokens: 500, messages: [{ role: "user", content: prompt }] }),
-        });
-        if (resp.ok) {
-          const result = await resp.json() as { content: Array<{ text: string }> };
-          const text = result.content[0]?.text?.trim() || "";
-          if (text.length > 40) return text;
-        } else {
-          console.error("Anthropic proposal narrative error:", resp.status, await resp.text());
-        }
-      } catch (error) {
-        console.error("Anthropic proposal narrative request failed:", error);
-      }
-    }
-  }
   try {
     const result = await invokeLLM({
-      model: "claude-opus-4-7",
+      model: "gpt-5.5",
       messages: [{ role: "user", content: prompt }],
       max_tokens: 500,
     });
@@ -190,16 +145,16 @@ Return ONLY the paragraph text, no quotes or formatting.`;
       ? content.map((part: any) => part.type === "text" ? part.text : "").join("") : "";
     if (text.trim().length > 40) return text.trim();
   } catch (error) {
-    console.error("Fallback proposal narrative request failed:", error);
+    console.error("Internal proposal narrative request failed:", error);
   }
-  return `The ${data.territoryName} territory generated ${revenueFormatted} in closed revenue from July 2025 through June 2026, with demand concentrated in ${data.topSuburbs.slice(0, 3).join(", ")}. The strongest species categories are ${speciesList}. This proposal presents the operator-approved scope for improving measured local visibility and turning more qualified demand into inspections and closed work.`;
+  return `This proposal outlines an approved digital marketing program for ${data.territoryName}. It uses available analytics and the active Drive-workbook aggregate only as disclosed planning context; where a source is unavailable or partial, the proposal does not infer a performance result. Local claims, content priorities, and final deliverables remain subject to the approved scope and editorial review.`;
 }
 
 // ─── HTML Template ───────────────────────────────────────────────────────────
 
 function buildProposalHtml(data: ProposalData, narrative: string, config: ProposalConfig): string {
-  const suburbList = data.topSuburbs.slice(0, 6).join(", ");
-  const seasonalTiming = data.seasonalTiming;
+  const cityList = data.workbook?.cities.slice(0, 6).map(row => row.label).join(", ") || "review-required local areas";
+  const workbookSummary = workbookContextSummary(data.workbook);
   const money = (amount: number) => (data.currency === "CAD" ? "CA$" : "$") + amount.toLocaleString("en-US");
   const tokenBuffer = config.estimatedTokenCost * (config.tokenBufferPercent / 100);
   const estimatedImplementationTotal = config.implementationFee + config.estimatedTokenCost + tokenBuffer;
@@ -450,34 +405,35 @@ function buildProposalHtml(data: ProposalData, narrative: string, config: Propos
   </div>
   
   <h1>Franchise Digital Marketing Proposal</h1>
-  <p class="subtitle">Prepared for ${data.territoryName} · Reporting period July 2025–June 2026 · Generated ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
+  <p class="subtitle">Prepared for ${data.territoryName} · Source period ${escapeHtml(data.workbook?.reportingPeriodLabel ?? "unavailable")} · Generated ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
   
   <h2>The Opportunity</h2>
   <p class="narrative">${safeNarrative}</p>
   <div class="includes-box"><strong>Measured digital baseline:</strong> ${data.analytics.available ? `${data.analytics.hasGsc ? `${data.analytics.organicClicks.toLocaleString("en-US")} Search Console clicks and ${data.analytics.searchImpressions.toLocaleString("en-US")} impressions across ${data.analytics.gscMonths} imported months (${data.analytics.gscPeriod}).` : "No persisted Search Console import."} ${data.analytics.hasGa4 ? `${data.analytics.priorityPageSessions.toLocaleString("en-US")} GA4 species/location-page sessions across ${data.analytics.ga4Months} imported months (${data.analytics.ga4Period}); coverage: ${data.analytics.ga4Coverage}.` : "No persisted GA4 import."}` : "No persisted GA4 or Search Console import is available for this proposal. Performance claims are intentionally omitted."}</div>
+  <div class="includes-box"><strong>Workbook context:</strong> ${escapeHtml(workbookSummary)}</div>
   
   <h2>Recommended Program Framework</h2>
   <p>The following workstreams explain the strategy. They are not purchased deliverables unless they appear in the approved scope notes and selected package.</p>
   
   <h3>Website Content Architecture</h3>
   <ul>
-    <li>Audit dedicated location and suburb hubs for ${suburbList}; build only the pages and counts explicitly approved in scope.</li>
+    <li>Audit dedicated location and suburb hubs for ${cityList}; build only the pages and counts explicitly approved in scope.</li>
     <li>Consider neighborhood targeting only after suburb hubs are verified and separately approved.</li>
     <li>Audit species pages for search intent and conversion before recommending rewrites or additions.</li>
-    <li>Seasonal and educational content timed to ${data.territoryName}'s wildlife biology calendar — ${seasonalTiming} — that pre-qualifies prospects and sets pricing expectations before the inspection occurs.</li>
+    <li>Select educational and seasonal themes only after editorial research, local-fact verification, and written approval; no service, pricing, or availability claim is implied here.</li>
   </ul>
   
   <h3>Google Business Profile Optimization & Management</h3>
   <ul>
     <li>Ongoing optimization of your existing GBP listings — service categories, description, photo refresh, Q&A, and profile completeness reviewed and updated on a consistent basis.</li>
-    <li>Monthly post program using a proven structure: species or seasonal hook, local ${data.territoryName} suburb signal (${data.topSuburbs.slice(0, 4).join(", ")}), service proof, and a direct call-to-action.</li>
-    <li>Post volume scales by package tier — higher frequency drives stronger local pack visibility and more call conversions during ${data.territoryName}'s peak wildlife seasons.</li>
+    <li>Monthly post topics and any local references require source review and approval before publication.</li>
+    <li>Post volume scales by the approved package tier; content volume is not presented as a visibility, call, or conversion guarantee.</li>
   </ul>
   
   <h3>Future Performance Strategy (Not Included Unless Approved)</h3>
   <ul>
-    <li>A later performance phase can review organic performance, GBP data, and species activity across the ${data.territoryName} territory to set the next content calendar.</li>
-    <li>Strategy is aligned to ${data.territoryName}'s seasonal wildlife patterns — ${seasonalTiming} — so your content is relevant when local search demand peaks.</li>
+    <li>A later performance phase can review only the sources available at that time, with their coverage and limitations stated explicitly.</li>
+    <li>The next content calendar requires independently reviewed research and approved local facts before claims are published.</li>
   </ul>
   
   <h3>Analytics & Reporting</h3>
@@ -599,7 +555,7 @@ function buildProposalHtml(data: ProposalData, narrative: string, config: Propos
   <div class="next-steps">
     <ul>
       <li>Choose the package tier that fits your growth goals for the ${data.territoryName} territory this season.</li>
-      <li>We'll schedule a kickoff call to map your priority suburbs (${data.topSuburbs.slice(0, 3).join(", ")} first), confirm the species content calendar, and set the initial GBP post program.</li>
+      <li>We'll schedule a kickoff call to confirm priority communities, content topics, source coverage, and the initial GBP post program before any local claims are used.</li>
     </ul>
   </div>
   
@@ -637,31 +593,20 @@ async function generatePdf(html: string): Promise<Buffer> {
 
 export const proposalRouter = router({
   // Get available territories for proposal generation
-  getTerritories: publicProcedure.query(async () => {
-    // Import franchise data dynamically to avoid circular deps
-    const { DASHBOARD_DATA } = await import("../client/src/data/dashboardData");
-    const { FRANCHISE_LOCATIONS } = await import("../client/src/data/franchises");
-
-    return FRANCHISE_LOCATIONS
-      .filter((loc) => loc.status === "active" && DASHBOARD_DATA[loc.id])
-      .map((loc) => ({
-        id: loc.id,
-        name: loc.name,
-        city: loc.city,
-        state: loc.state,
-        country: loc.country,
-        revenue: DASHBOARD_DATA[loc.id]?.total_revenue || 0,
-      }));
+  getTerritories: adminProcedure.query(async () => {
+    return TERRITORY_CATALOG.map((territory) => ({
+      ...territory,
+      source: "approved_identity_mapping" as const,
+    }));
   }),
 
   // Backward-compatible PDF action; it only accepts an existing saved draft.
-  generate: publicProcedure
+  generate: adminProcedure
     .input(z.object({ draftId: z.string().uuid() }))
     .mutation(async ({ input }) => {
-      const { DASHBOARD_DATA } = await import("../client/src/data/dashboardData");
       const draft = await getReportDraft(input.draftId, "proposal");
-      const dashData = DASHBOARD_DATA[draft.territoryId];
-      if (!dashData) throw new Error(`No dashboard data for: ${draft.territoryId}`);
+      const territory = getTerritoryCatalogEntry(draft.territoryId);
+      if (!territory) throw new Error(`Territory not found: ${draft.territoryId}`);
       const pdfBuffer = await generatePdf(draft.html);
       const filename = `proposals/${draft.territoryId}_franchise_proposal_${Date.now()}.pdf`;
       const { url } = await storagePut(filename, pdfBuffer, "application/pdf");
@@ -671,36 +616,30 @@ export const proposalRouter = router({
         url,
         draftId: draft.id,
         html: draft.html,
-        territoryName: dashData.name,
+        territoryName: territory.name,
         generatedAt: new Date().toISOString(),
       };
     }),
 
   // Preview HTML (for in-browser preview without PDF generation)
-  preview: publicProcedure
+  preview: adminProcedure
     .input(proposalInputSchema)
     .mutation(async ({ input }) => {
-      const { DASHBOARD_DATA } = await import("../client/src/data/dashboardData");
-      const { FRANCHISE_LOCATIONS } = await import("../client/src/data/franchises");
-
-      const location = FRANCHISE_LOCATIONS.find((l) => l.id === input.territoryId);
-      if (!location) throw new Error(`Territory not found: ${input.territoryId}`);
-
-      const dashData = DASHBOARD_DATA[input.territoryId];
-      if (!dashData) throw new Error(`No dashboard data for: ${input.territoryId}`);
-      const reportingAnalytics = await loadTerritoryReportingAnalytics(input.territoryId);
+      const territory = getTerritoryCatalogEntry(input.territoryId);
+      if (!territory) throw new Error(`Territory not found: ${input.territoryId}`);
+      const [reportingAnalytics, workbook] = await Promise.all([
+        loadTerritoryReportingAnalytics(input.territoryId, INITIAL_SALES_REPORT_WINDOW),
+        loadTerritoryWorkbookAggregate(input.territoryId, territory.country === "CA" ? "CAD" : "USD", INITIAL_SALES_REPORT_WINDOW),
+      ]);
 
       const proposalData: ProposalData = {
         territoryId: input.territoryId,
-        territoryName: dashData.name,
-        city: location.city,
-        state: location.state,
-        country: location.country === "CA" ? "Canada" : "United States",
-        currency: dashData.currency,
-        totalRevenue: dashData.total_revenue,
-        topSuburbs: dashData.suburbs.slice(0, 8).map((s) => s.suburb),
-        topSpecies: dashData.species.slice(0, 5).map((s) => s.species),
-        seasonalTiming: getSeasonalTiming(location.state),
+        territoryName: territory.name,
+        city: territory.city,
+        state: territory.state,
+        country: territory.country === "CA" ? "Canada" : "United States",
+        currency: territory.country === "CA" ? "CAD" : "USD",
+        workbook,
         analytics: buildProposalAnalytics(reportingAnalytics),
       };
 
@@ -710,7 +649,7 @@ export const proposalRouter = router({
         reportType: "proposal",
         territoryId: input.territoryId,
         reportStart: `${reportingMonthIso(INITIAL_SALES_REPORT_WINDOW.start)}-01`,
-        reportEnd: "2026-06-30",
+        reportEnd: `${INITIAL_SALES_REPORT_WINDOW.end.year}-${String(INITIAL_SALES_REPORT_WINDOW.end.month).padStart(2, "0")}-01`,
         config: input.config,
         dataSnapshot: proposalData,
         html,
@@ -720,7 +659,7 @@ export const proposalRouter = router({
     }),
 
   // Export the exact reviewed preview; no second AI call can change the copy.
-  exportPdf: publicProcedure
+  exportPdf: adminProcedure
     .input(z.object({ draftId: z.string().uuid() }))
     .mutation(async ({ input }) => {
       const draft = await getReportDraft(input.draftId, "proposal");

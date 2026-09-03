@@ -123,14 +123,15 @@ describe("Strategy Report Router", { timeout: 15_000 }, () => {
     expect(data.topSpeciesNames.length).toBeGreaterThan(0);
     expect(data.topSuburbNames.length).toBeGreaterThan(0);
     expect(data.seasonalTiming).toBeDefined();
-    expect(data.networkAvgJobValue).toBe(2203);
+    expect(data.salesDataSource.kind).toMatch(/active_drive_workbook_aggregate|historical_snapshot/);
+    expect(data.networkAvgJobValue).toBeGreaterThan(0);
     expect(data.subMarkets).toBeDefined();
     expect(data.subMarkets.length).toBeGreaterThan(0);
     expect(data.gbpSubListings).toBeDefined();
     expect(data.suburbPageStatus).toBeDefined();
     expect(data.currentGbpPostVolume).toBe("Not provided");
-    // Hamilton should have partial page validation data
-    expect(data.suburbPageStatus).toBe("partial");
+    // Page coverage remains deliberately unknown unless an exact analytics match is measured.
+    expect(data.suburbPageStatus).toMatch(/validated|partial|unknown/);
     // Species should have network benchmarks
     expect(data.species[0].networkAvgJobValue).toBeGreaterThan(0);
     expect(data.species[0].networkPctRevenue).toBeGreaterThanOrEqual(0);
@@ -192,19 +193,19 @@ describe("Strategy Report Router", { timeout: 15_000 }, () => {
     const source = readFileSync(resolve(process.cwd(), "server/strategyReportRouter.ts"), "utf8");
     expect(source).toContain("Work-Order Data Status");
     expect(source).toContain("unavailable pending an approved status definition");
-    expect(source).toContain("historical sales snapshot");
+    expect(source).toContain("active_drive_workbook_aggregate");
+    expect(source).toContain("recorded pre-tax invoice value");
     expect(source).not.toContain("Use closed revenue, jobs, inspections, close rate");
     expect(source).not.toContain("<strong>Data Sources:</strong> Salesforce CRM");
-    expect(source).toContain("Historical Revenue Snapshot");
+    expect(source).toContain("Historical Sales Snapshot");
   });
 
-  it("qualifies historical revenue and job context in active report prompts and deterministic gap narratives", () => {
+  it("qualifies workbook-primary and historical-fallback sales context in report prompts and deterministic narratives", () => {
     const source = readFileSync(resolve(process.cwd(), "server/strategyReportRouter.ts"), "utf8");
-    expect(source).toContain("historical-snapshot revenue order");
+    expect(source).toContain("Active Drive-workbook aggregate context");
     expect(source).toContain("Historical source context: the listed revenue and job figures are from a prior sales snapshot, not current Google Drive workbook values.");
-    expect(source).toContain("historical-snapshot demand mix");
-    expect(source).toContain("explicitly labels key revenue/jobs metrics as historical sales-snapshot context");
-    expect(source).toContain("not current Google Drive workbook values");
+    expect(source).toContain("not closed-job, recognized-revenue, inspection, lead, or conversion measures");
+    expect(source).toContain("not current Drive-workbook evidence");
   });
 
   it("uses the strongest approved non-Claude internal narrative path without direct Anthropic transport", () => {

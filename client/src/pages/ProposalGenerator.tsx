@@ -98,14 +98,6 @@ export default function ProposalGenerator() {
     setPdfUrl(null);
   };
 
-  const formatRevenue = (revenue: number, id: string) => {
-    const territory = territories?.find((t) => t.id === id);
-    const symbol = territory?.country === "CA" ? "CA$" : "$";
-    return revenue >= 1_000_000
-      ? `${symbol}${(revenue / 1_000_000).toFixed(2)}M`
-      : `${symbol}${(revenue / 1_000).toFixed(0)}K`;
-  };
-
   if (user?.role !== "admin") {
     return (
       <PortalLayout>
@@ -142,8 +134,8 @@ export default function ProposalGenerator() {
             className="text-sm"
             style={{ color: "oklch(0.52 0.016 80)", fontFamily: "Inter, sans-serif" }}
           >
-            Generate branded 3-page franchise proposals with territory-specific data and
-            AI-written narrative.
+            Generate review-ready proposals using approved territory identity, disclosed
+            Drive-workbook aggregates, and persisted analytics where available.
           </div>
           <div
             className="mt-3"
@@ -195,7 +187,7 @@ export default function ProposalGenerator() {
                   <option value="">Choose a territory...</option>
                   {territories?.map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.name} — {formatRevenue(t.revenue, t.id)} T12 Revenue
+                      {t.name} — {t.city}, {t.state}
                     </option>
                   ))}
                 </select>
@@ -217,9 +209,9 @@ export default function ProposalGenerator() {
                     {selectedTerritoryData.city}, {selectedTerritoryData.state} ·{" "}
                     {selectedTerritoryData.country === "CA" ? "Canada" : "United States"}
                   </div>
-                  <div style={{ color: "oklch(0.75 0.18 140)", fontWeight: 600 }}>
-                    {formatRevenue(selectedTerritoryData.revenue, selectedTerritoryData.id)}{" "}
-                    trailing 12-month revenue
+                  <div style={{ color: "oklch(0.52 0.016 80)", fontWeight: 600 }}>
+                    Approved identity mapping only. The proposal will disclose active workbook
+                    and analytics source availability rather than relying on a static snapshot.
                   </div>
                 </div>
               )}
@@ -320,7 +312,7 @@ export default function ProposalGenerator() {
           <div className="flex gap-3 mt-5">
             <button
               onClick={handlePreview}
-              disabled={!selectedTerritory || !termsConfirmed || !draftId || generating}
+              disabled={!selectedTerritory || !termsConfirmed || generating}
               className="flex items-center gap-2 px-4 py-2 rounded-sm text-sm font-semibold transition-all"
               style={{
                 background: selectedTerritory && termsConfirmed && !generating ? "oklch(0.97 0.012 80)" : "oklch(0.94 0.008 80)",
@@ -500,8 +492,8 @@ export default function ProposalGenerator() {
               </p>
               <p>
                 <strong style={{ color: "oklch(0.32 0.015 65)" }}>2.</strong> Click
-                "Preview Proposal" to generate a branded 3-page proposal with
-                territory-specific data and AI-written narrative.
+                "Preview Proposal" to generate a branded draft that states which workbook and
+                analytics sources are available, partial, or unavailable.
               </p>
               <p>
                 <strong style={{ color: "oklch(0.32 0.015 65)" }}>3.</strong> Review the
@@ -516,8 +508,9 @@ export default function ProposalGenerator() {
               className="mt-4 text-xs"
               style={{ color: "oklch(0.65 0.010 80)", fontFamily: "Inter, sans-serif" }}
             >
-              The proposal auto-fills suburb names, revenue figures, seasonal timing, and
-              species data from the territory snapshot. Commercial terms always come from the confirmed inputs above; the opening narrative is generated once per draft.
+              Commercial terms always come from the confirmed inputs above. The draft does not
+              auto-fill revenue, rankings, seasonal facts, or local service claims from a static
+              territory snapshot; any available aggregate source context is labelled for review.
             </div>
           </div>
         )}
