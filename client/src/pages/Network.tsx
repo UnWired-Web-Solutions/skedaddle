@@ -66,7 +66,7 @@ export default function Network() {
           ) : (
             <>
               <div className="rounded-sm border p-4 mb-4 text-sm" style={{ borderColor: MIST, background: "oklch(0.975 0.008 80)", color: "oklch(0.40 0.015 65)" }}>
-                <strong style={{ color: FOREST }}>Source:</strong> Approved Google Drive workbook · active snapshot <strong>{workbook.activeRun.status}</strong>. Values are accepted work-order aggregates from the active snapshot, not Salesforce API data and not a trailing-12-month revenue claim. {workbook.activeRun.status === "partial" ? `${workbook.activeRun.rowsRejected.toLocaleString()} source rows were explicitly excluded from canonical territory aggregates.` : ""}
+                <strong style={{ color: FOREST }}>Source:</strong> Approved Google Drive workbook · <strong>{workbook.reportingWindow}</strong> · active snapshot <strong>{workbook.activeRun.status}</strong>. Values are accepted work-order aggregates from the stated completed-month window, not Salesforce API data and not a trailing-12-month revenue claim. {workbook.activeRun.status === "partial" ? `${workbook.activeRun.rowsRejected.toLocaleString()} source rows were explicitly excluded from canonical territory aggregates.` : ""}
               </div>
               <div className="rounded-sm border overflow-hidden" style={{ borderColor: MIST }}>
                 <table className="w-full" style={{ fontFamily: "Inter, sans-serif" }}>

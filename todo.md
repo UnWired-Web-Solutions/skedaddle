@@ -1,6 +1,9 @@
 # Skedaddle Franchise Portal — TODO
 
 ## Repository Updates Review (Aug 18, 2026)
+- [ ] Inspect, review, and safely integrate the newly available repository update; preserve source-provenance and authentication safeguards and verify the result before publishing
+- [ ] Selectively adapt safe workbook reporting-window and migration-integrity improvements from `codex/workbook-integrity-fixes`; preserve public procedures, fail-closed source rules, and current active-content protections
+- [x] Write a Codex-facing Markdown handoff that records adopted changes and the authorization, static-data, and stale-documentation changes intentionally omitted — `CODEX_WORKBOOK_INTEGRITY_ADAPTATION_2026-09-03.md` records the exact selective-adaptation and omission decisions
 - [x] Inspect and assess newly available repository updates before integration — `codex/meeting-report-priorities` validated (76 passed, 1 skipped); needs one GSC query-scope safeguard before merge
 - [x] Publish and verify the merged `codex/meeting-report-priorities` update — safeguard, merge, database migration, TypeScript, and 76 passing tests complete
 - [x] Generate and review a live Strategy Report Generator output after the Claude model repair — Hamilton completed all 13 sections with no Claude API error or missing-data placeholder

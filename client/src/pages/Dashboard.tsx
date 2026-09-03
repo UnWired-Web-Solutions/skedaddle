@@ -143,14 +143,14 @@ export default function Dashboard() {
             <ArrowLeft size={14} /> Back to {data.name}
           </Link>
           <span style={{ color: "#888", fontSize: 11 }}>
-            Salesforce-derived source: Google Drive workbook{workbookPerformance?.activeRun ? ` · active ${workbookPerformance.activeRun.status} snapshot` : " · no active canonical snapshot"}{hasGsc ? " · GSC connected" : ""}{hasGbp ? " · GBP connected" : ""}
+            Salesforce-derived source: Google Drive workbook{workbookPerformance?.activeRun ? ` · ${workbookPerformance.reportingWindow} · active ${workbookPerformance.activeRun.status} snapshot` : " · no active canonical snapshot"}{hasGsc ? " · GSC connected" : ""}{hasGbp ? " · GBP connected" : ""}
           </span>
         </div>
 
         {/* ── KPI Strip ── */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 40 }}>
           <KpiCard icon={DollarSign} label={workbookCurrency ? `Recorded Invoice Value (${workbookCurrency})` : "Recorded Invoice Value"} value={totalWorkbookInvoiceRows > 0 ? formatWorkbookMoney(totalWorkbookInvoiceValue) : "Pending"} sub={totalWorkbookInvoiceRows > 0 ? "Workbook pre-tax amounts; not Salesforce API" : "No canonical workbook amount available"} color={SAGE} />
-          <KpiCard icon={Users} label="Workbook Work Orders" value={workbookMonths.length ? totalWorkbookJobs.toLocaleString() : "Pending"} sub={workbookMonths.length ? "Last 12 source months; all statuses" : "No canonical workbook snapshot available"} color={SAGE} />
+          <KpiCard icon={Users} label="Workbook Work Orders" value={workbookMonths.length ? totalWorkbookJobs.toLocaleString() : "Pending"} sub={workbookMonths.length ? `${workbookPerformance?.reportingWindow}; all statuses` : "No canonical workbook snapshot available"} color={SAGE} />
           <KpiCard icon={TrendingUp} label="Top Species" value={workbookSpecies[0]?.label || "Pending"} sub={workbookSpecies[0] ? `${workbookSpecies[0].workOrders.toLocaleString()} recorded work orders` : "Workbook aggregate unavailable"} color={GOLD} />
           <KpiCard icon={MapPin} label="Top City" value={workbookCities[0]?.label || "Pending"} sub={workbookCities[0] ? `${workbookCities[0].workOrders.toLocaleString()} recorded work orders` : "Workbook aggregate unavailable"} color={GOLD} />
           {hasGsc && <KpiCard icon={Search} label="GSC Clicks" value={fmtN(data.gsc.total_clicks)} sub={`${gscTrend >= 0 ? "+" : ""}${gscTrend} vs prev month`} color={RUST} />}
@@ -159,7 +159,7 @@ export default function Dashboard() {
 
         {/* ── Workbook species breakdown ── */}
         <div style={{ background: CREAM, borderRadius: 10, padding: 24, border: `1px solid ${MIST}`, marginBottom: 32 }}>
-          <SectionHeader title="Work Orders by Species" subtitle="Active Google Drive workbook snapshot; all statuses retained" />
+          <SectionHeader title="Work Orders by Species" subtitle={workbookPerformance?.reportingWindow ? `Active Google Drive workbook · ${workbookPerformance.reportingWindow} · all statuses retained` : "Active Google Drive workbook snapshot; all statuses retained"} />
           {workbookSpecies.length ? <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}><thead><tr style={{ borderBottom: `2px solid ${MIST}` }}><th style={{ textAlign: "left", padding: "8px 12px", color: "#888", fontSize: 11 }}>SPECIES</th><th style={{ textAlign: "right", padding: "8px 12px", color: "#888", fontSize: 11 }}>WORK ORDERS</th><th style={{ textAlign: "right", padding: "8px 12px", color: "#888", fontSize: 11 }}>RECORDED INVOICE VALUE</th></tr></thead><tbody>{workbookSpecies.map((item, index) => <tr key={`${item.currencyCode}-${item.label}`} style={{ borderBottom: `1px solid ${MIST}` }}><td style={{ padding: "10px 12px", color: FOREST, fontWeight: index < 3 ? 600 : 400 }}>{item.label}</td><td style={{ padding: "10px 12px", textAlign: "right", color: "#666" }}>{item.workOrders.toLocaleString()}</td><td style={{ padding: "10px 12px", textAlign: "right", color: FOREST, fontWeight: 600 }}>{item.invoiceValueRows ? formatWorkbookMoney(item.invoicePreTaxAmount, item.currencyCode) : "Unavailable"}</td></tr>)}</tbody></table></div> : <p style={{ color: "#777", fontSize: 13, margin: 0 }}>Species aggregates are unavailable until a canonical workbook snapshot is active for this territory.</p>}
         </div>
 

@@ -17,6 +17,21 @@ export function reportingMonthKey(value: ReportingMonth): number {
   return value.year * 100 + value.month;
 }
 
+/**
+ * Returns the latest twelve fully completed UTC calendar months. This is the
+ * reporting window for current workbook performance surfaces; it deliberately
+ * excludes the partial month in which a request is made.
+ */
+export function latestTwelveCompletedMonths(asOf = new Date()): ReportingWindow {
+  const endDate = new Date(Date.UTC(asOf.getUTCFullYear(), asOf.getUTCMonth() - 1, 1));
+  const startDate = new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth() - 11, 1));
+  return {
+    start: { year: startDate.getUTCFullYear(), month: startDate.getUTCMonth() + 1 },
+    end: { year: endDate.getUTCFullYear(), month: endDate.getUTCMonth() + 1 },
+    sourceLabel: "Latest 12 completed UTC calendar months",
+  };
+}
+
 export function isMonthInWindow(year: number, month: number, window: ReportingWindow): boolean {
   const key = reportingMonthKey({ year, month });
   return key >= reportingMonthKey(window.start) && key <= reportingMonthKey(window.end);

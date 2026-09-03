@@ -5,8 +5,15 @@ import {
   salesforceWorkbookImportRuns,
   salesforceWorkbookSources,
 } from "../drizzle/schema";
+import { latestTwelveCompletedMonths, reportingWindowLabel, type ReportingWindow } from "../shared/reportingPeriod";
 import { publicProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
+
+function inWorkbookWindow(window: ReportingWindow) {
+  const start = window.start.year * 100 + window.start.month;
+  const end = window.end.year * 100 + window.end.month;
+  return sql`${salesforceWorkbookAggregates.periodYear} * 100 + ${salesforceWorkbookAggregates.periodMonth} BETWEEN ${start} AND ${end}`;
+}
 
 export function parseWorkbookCountJson(value: string | null): Record<string, number> {
   if (!value) return {};
@@ -127,7 +134,8 @@ export const salesforceWorkbookRouter = router({
   getTerritoryPerformance: publicProcedure
     .input(z.object({ territoryId: z.string().min(1).max(64) }))
     .query(async ({ input }) => {
-      const unavailable = { source: "unavailable" as const, activeRun: null, months: [], species: [], cities: [], conversionMetric: "unavailable_pending_status_definition" as const };
+      const reportingWindow = latestTwelveCompletedMonths();
+      const unavailable = { source: "unavailable" as const, activeRun: null, reportingWindow: reportingWindowLabel(reportingWindow), months: [], species: [], cities: [], conversionMetric: "unavailable_pending_status_definition" as const };
       const db = await getDb();
       if (!db) return unavailable;
       const sourceRows = await db.select().from(salesforceWorkbookSources).orderBy(desc(salesforceWorkbookSources.updatedAt)).limit(1);
@@ -140,6 +148,7 @@ export const salesforceWorkbookRouter = router({
       const baseFilters = [
         eq(salesforceWorkbookAggregates.importRunId, run.id),
         eq(salesforceWorkbookAggregates.territoryId, input.territoryId),
+        inWorkbookWindow(reportingWindow),
       ];
       const aggregateSelection = {
         label: salesforceWorkbookAggregates.speciesLabel,
@@ -204,6 +213,7 @@ export const salesforceWorkbookRouter = router({
       };
       return {
         source: "salesforce_drive_workbook" as const,
+        reportingWindow: reportingWindowLabel(reportingWindow),
         activeRun: { id: run.id, status: run.status, rowsRejected: run.rowsRejected, activatedAt: run.activatedAt, maxSourceModifiedAt: run.maxSourceModifiedAt },
         months: months.map(row => ({ year: row.year, month: row.month, currencyCode: row.currencyCode, workOrders: Number(row.workOrders), invoiceValueRows: Number(row.invoiceValueRows), invoicePreTaxAmount: Number(row.invoicePreTaxAmount) })).sort((a, b) => a.year - b.year || a.month - b.month),
         species: summarize(speciesRows, "label"),
@@ -213,7 +223,8 @@ export const salesforceWorkbookRouter = router({
     }),
 
   getNetworkPerformance: publicProcedure.query(async () => {
-    const unavailable = { source: "unavailable" as const, activeRun: null, territories: [] };
+    const reportingWindow = latestTwelveCompletedMonths();
+    const unavailable = { source: "unavailable" as const, activeRun: null, reportingWindow: reportingWindowLabel(reportingWindow), territories: [] };
     const db = await getDb();
     if (!db) return unavailable;
     const sourceRows = await db.select().from(salesforceWorkbookSources).orderBy(desc(salesforceWorkbookSources.updatedAt)).limit(1);
@@ -235,6 +246,7 @@ export const salesforceWorkbookRouter = router({
       eq(salesforceWorkbookAggregates.statusLabel, "__ALL__"),
       eq(salesforceWorkbookAggregates.speciesLabel, "__ALL__"),
       eq(salesforceWorkbookAggregates.cityLabel, "__ALL__"),
+      inWorkbookWindow(reportingWindow),
     )).groupBy(
       salesforceWorkbookAggregates.territoryId,
       salesforceWorkbookAggregates.currencyCode,
@@ -242,6 +254,7 @@ export const salesforceWorkbookRouter = router({
 
     return {
       source: "salesforce_drive_workbook" as const,
+      reportingWindow: reportingWindowLabel(reportingWindow),
       activeRun: {
         id: run.id,
         status: run.status,

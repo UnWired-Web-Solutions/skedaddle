@@ -26,12 +26,43 @@ const accountSchema = z.object({
 });
 
 const accountsSchema = z.array(accountSchema).min(1).max(100);
+const MAX_FAILED_LOGINS = 5;
+const FAILED_LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const MAX_RATE_LIMIT_KEYS = 1_000;
+const failedLogins = new Map<string, number[]>();
 
 function constantTimeMatch(expected: string, supplied: string): boolean {
   const expectedBytes = Buffer.from(expected, "utf8");
   const suppliedBytes = Buffer.from(supplied, "utf8");
   if (expectedBytes.length !== suppliedBytes.length) return false;
   return timingSafeEqual(expectedBytes, suppliedBytes);
+}
+
+function loginAttemptKey(ip: string | undefined, username: string): string {
+  return `${ip || "unknown"}\u0000${username.trim().toLowerCase()}`;
+}
+
+export function isLoginRateLimited(key: string, now = Date.now()): boolean {
+  const cutoff = now - FAILED_LOGIN_WINDOW_MS;
+  const recent = (failedLogins.get(key) ?? []).filter((timestamp) => timestamp > cutoff);
+  if (recent.length === 0) failedLogins.delete(key);
+  else failedLogins.set(key, recent);
+  return recent.length >= MAX_FAILED_LOGINS;
+}
+
+export function recordFailedLogin(key: string, now = Date.now()): void {
+  if (!failedLogins.has(key) && failedLogins.size >= MAX_RATE_LIMIT_KEYS) {
+    const oldestKey = failedLogins.keys().next().value;
+    if (oldestKey) failedLogins.delete(oldestKey);
+  }
+  const cutoff = now - FAILED_LOGIN_WINDOW_MS;
+  const recent = (failedLogins.get(key) ?? []).filter((timestamp) => timestamp > cutoff);
+  recent.push(now);
+  failedLogins.set(key, recent);
+}
+
+export function resetLoginRateLimitForTests(): void {
+  failedLogins.clear();
 }
 
 export function parseLocalAuthAccounts(raw: string | undefined): LocalAuthAccount[] {
@@ -78,14 +109,22 @@ export const localAuthRouter = router({
       username: z.string().trim().min(1).max(64),
       password: z.string().min(1).max(256),
     }))
-    .mutation(({ input }) => {
+    .mutation(({ input, ctx }) => {
+      const key = loginAttemptKey(ctx.req?.ip, input.username);
+      if (isLoginRateLimited(key)) {
+        return { success: false as const, reason: "rate_limited" as const };
+      }
       try {
         const user = authenticateLocalAccount(
           ENV.localAuthAccountsJson,
           input.username,
           input.password,
         );
-        if (!user) return { success: false as const, reason: "invalid_credentials" as const };
+        if (!user) {
+          recordFailedLogin(key);
+          return { success: false as const, reason: "invalid_credentials" as const };
+        }
+        failedLogins.delete(key);
         return { success: true as const, user };
       } catch {
         return { success: false as const, reason: "unavailable" as const };

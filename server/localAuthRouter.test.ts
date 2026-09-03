@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { authenticateLocalAccount, localAuthRouter, parseLocalAuthAccounts } from "./localAuthRouter";
+import {
+  authenticateLocalAccount,
+  isLoginRateLimited,
+  localAuthRouter,
+  parseLocalAuthAccounts,
+  recordFailedLogin,
+  resetLoginRateLimitForTests,
+} from "./localAuthRouter";
 
 const testAccounts = JSON.stringify([
   { username: "admin", password: "test-admin-password", role: "admin" },
@@ -42,5 +49,15 @@ describe("local server authentication", () => {
     expect(() => parseLocalAuthAccounts(JSON.stringify([
       { username: "missing-location", password: "password", role: "franchise" },
     ]))).toThrow(/locationId/i);
+  });
+
+  it("limits repeated failed attempts by normalized username and expires the limit", () => {
+    resetLoginRateLimitForTests();
+    const key = "127.0.0.1\u0000admin";
+    const startedAt = Date.UTC(2026, 8, 3, 12, 0, 0);
+    for (let attempt = 0; attempt < 5; attempt += 1) recordFailedLogin(key, startedAt + attempt);
+    expect(isLoginRateLimited(key, startedAt + 10)).toBe(true);
+    expect(isLoginRateLimited(key, startedAt + 15 * 60 * 1000 + 10)).toBe(false);
+    resetLoginRateLimitForTests();
   });
 });
